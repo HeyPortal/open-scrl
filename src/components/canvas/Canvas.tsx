@@ -6,6 +6,8 @@ import { useEditorSession } from '@/editor/sessionStore';
 import type { Layer as DocLayer, Slide } from '@/types';
 import { getSlideLayers } from '@/core/document/selectors';
 import { compileScene } from '@/core/scene/compileScene';
+import { findCrossedSlideSeams } from '@/core/scene/slideSeams';
+import { getCanvasScrollIntent } from '@/core/scene/scrollIntent';
 import { snapBox, type SnapGuide } from '@/lib/snap';
 import { ImageNode } from './ImageNode';
 import { TextNode } from './TextNode';
@@ -33,16 +35,17 @@ export function Canvas({ width, height }: { width: number; height: number }) {
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
-  const roots = useRef<Konva.Group[]>([]);
   const transformerRef = useRef<Konva.Transformer>(null);
   const layerNodes = useRef(new Map<string, Konva.Node>());
   const scrollPosition = useRef({ left: 0, top: 0 });
   const raf = useRef<number | null>(null);
   const touch = useRef<{ x:number; y:number; distance:number; zoom:number; left:number; top:number } | null>(null);
   const [visibleRange, setVisibleRange] = useState({ start: 0, end: 0 });
+  const [viewportOffset, setViewportOffset] = useState({ x: PADDING, y: PADDING });
   const [guides, setGuides] = useState<SnapGuide[]>([]);
   const [guideOffsetX, setGuideOffsetX] = useState(0);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
+  const [resizeSeams, setResizeSeams] = useState<{ x: number; y: number; height: number }[]>([]);
   const fmt = doc.format;
 
   const fitZoom = useMemo(() => !width || !height ? .5 : Math.max(MIN_ZOOM, Math.min((width-PADDING*2)/fmt.width,(height-PADDING*2)/fmt.height)), [width,height,fmt.width,fmt.height]);
@@ -50,15 +53,6 @@ export function Canvas({ width, height }: { width: number; height: number }) {
   const spacerWidth = Math.max(width, deckWidth * zoom + PADDING * 2);
   const spacerHeight = Math.max(height, fmt.height * zoom + PADDING * 2);
   const centeredY = Math.max(PADDING, Math.round((height - fmt.height * zoom) / 2));
-
-  const syncTransform = useCallback(() => {
-    const { left, top } = scrollPosition.current;
-    for (const root of roots.current) {
-      root.position({ x: PADDING - left, y: centeredY - top });
-      root.scale({ x: zoom, y: zoom });
-      root.getLayer()?.batchDraw();
-    }
-  }, [centeredY, zoom]);
 
   const updateVisible = useCallback(() => {
     const el = scrollRef.current; if (!el) return;
@@ -73,12 +67,21 @@ export function Canvas({ width, height }: { width: number; height: number }) {
     const el = scrollRef.current; if (!el) return;
     scrollPosition.current = { left: el.scrollLeft, top: el.scrollTop };
     if (raf.current !== null) return;
-    raf.current = requestAnimationFrame(() => { raf.current = null; syncTransform(); updateVisible(); });
-  }, [syncTransform, updateVisible]);
+    raf.current = requestAnimationFrame(() => {
+      raf.current = null;
+      const position = scrollPosition.current;
+      setViewportOffset({ x: PADDING - position.left, y: centeredY - position.top });
+      updateVisible();
+    });
+  }, [centeredY, updateVisible]);
 
   useEffect(() => () => { if (raf.current !== null) cancelAnimationFrame(raf.current); }, []);
   useLayoutEffect(() => { setZoom(fitZoom); }, [fitZoom, setZoom]);
-  useLayoutEffect(() => { syncTransform(); updateVisible(); }, [syncTransform, updateVisible]);
+  useLayoutEffect(() => {
+    const position = scrollPosition.current;
+    setViewportOffset({ x: PADDING - position.left, y: centeredY - position.top });
+    updateVisible();
+  }, [centeredY, updateVisible, zoom]);
 
   useEffect(() => {
     const el = scrollRef.current; if (!el) return;
@@ -101,7 +104,10 @@ export function Canvas({ width, height }: { width: number; height: number }) {
     const el = scrollRef.current; if (!el) return;
     event.evt.preventDefault();
     if (!event.evt.ctrlKey && !event.evt.metaKey) {
-      el.scrollBy({ left: event.evt.shiftKey ? event.evt.deltaY : event.evt.deltaX, top: event.evt.shiftKey ? 0 : event.evt.deltaY }); scheduleScrollSync(); return;
+      const intent=getCanvasScrollIntent({deltaX:event.evt.deltaX,deltaY:event.evt.deltaY,canScrollX:deckWidth*zoom+PADDING*2>width+1,canScrollY:fmt.height*zoom+PADDING*2>height+1,shiftKey:event.evt.shiftKey});
+      const left=Math.max(0,Math.min(el.scrollWidth-el.clientWidth,el.scrollLeft+intent.left));
+      const top=Math.max(0,Math.min(el.scrollHeight-el.clientHeight,el.scrollTop+intent.top));
+      el.scrollTo({left,top});scrollPosition.current={left,top};setViewportOffset({x:PADDING-left,y:centeredY-top});updateVisible();return;
     }
     const rect = el.getBoundingClientRect(); const pointerX = event.evt.clientX - rect.left; const pointerY = event.evt.clientY - rect.top;
     const contentX = (el.scrollLeft + pointerX - PADDING) / zoom; const contentY = (el.scrollTop + pointerY - centeredY) / zoom;
@@ -131,23 +137,22 @@ export function Canvas({ width, height }: { width: number; height: number }) {
     const slide = slideModel(slideId); const offset = pageX(slideId);
     const onSelect = (e: Konva.KonvaEventObject<MouseEvent|TouchEvent>) => { e.cancelBubble=true; if(selectedSlideId!==slideId)selectSlide(slideId);selectLayer(layer.id);if(layer.kind==='image'&&!layer.assetId)setLeftPanel('photos'); };
     const onDragStart = () => { selectSlide(slideId); selectLayer(layer.id); };
-    const onDragMove = (e: Konva.KonvaEventObject<DragEvent>) => { if(layer.locked||layer.kind==='image')return;const result=snap(slide,layer,localMoving(e.target,layer));e.target.position({x:result.x+layer.width/2,y:result.y+layer.height/2});setGuideOffsetX(offset);setGuides(result.guides); };
+    const onDragMove = (e: Konva.KonvaEventObject<DragEvent>) => { if(layer.locked)return;const result=snap(slide,layer,localMoving(e.target,layer));e.target.position({x:result.x+layer.width/2,y:result.y+layer.height/2});setGuideOffsetX(offset);setGuides(result.guides); };
     const onDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => { setGuides([]);if(layer.locked)return;const result=snap(slide,layer,localMoving(e.target,layer));updateLayer(layer.id,{x:result.x,y:result.y}); };
-    const onTransform = (e: Konva.KonvaEventObject<Event>) => { if(layer.locked)return;const moving=localMoving(e.target,layer,true);const result=snap(slide,layer,moving);e.target.position({x:result.x+moving.width/2,y:result.y+moving.height/2});setGuideOffsetX(offset);setGuides(result.guides); };
-    const onTransformEnd = (e: Konva.KonvaEventObject<Event>) => { if(layer.locked)return;const node=e.target;const moving=localMoving(node,layer,true);const result=snap(slide,layer,moving);node.scale({x:1,y:1});updateLayer(layer.id,{x:result.x,y:result.y,width:moving.width,height:moving.height,rotation:node.rotation()});setGuides([]); };
+    const onTransform = (e: Konva.KonvaEventObject<Event>) => { if(layer.locked)return;const moving=localMoving(e.target,layer,true);const result=snap(slide,layer,moving);e.target.position({x:result.x+moving.width/2,y:result.y+moving.height/2});setGuideOffsetX(offset);setGuides(result.guides);if(layer.kind==='image'){const seams=findCrossedSlideSeams({x:offset+result.x,y:result.y,width:moving.width,height:moving.height},fmt.width,doc.slideOrder.length);setResizeSeams(seams.map((x)=>({x,y:result.y,height:moving.height})));}else setResizeSeams([]); };
+    const onTransformEnd = (e: Konva.KonvaEventObject<Event>) => { setResizeSeams([]);if(layer.locked)return;const node=e.target;const moving=localMoving(node,layer,true);const result=snap(slide,layer,moving);node.scale({x:1,y:1});updateLayer(layer.id,{x:result.x,y:result.y,width:moving.width,height:moving.height,rotation:node.rotation()});setGuides([]); };
     const ref = (node: Konva.Node|null) => { if(node)layerNodes.current.set(layer.id,node);else layerNodes.current.delete(layer.id); };
     const props={onSelect,onDragStart,onDragMove,onDragEnd,onTransform,onTransformEnd};
     return <Group key={layer.id} x={offset}>{layer.kind==='image'?<ImageNode {...props} layer={layer} selected={selectedId===layer.id} groupRef={ref}/>:layer.kind==='shape'?<ShapeNode {...props} layer={layer} groupRef={ref}/>:<TextNode {...props} layer={layer} onDblClick={()=>setEditingTextId(layer.id)} nodeRef={ref}/>}</Group>;
   };
 
-  const rootRef = (index: number) => (node: Konva.Group|null) => { if(node) roots.current[index]=node; };
   return <div className="relative h-full w-full overflow-hidden bg-bg select-none">
-    <div ref={scrollRef} onScroll={scheduleScrollSync} className="absolute inset-0 overflow-auto scrollbar-thin"><div style={{width:spacerWidth,height:spacerHeight}} /></div>
+    <div ref={scrollRef} data-testid="canvas-scroll" onScroll={scheduleScrollSync} className="absolute inset-0 overflow-auto scrollbar-thin"><div style={{width:spacerWidth,height:spacerHeight}} /></div>
     <div className="absolute inset-0 pointer-events-auto overflow-hidden">
       <Stage ref={stageRef} width={Math.max(1,width)} height={Math.max(1,height)} onWheel={onWheel} onMouseDown={(e)=>{if(e.target===e.target.getStage())selectPageAtPointer();}} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={()=>{if(touch.current)selectPageAtPointer();touch.current=null;}}>
-        <KLayer listening={false}><Group ref={rootRef(0)}>{visibleSlides.map(({slide,index})=>{const x=index*fmt.width;return <Group key={slide.id} x={x}><Rect width={fmt.width} height={fmt.height} fill={slide.background.kind==='solid'?slide.background.color:'#fff'}/>{slide.background.kind==='gradient'&&<Rect width={fmt.width} height={fmt.height} fillLinearGradientStartPoint={{x:0,y:0}} fillLinearGradientEndPoint={{x:fmt.width*Math.cos(slide.background.angle*Math.PI/180),y:fmt.height*Math.sin(slide.background.angle*Math.PI/180)}} fillLinearGradientColorStops={[0,slide.background.from,1,slide.background.to]}/>}<Rect width={fmt.width} height={fmt.height} stroke={slide.id===selectedSlideId?'#7c5cff':'#2b2b35'} strokeWidth={(slide.id===selectedSlideId?3:1)/zoom}/></Group>;})}</Group></KLayer>
-        <KLayer><Group ref={rootRef(1)}>{visibleItems.map((item)=>renderNode(item.slideId,item.layer))}<Transformer ref={transformerRef} rotateEnabled anchorSize={10} anchorStroke="#7c5cff" anchorFill="#0b0b0f" borderStroke="#7c5cff" borderDash={[4,4]} keepRatio={active?.kind==='image'} ignoreStroke /></Group></KLayer>
-        <KLayer listening={false}><Group ref={rootRef(2)}>{guides.map((g,i)=>g.orientation==='v'?<Line key={i} points={[guideOffsetX+g.position,g.start,guideOffsetX+g.position,g.end]} stroke="#ff3b8a" strokeWidth={1/zoom}/>:<Line key={i} points={[guideOffsetX+g.start,g.position,guideOffsetX+g.end,g.position]} stroke="#ff3b8a" strokeWidth={1/zoom}/>)}</Group></KLayer>
+        <KLayer listening={false}><Group x={viewportOffset.x} y={viewportOffset.y} scaleX={zoom} scaleY={zoom}>{visibleSlides.map(({slide,index})=>{const x=index*fmt.width;return <Group key={slide.id} x={x}><Rect width={fmt.width} height={fmt.height} fill={slide.background.kind==='solid'?slide.background.color:'#fff'}/>{slide.background.kind==='gradient'&&<Rect width={fmt.width} height={fmt.height} fillLinearGradientStartPoint={{x:0,y:0}} fillLinearGradientEndPoint={{x:fmt.width*Math.cos(slide.background.angle*Math.PI/180),y:fmt.height*Math.sin(slide.background.angle*Math.PI/180)}} fillLinearGradientColorStops={[0,slide.background.from,1,slide.background.to]}/>}<Rect width={fmt.width} height={fmt.height} stroke={slide.id===selectedSlideId?'#7c5cff':'#2b2b35'} strokeWidth={(slide.id===selectedSlideId?3:1)/zoom}/></Group>;})}</Group></KLayer>
+        <KLayer><Group x={viewportOffset.x} y={viewportOffset.y} scaleX={zoom} scaleY={zoom}>{visibleItems.map((item)=>renderNode(item.slideId,item.layer))}<Transformer ref={transformerRef} rotateEnabled anchorSize={10} anchorStroke="#7c5cff" anchorFill="#0b0b0f" borderStroke="#7c5cff" borderDash={[4,4]} keepRatio={active?.kind==='image'} ignoreStroke /></Group></KLayer>
+        <KLayer listening={false}><Group x={viewportOffset.x} y={viewportOffset.y} scaleX={zoom} scaleY={zoom}>{resizeSeams.map((seam)=><Group key={`seam-${seam.x}`}><Rect x={seam.x-6/zoom} y={seam.y} width={12/zoom} height={seam.height} fill="#ff3b8a" opacity={0.2}/><Line points={[seam.x,seam.y,seam.x,seam.y+seam.height]} stroke="#ff3b8a" strokeWidth={3/zoom} dash={[10/zoom,6/zoom]}/></Group>)}{guides.map((g,i)=>g.orientation==='v'?<Line key={i} points={[guideOffsetX+g.position,g.start,guideOffsetX+g.position,g.end]} stroke="#ff3b8a" strokeWidth={1/zoom}/>:<Line key={i} points={[guideOffsetX+g.start,g.position,guideOffsetX+g.end,g.position]} stroke="#ff3b8a" strokeWidth={1/zoom}/>)}</Group></KLayer>
       </Stage>
     </div>
     {editingTextId&&active?.kind==='text'&&stageRef.current&&(
