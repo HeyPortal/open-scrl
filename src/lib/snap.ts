@@ -44,7 +44,8 @@ export function snapBox(
   cl.h.forEach((v) => targetsH.push({ value: v, from: canvasBox }));
 
   for (const layer of others) {
-    if (!layer.visible || layer.locked) continue;
+    // Locked layers cannot move, but remain useful alignment targets.
+    if (!layer.visible) continue;
     if (layer.rotation && layer.rotation % 360 !== 0) continue;
     const ll = lines(layer);
     ll.v.forEach((v) => targetsV.push({ value: v, from: layer }));

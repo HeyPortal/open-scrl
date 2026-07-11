@@ -17,3 +17,10 @@ test('imports, deduplicates, persists, and uses asset metadata',async({page})=>{
   await input.setInputFiles({name:'tiny-copy.png',mimeType:'image/png',buffer:tinyPng});await expect(page.getByText(/already been imported/).first()).toBeVisible();
   await page.getByAltText('tiny.png').click();await expect(page.getByText('Photo').last()).toBeVisible();await page.waitForTimeout(900);await page.reload();await page.getByText('Untitled',{exact:true}).click();await page.getByRole('button',{name:'Photos'}).click();await expect(page.getByAltText('tiny.png')).toBeVisible();
 });
+
+test('wheel scrolling moves the rendered carousel with the scroll container',async({page})=>{
+  await page.goto('/');await page.getByRole('button',{name:/create|start/i}).first().click();const scroll=page.getByTestId('canvas-scroll');await page.getByTitle('Add slide').click();await expect.poll(()=>scroll.evaluate((element)=>element.scrollLeft)).toBeGreaterThan(0);
+  const canvasFrame=()=>page.locator('canvas').first().evaluate((canvas)=>(canvas as HTMLCanvasElement).toDataURL());const beforeColor=await canvasFrame();
+  await page.getByRole('button',{name:'BG'}).click();await page.locator('.grid.grid-cols-6 button').nth(6).click();await expect.poll(canvasFrame).not.toBe(beforeColor);
+  await page.getByTitle('Slide 1').click();await expect.poll(()=>scroll.evaluate((element)=>element.scrollLeft)).toBe(0);const firstSlideFrame=await canvasFrame();const stage=await page.locator('.konvajs-content').boundingBox();expect(stage).not.toBeNull();await page.mouse.move(stage!.x+stage!.width/2,stage!.y+stage!.height/2);await page.mouse.wheel(0,700);await expect.poll(()=>scroll.evaluate((element)=>element.scrollLeft)).toBeGreaterThan(0);await expect.poll(canvasFrame).not.toBe(firstSlideFrame);
+});
