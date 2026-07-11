@@ -3,6 +3,8 @@ import { ChevronLeft, ChevronRight, Copy, Plus, Trash2 } from 'lucide-react';
 import { useEditor } from '@/store/editor';
 import { useAssets } from '@/store/assets';
 import type { Slide } from '@/types';
+import { materializeSlides } from '@/core/document/selectors';
+import { useEditorSession } from '@/editor/sessionStore';
 
 function SlidePreview({
   slide,
@@ -205,11 +207,11 @@ const SlideThumb = memo(function SlideThumb({
 
 export function Filmstrip() {
   const doc = useEditor((s) => s.doc);
-  const slides = doc.slides;
+  const slides = materializeSlides(doc);
   const format = doc.format;
   const thumbs = useAssets((s) => s.thumbs);
-  const selected = useEditor((s) => s.selectedSlideId);
-  const select = useEditor((s) => s.selectSlide);
+  const selected = useEditorSession((s) => s.selectedSlideId);
+  const select = useEditorSession((s) => s.selectSlide);
   const addSlide = useEditor((s) => s.addSlide);
   const dup = useEditor((s) => s.duplicateSlide);
   const del = useEditor((s) => s.deleteSlide);

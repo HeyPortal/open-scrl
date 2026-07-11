@@ -10,6 +10,7 @@ import {
 import { useEditor } from '@/store/editor';
 import { FORMATS } from '@/lib/format';
 import { exportAllAsZip, exportSlide } from '@/lib/export';
+import { useEditorSession } from '@/editor/sessionStore';
 
 export function TopBar() {
   const docName = useEditor((s) => s.doc.name);
@@ -23,7 +24,7 @@ export function TopBar() {
   const past = useEditor((s) => s.past);
   const future = useEditor((s) => s.future);
   const doc = useEditor((s) => s.doc);
-  const selectedSlideId = useEditor((s) => s.selectedSlideId);
+  const selectedSlideId = useEditorSession((s) => s.selectedSlideId);
 
   const [exporting, setExporting] = useState(false);
   const [progress, setProgress] = useState<string>('');
@@ -31,7 +32,7 @@ export function TopBar() {
   const exportCurrent = async () => {
     setExporting(true);
     try {
-      const idx = doc.slides.findIndex((s) => s.id === selectedSlideId);
+      const idx = doc.slideOrder.indexOf(selectedSlideId);
       await exportSlide(doc, Math.max(0, idx));
     } finally {
       setExporting(false);

@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react';
 import { Trash2, Upload } from 'lucide-react';
-import type { Asset } from '@/types';
+import type { AssetMeta } from '@/types';
 import { useAssets } from '@/store/assets';
 import { useEditor } from '@/store/editor';
+import { useEditorSession } from '@/editor/sessionStore';
 
 export function PhotosPanel() {
   const assets = useAssets((s) => s.assets);
@@ -18,8 +19,8 @@ export function PhotosPanel() {
 
   const addImageLayer = useEditor((s) => s.addImageLayer);
   const updateLayer = useEditor((s) => s.updateLayer);
-  const selectedLayerId = useEditor((s) => s.selectedLayerId);
-  const doc = useEditor((s) => s.doc);
+  const selectedLayerId = useEditorSession((s) => s.selectedLayerId);
+  const selectedLayer = useEditor((s) => selectedLayerId ? s.doc.layers[selectedLayerId] : undefined);
 
   const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -32,15 +33,10 @@ export function PhotosPanel() {
   };
 
   const findSelectedImageLayer = () => {
-    if (!selectedLayerId) return null;
-    for (const sl of doc.slides) {
-      const l = sl.layers.find((x) => x.id === selectedLayerId);
-      if (l && l.kind === 'image') return l;
-    }
-    return null;
+    return selectedLayerId && selectedLayer?.kind === 'image' ? selectedLayer : null;
   };
 
-  const handleAssetClick = (asset: Asset) => {
+  const handleAssetClick = (asset: AssetMeta) => {
     const sel = findSelectedImageLayer();
     if (sel) {
       updateLayer(sel.id, { assetId: asset.id, locked: false });

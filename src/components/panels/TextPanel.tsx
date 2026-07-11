@@ -1,4 +1,5 @@
 import { useEditor } from '@/store/editor';
+import { useEditorSession } from '@/editor/sessionStore';
 
 const PRESETS = [
   { name: 'Big headline', text: 'BIG IDEA', size: 200, weight: 800 },
@@ -11,24 +12,19 @@ const PRESETS = [
 export function TextPanel() {
   const addText = useEditor((s) => s.addTextLayer);
   const updateLayer = useEditor((s) => s.updateLayer);
-  const doc = useEditor((s) => s.doc);
-  const selectedLayerId = useEditor((s) => s.selectedLayerId);
+  const selectedLayerId = useEditorSession((s) => s.selectedLayerId);
+  const selectedLayer = useEditor((s) => selectedLayerId ? s.doc.layers[selectedLayerId] : undefined);
 
   const apply = (preset: (typeof PRESETS)[number]) => {
     const sel = (() => {
-      if (!selectedLayerId) return null;
-      for (const sl of doc.slides) {
-        const l = sl.layers.find((x) => x.id === selectedLayerId);
-        if (l && l.kind === 'text') return l;
-      }
-      return null;
+      return selectedLayerId && selectedLayer?.kind === 'text' ? selectedLayer : null;
     })();
     if (sel) {
       updateLayer(sel.id, { text: preset.text, fontSize: preset.size, fontWeight: preset.weight });
     } else {
       addText(preset.text);
       setTimeout(() => {
-        const id = useEditor.getState().selectedLayerId;
+        const id = useEditorSession.getState().selectedLayerId;
         if (id) updateLayer(id, { fontSize: preset.size, fontWeight: preset.weight });
       }, 0);
     }

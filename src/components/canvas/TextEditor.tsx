@@ -7,10 +7,12 @@ interface Props {
   layer: TextLayer;
   stage: Konva.Stage;
   offsetX?: number;
+  scale?: number;
+  viewportOffset?: { x: number; y: number };
   onClose: () => void;
 }
 
-export function TextEditor({ layer, stage, offsetX = 0, onClose }: Props) {
+export function TextEditor({ layer, stage, offsetX = 0, scale: scaleProp, viewportOffset, onClose }: Props) {
   const updateLayer = useEditor((s) => s.updateLayer);
   const ref = useRef<HTMLTextAreaElement | null>(null);
 
@@ -21,10 +23,10 @@ export function TextEditor({ layer, stage, offsetX = 0, onClose }: Props) {
     el.select();
   }, []);
 
-  const scale = stage.scaleX();
+  const scale = scaleProp ?? stage.scaleX();
   const stageBox = stage.container().getBoundingClientRect();
-  const x = stageBox.left + (offsetX + layer.x) * scale + stage.x();
-  const y = stageBox.top + layer.y * scale + stage.y();
+  const x = stageBox.left + (offsetX + layer.x) * scale + (viewportOffset?.x ?? stage.x());
+  const y = stageBox.top + layer.y * scale + (viewportOffset?.y ?? stage.y());
   const w = layer.width * scale;
 
   return (

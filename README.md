@@ -18,9 +18,10 @@ Early-stage personal project. Phase 1 MVP is functional:
   duplicate, delete.
 - Image, text, shape (rect / ellipse) layers with full inspector panel.
 - Solid + linear gradient backgrounds.
-- Undo / redo (80 step history), keyboard shortcuts.
+- Transactional undo / redo (80 steps with a 32 MB patch budget), keyboard shortcuts.
 - Per-slide PNG export and full-project ZIP export.
-- Autosave to IndexedDB every 5 s; reopens to your last project.
+- Transactional autosave to IndexedDB; reopens existing projects through a versioned migration.
+- Viewport-sized canvas rendering, worker imports/exports, OPFS-backed originals, and bounded decoded-image memory.
 - Installable PWA.
 
 See `PLAN.md` for the long-term roadmap.
@@ -52,27 +53,33 @@ npm run preview    # preview the build
 
 ## Tech
 
-Vite + React 19 + TypeScript · Konva (`react-konva`) for canvas · Zustand +
-Immer for state with undo/redo · Tailwind v3 · `@dnd-kit/sortable` for layer
-reorder · `idb-keyval` for IndexedDB persistence · `jszip` for export ·
-`vite-plugin-pwa` for service worker + manifest.
+Vite + React 19 + TypeScript · Konva (`react-konva`) for the viewport renderer ·
+Zustand + Immer patches for state/history · Tailwind v3 · `@dnd-kit/sortable`
+for layer reorder · `idb` + OPFS for local persistence · worker-backed Canvas2D
+export + Zip.js · `vite-plugin-pwa` for service worker + manifest.
 
 ## Layout
 
 ```
 src/
-  App.tsx                        shell + autosave + global hotkeys
+  App.tsx                        lazy shell + autosave + global hotkeys
+  app/EditorShell.tsx            editor-only lazy boundary
   main.tsx                       entry
   index.css                      tailwind + component classes
   types.ts                       Document / Slide / Layer model
-  store/
-    editor.ts                    Zustand store, undo/redo, mutations
+  core/                          framework-independent document + scene model
+  editor/                        document/session stores, history, persistence
+  assets/                        metadata repository, OPFS/IDB storage, imports
+  export/                        shared Canvas2D renderer + export worker
+  render/                        Konva viewport + bounded image resources
+  storage/                       transactional IndexedDB database
+  store/                         compatibility exports + asset UI state
   lib/
     format.ts                    canvas size presets
     grids.ts                     photo grid template definitions
     snap.ts                      snapping math (returns guides)
-    assets.ts                    IndexedDB asset store
-    export.ts                    Konva off-screen render → PNG / ZIP
+    assets.ts                    asset repository compatibility facade
+    export.ts                    worker export compatibility facade
     nano.ts                      ids + helpers
   components/
     TopBar.tsx                   project name, format, undo/redo, export

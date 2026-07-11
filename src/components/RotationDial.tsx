@@ -21,9 +21,11 @@ type Props = {
   onChange: (degrees: number) => void;
   disabled?: boolean;
   size?: number;
+  onInteractionStart?: () => void;
+  onInteractionEnd?: (cancelled: boolean) => void;
 };
 
-export function RotationDial({ value, onChange, disabled, size = 92 }: Props) {
+export function RotationDial({ value, onChange, disabled, size = 92, onInteractionStart, onInteractionEnd }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const display = norm360(value);
   const r = (size / 2) * 0.72;
@@ -46,6 +48,7 @@ export function RotationDial({ value, onChange, disabled, size = 92 }: Props) {
   const onPointerDown = (e: React.PointerEvent) => {
     if (disabled) return;
     e.preventDefault();
+    onInteractionStart?.();
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     applyFromClient(e.clientX, e.clientY);
   };
@@ -57,6 +60,7 @@ export function RotationDial({ value, onChange, disabled, size = 92 }: Props) {
 
   const onPointerUp = (e: React.PointerEvent) => {
     (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    onInteractionEnd?.(e.type === 'pointercancel');
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {

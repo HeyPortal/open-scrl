@@ -72,6 +72,36 @@ export interface Document {
   updatedAt: number;
 }
 
+/** Persisted project format. Layers are normalized so a layer update does not
+ * recreate every slide and consumers can subscribe by id. */
+export interface ProjectDocumentV2 {
+  schemaVersion: 2;
+  revision: number;
+  id: string;
+  name: string;
+  format: Format;
+  slideOrder: string[];
+  slides: Record<string, SlideRecord>;
+  layers: Record<string, Layer>;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface SlideRecord {
+  id: string;
+  background: Background;
+  layerOrder: string[];
+}
+
+export type PersistedDocument = Document | ProjectDocumentV2;
+
+export interface Bounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface Asset {
   id: string;
   name: string;
@@ -81,4 +111,16 @@ export interface Asset {
   blob: Blob;
   size?: number;
   hash?: string;
+}
+
+export interface AssetMeta {
+  id: string;
+  blobKey: string;
+  thumbnailKey: string;
+  hash: string;
+  name: string;
+  mime: string;
+  width: number;
+  height: number;
+  size: number;
 }

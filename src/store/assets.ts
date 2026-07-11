@@ -7,16 +7,17 @@ import {
   isLikelyImageFile,
   listAssets,
 } from '@/lib/assets';
-import type { Asset } from '@/types';
+import type { AssetMeta } from '@/types';
 import { useToasts } from './toasts';
+import { useEditor } from './editor';
 
 interface AssetsState {
-  assets: Asset[];
+  assets: AssetMeta[];
   thumbs: Record<string, string>;
   ready: boolean;
   importMessage: string | null;
   loadAll: () => Promise<void>;
-  importFiles: (files: File[] | FileList) => Promise<Asset[]>;
+  importFiles: (files: File[] | FileList) => Promise<AssetMeta[]>;
   remove: (id: string) => Promise<void>;
   clearImportMessage: () => void;
 }
@@ -52,7 +53,7 @@ export const useAssets = create<AssetsState>((set, get) => ({
       });
       return [];
     }
-    const imported: Asset[] = [];
+    const imported: AssetMeta[] = [];
     const duplicates: string[] = [];
     const failed: string[] = [];
     for (const f of arr) {
@@ -108,6 +109,9 @@ export const useAssets = create<AssetsState>((set, get) => ({
   },
 
   remove: async (id) => {
+    const doc = useEditor.getState().doc;
+    const references = Object.values(doc.layers).filter((layer) => layer.kind === 'image' && layer.assetId === id).length;
+    if (references > 0 && !window.confirm(`This photo is used by ${references} layer${references === 1 ? '' : 's'}. Delete it anyway? Those layers will show a missing-photo placeholder.`)) return;
     await idbDelete(id);
     const next = get().assets.filter((a) => a.id !== id);
     const thumbs = { ...get().thumbs };
