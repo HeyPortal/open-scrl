@@ -25,7 +25,15 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
+        globIgnores: ['**/heic2any-*.js', '**/export.worker-*.js', '**/zip-*.js'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+        runtimeCaching: [
+          {
+            urlPattern: /\/(?:assets\/)?(?:heic2any|export\.worker|zip)[^/]*\.js$/,
+            handler: 'CacheFirst',
+            options: { cacheName: 'optional-editor-tools', expiration: { maxEntries: 8, maxAgeSeconds: 60 * 60 * 24 * 30 } },
+          },
+        ],
       },
     }),
   ],
@@ -37,5 +45,15 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
+  },
+  worker: { format: 'es' },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(moduleId) {
+          if (moduleId.includes('@zip.js/zip.js')) return 'zip';
+        },
+      },
+    },
   },
 });

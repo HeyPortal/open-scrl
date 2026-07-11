@@ -1,0 +1,44 @@
+import type { Document, PersistedDocument, ProjectDocumentV2 } from '@/types';
+import { CURRENT_SCHEMA_VERSION, getSchemaVersion, isDocumentV2, isLegacyDocument } from './schema';
+
+export class UnsupportedDocumentVersionError extends Error {
+  readonly version: number;
+  constructor(version: number) {
+    super(`This project uses unsupported schema version ${version}.`);
+    this.version = version;
+    this.name = 'UnsupportedDocumentVersionError';
+  }
+}
+
+export function migrateV1ToV2(legacy: Document): ProjectDocumentV2 {
+  const slides: ProjectDocumentV2['slides'] = {};
+  const layers: ProjectDocumentV2['layers'] = {};
+  const slideOrder: string[] = [];
+  for (const slide of legacy.slides) {
+    slideOrder.push(slide.id);
+    slides[slide.id] = {
+      id: slide.id,
+      background: slide.background,
+      layerOrder: slide.layers.map((layer) => layer.id),
+    };
+    for (const layer of slide.layers) layers[layer.id] = layer;
+  }
+  return {
+    schemaVersion: CURRENT_SCHEMA_VERSION,
+    revision: 0,
+    id: legacy.id,
+    name: legacy.name,
+    format: legacy.format,
+    slideOrder,
+    slides,
+    layers,
+    createdAt: legacy.createdAt,
+    updatedAt: legacy.updatedAt,
+  };
+}
+
+export function migrateDocument(value: PersistedDocument | unknown): ProjectDocumentV2 {
+  if (isDocumentV2(value)) return value;
+  if (isLegacyDocument(value)) return migrateV1ToV2(value);
+  throw new UnsupportedDocumentVersionError(getSchemaVersion(value));
+}

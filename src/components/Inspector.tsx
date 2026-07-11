@@ -1,9 +1,22 @@
-import type { CSSProperties, KeyboardEvent, ReactNode } from 'react';
-import { useEditor, selectActiveLayer } from '@/store/editor';
+import { useRef, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
+import { useEditor } from '@/store/editor';
+import { useEditorSession } from '@/editor/sessionStore';
 import { round } from '@/lib/nano';
 import type { Layer, ShapeLayer, TextLayer } from '@/types';
 import { AlignCenter, AlignLeft, AlignRight, Droplet, Italic, Lock } from 'lucide-react';
 import { RotationDial } from './RotationDial';
+
+function useLayerGesture(layerId: string, label: string) {
+  const beginTransaction = useEditor((s) => s.beginTransaction);
+  const commitTransaction = useEditor((s) => s.commitTransaction);
+  const cancelTransaction = useEditor((s) => s.cancelTransaction);
+  const transaction = useRef<string | null>(null);
+  return {
+    begin: () => { if (!transaction.current) transaction.current = beginTransaction(label, `gesture:${layerId}:${label}`); },
+    end: () => { if (transaction.current) commitTransaction(transaction.current); transaction.current = null; },
+    cancel: () => { if (transaction.current) cancelTransaction(transaction.current); transaction.current = null; },
+  };
+}
 
 function clampNum(n: number, min?: number, max?: number) {
   let v = n;
@@ -102,6 +115,8 @@ function LayoutSection({
 }) {
   const locked = layer.locked;
   const opacityPct = Math.round(layer.opacity * 100);
+  const opacityGesture = useLayerGesture(layer.id, 'Change opacity');
+  const rotationGesture = useLayerGesture(layer.id, 'Rotate layer');
 
   return (
     <div className="border-b border-line px-3 py-3">
@@ -163,6 +178,8 @@ function LayoutSection({
               value={layer.rotation}
               onChange={(v) => onPatch({ rotation: v })}
               disabled={locked}
+              onInteractionStart={rotationGesture.begin}
+              onInteractionEnd={(cancelled) => cancelled ? rotationGesture.cancel() : rotationGesture.end()}
             />
           </div>
         </div>
@@ -182,6 +199,9 @@ function LayoutSection({
               step={0.01}
               value={layer.opacity}
               onChange={(e) => onPatch({ opacity: Number(e.target.value) })}
+              onPointerDown={opacityGesture.begin}
+              onPointerUp={opacityGesture.end}
+              onPointerCancel={opacityGesture.cancel}
               className="opacity-range"
               style={{ '--opacity-fill': `${opacityPct}%` } as CSSProperties}
               aria-valuetext={`${opacityPct} percent`}
@@ -223,6 +243,9 @@ function cornerRadiusFillPct(radius: number, max: number) {
 function TextInspector({ layer }: { layer: TextLayer }) {
   const updateLayer = useEditor((s) => s.updateLayer);
   const u = (patch: Partial<TextLayer>) => updateLayer(layer.id, patch);
+  const sizeGesture = useLayerGesture(layer.id, 'Change font size');
+  const lineGesture = useLayerGesture(layer.id, 'Change line height');
+  const spacingGesture = useLayerGesture(layer.id, 'Change letter spacing');
 
   return (
     <div className="border-b border-line px-3 py-3">
@@ -290,6 +313,9 @@ function TextInspector({ layer }: { layer: TextLayer }) {
                   max={FONT_SIZE_MAX}
                   value={layer.fontSize}
                   onChange={(e) => u({ fontSize: Number(e.target.value) })}
+                  onPointerDown={sizeGesture.begin}
+                  onPointerUp={sizeGesture.end}
+                  onPointerCancel={sizeGesture.cancel}
                   className="inspector-range"
                   style={{ '--range-fill': fontSizeFillPct(layer.fontSize) } as CSSProperties}
                   aria-valuetext={`${layer.fontSize} pixels`}
@@ -369,6 +395,9 @@ function TextInspector({ layer }: { layer: TextLayer }) {
                 step={0.05}
                 value={layer.lineHeight}
                 onChange={(e) => u({ lineHeight: Number(e.target.value) })}
+                onPointerDown={lineGesture.begin}
+                onPointerUp={lineGesture.end}
+                onPointerCancel={lineGesture.cancel}
                 className="inspector-range"
                 style={{ '--range-fill': lineHeightFillPct(layer.lineHeight) } as CSSProperties}
                 aria-valuetext={String(layer.lineHeight)}
@@ -387,6 +416,9 @@ function TextInspector({ layer }: { layer: TextLayer }) {
                 max={LETTER_SPACING_MAX}
                 value={layer.letterSpacing}
                 onChange={(e) => u({ letterSpacing: Number(e.target.value) })}
+                onPointerDown={spacingGesture.begin}
+                onPointerUp={spacingGesture.end}
+                onPointerCancel={spacingGesture.cancel}
                 className="inspector-range"
                 style={{ '--range-fill': letterSpacingFillPct(layer.letterSpacing) } as CSSProperties}
                 aria-valuetext={`${layer.letterSpacing} pixels`}
@@ -405,6 +437,7 @@ function ShapeInspector({ layer }: { layer: ShapeLayer }) {
   const strokePickerValue = layer.stroke === 'transparent' ? '#000000' : layer.stroke;
   const cornerMax = Math.min(layer.width, layer.height) / 2;
   const cornerFill = cornerRadiusFillPct(layer.cornerRadius, cornerMax);
+  const cornerGesture = useLayerGesture(layer.id, 'Change corner radius');
 
   return (
     <div className="border-b border-line px-3 py-3">
@@ -451,6 +484,9 @@ function ShapeInspector({ layer }: { layer: ShapeLayer }) {
                 max={cornerMax}
                 value={layer.cornerRadius}
                 onChange={(e) => u({ cornerRadius: Number(e.target.value) })}
+                onPointerDown={cornerGesture.begin}
+                onPointerUp={cornerGesture.end}
+                onPointerCancel={cornerGesture.cancel}
                 className="inspector-range"
                 style={{ '--range-fill': cornerFill } as CSSProperties}
                 aria-valuetext={`${Math.round(layer.cornerRadius)} pixels`}
@@ -464,7 +500,8 @@ function ShapeInspector({ layer }: { layer: ShapeLayer }) {
 }
 
 export function Inspector() {
-  const layer = useEditor(selectActiveLayer);
+  const selectedLayerId = useEditorSession((s) => s.selectedLayerId);
+  const layer = useEditor((s) => selectedLayerId ? s.doc.layers[selectedLayerId] : undefined);
   const updateLayer = useEditor((s) => s.updateLayer);
 
   if (!layer) {

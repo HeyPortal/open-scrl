@@ -2,22 +2,9 @@ import { useEffect, useState } from 'react';
 import { Circle, Group, Image as KImage, Line, Rect, Text } from 'react-konva';
 import type Konva from 'konva';
 import type { ImageLayer } from '@/types';
-import { getAsset, getAssetUrl, getAssetUrlSync } from '@/lib/assets';
-
-const MAX_EDITOR_IMAGE_EDGE = 1600;
+import { imageResourceManager } from '@/render/resources/ImageResourceManager';
 
 type DrawableImage = HTMLImageElement | ImageBitmap;
-const editorBitmapCache = new Map<string, Promise<ImageBitmap | null>>();
-
-function bitmapResizeOptions(width: number, height: number): ImageBitmapOptions {
-  const scale = Math.min(1, MAX_EDITOR_IMAGE_EDGE / Math.max(width, height));
-  if (scale >= 1) return {};
-  return {
-    resizeWidth: Math.max(1, Math.round(width * scale)),
-    resizeHeight: Math.max(1, Math.round(height * scale)),
-    resizeQuality: 'high',
-  };
-}
 
 interface Props {
   layer: ImageLayer;
@@ -54,51 +41,16 @@ export function ImageNode({
       return;
     }
 
-    const loadFallbackImage = (url: string) => {
-      const im = new Image();
-      im.onload = () => {
-        if (!cancelled) setImg(im);
-      };
-      im.onerror = () => {
-        if (!cancelled) setMissing(true);
-      };
-      im.src = url;
-    };
-
-    const loadBitmap = async () => {
-      if (!layer.assetId || !('createImageBitmap' in window)) return false;
-      let bitmapPromise = editorBitmapCache.get(layer.assetId);
-      if (!bitmapPromise) {
-        bitmapPromise = getAsset(layer.assetId).then((asset) => {
-          if (!asset) return null;
-          return createImageBitmap(asset.blob, bitmapResizeOptions(asset.width, asset.height));
-        });
-        editorBitmapCache.set(layer.assetId, bitmapPromise);
-      }
-      const bitmap = await bitmapPromise;
-      if (cancelled || !bitmap) return !!bitmap;
-      setImg(bitmap);
-      return true;
-    };
-
-    const load = (url: string) => {
-      loadBitmap().catch(() => false).then((loaded) => {
-        if (!cancelled && !loaded) loadFallbackImage(url);
-      });
-    };
-
-    const cached = getAssetUrlSync(layer.assetId);
-    if (cached) load(cached);
-    else
-      getAssetUrl(layer.assetId).then((url) => {
-        if (cancelled) return;
-        if (!url) setMissing(true);
-        else load(url);
-      });
+    const assetId = layer.assetId;
+    const requestedEdge = Math.max(layer.width, layer.height);
+    imageResourceManager.acquire(assetId, requestedEdge).then((bitmap) => {
+      if (!cancelled) setImg(bitmap);
+    }).catch(() => { if (!cancelled) setMissing(true); });
     return () => {
       cancelled = true;
+      imageResourceManager.release(assetId, requestedEdge);
     };
-  }, [layer.assetId]);
+  }, [layer.assetId, layer.height, layer.width]);
 
   const cx = layer.x + layer.width / 2;
   const cy = layer.y + layer.height / 2;

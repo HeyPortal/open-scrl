@@ -1,5 +1,6 @@
 import { Grid3x3, Image, Palette, Square, Type } from 'lucide-react';
-import { useEditor, type LeftPanel } from '@/store/editor';
+import type { LeftPanel } from '@/store/editor';
+import { useEditorSession } from '@/editor/sessionStore';
 
 const TABS: { id: LeftPanel; label: string; icon: typeof Image }[] = [
   { id: 'templates', label: 'Grids', icon: Grid3x3 },
@@ -10,8 +11,8 @@ const TABS: { id: LeftPanel; label: string; icon: typeof Image }[] = [
 ];
 
 export function LeftRail() {
-  const left = useEditor((s) => s.leftPanel);
-  const setLeft = useEditor((s) => s.setLeftPanel);
+  const left = useEditorSession((s) => s.leftPanel);
+  const setLeft = useEditorSession((s) => s.setLeftPanel);
   return (
     <div className="w-16 bg-bg-rail border-r border-line flex flex-col">
       {TABS.map((t) => {

@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
 import { useSortable, SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import {
@@ -24,7 +24,9 @@ import {
   Trash2,
   Type,
 } from 'lucide-react';
-import { useEditor, selectActiveSlide } from '@/store/editor';
+import { useEditor } from '@/store/editor';
+import { materializeSlide } from '@/core/document/selectors';
+import { useEditorSession } from '@/editor/sessionStore';
 import type { ImageLayer, Layer } from '@/types';
 
 const layerIcon = (l: Layer) =>
@@ -160,7 +162,7 @@ function LayerRow({ layer, selected }: RowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: layer.id,
   });
-  const select = useEditor((s) => s.selectLayer);
+  const select = useEditorSession((s) => s.selectLayer);
   const toggleVisible = useEditor((s) => s.toggleVisible);
   const toggleLocked = useEditor((s) => s.toggleLocked);
   const del = useEditor((s) => s.deleteLayer);
@@ -269,9 +271,11 @@ function LayerRow({ layer, selected }: RowProps) {
 }
 
 export function LayersPanel() {
-  const slide = useEditor(selectActiveSlide);
-  const selectedId = useEditor((s) => s.selectedLayerId);
-  const updateLayers = useEditor((s) => s.updateLayer);
+  const doc = useEditor((s) => s.doc);
+  const selectedSlideId = useEditorSession((s) => s.selectedSlideId);
+  const slide = useMemo(() => materializeSlide(doc, selectedSlideId || doc.slideOrder[0]), [doc, selectedSlideId]);
+  const selectedId = useEditorSession((s) => s.selectedLayerId);
+  const setLayerOrder = useEditor((s) => s.setLayerOrder);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
   if (!slide) return null;
@@ -287,21 +291,7 @@ export function LayersPanel() {
     const [m] = reorderedReversed.splice(oldIdx, 1);
     reorderedReversed.splice(newIdx, 0, m);
     const newOrder = reorderedReversed.reverse();
-    // map order to direct mutation: we update by re-assigning slide.layers via a noop patch trick.
-    // Simpler: dispatch through editor's internal reorder by computing required swaps.
-    const editor = (window as unknown as { __editor: typeof useEditor }).__editor;
-    void editor; // not used - keep typing happy
-    void updateLayers;
-    useEditor.setState((state) => {
-      const nextDoc = JSON.parse(JSON.stringify(state.doc));
-      const sl = nextDoc.slides.find((x: { id: string }) => x.id === slide.id);
-      if (sl) sl.layers = newOrder;
-      return {
-        doc: { ...nextDoc, updatedAt: Date.now() },
-        past: [...state.past, state.doc].slice(-80),
-        future: [],
-      };
-    });
+    setLayerOrder(slide.id, newOrder.map((layer) => layer.id));
   };
 
   return (

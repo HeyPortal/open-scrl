@@ -1,4 +1,5 @@
-import { useEditor, selectActiveSlide } from '@/store/editor';
+import { useEditor } from '@/store/editor';
+import { useEditorSession } from '@/editor/sessionStore';
 
 const SOLIDS = [
   '#ffffff',
@@ -25,7 +26,8 @@ const GRADIENTS: { from: string; to: string; angle: number }[] = [
 
 export function BackgroundPanel() {
   const setBackground = useEditor((s) => s.setBackground);
-  const slide = useEditor(selectActiveSlide);
+  const selectedSlideId = useEditorSession((s) => s.selectedSlideId);
+  const slide = useEditor((s) => s.doc.slides[selectedSlideId || s.doc.slideOrder[0]]);
 
   return (
     <div className="flex flex-col h-full overflow-auto scrollbar-thin">
