@@ -1,5 +1,6 @@
 import type { Asset, AssetMeta } from '@/types';
 import { AssetImportController, DuplicateAssetError } from '@/assets/AssetImportController';
+import type { PreparedAsset } from '@/assets/AssetRepository';
 import { assetRepository } from '@/assets/indexeddb/IndexedDbAssetRepository';
 import { imageResourceManager } from '@/render/resources/ImageResourceManager';
 
@@ -8,6 +9,8 @@ export { DuplicateAssetError };
 let importer: AssetImportController | null | undefined;
 const originalUrls = new Map<string, { url: string; touched: number }>();
 const thumbUrls = new Map<string, string>();
+const generatedThumbnails = new Map<string, Promise<Blob | undefined>>();
+let thumbnailGenerationTail: Promise<void> = Promise.resolve();
 const MAX_ORIGINAL_URLS = 12;
 
 const IMAGE_EXTENSIONS = new Set(['jpg','jpeg','png','webp','gif','bmp','svg','avif','heic','heif']);
@@ -53,33 +56,44 @@ async function prepareOnMain(file: File) {
   bitmap.close(); return result;
 }
 
-export async function importAsset(file: File): Promise<AssetMeta> {
+async function importPrepared(prepared: PreparedAsset, projectId: string) {
+  const duplicate = await assetRepository.findByHash(prepared.hash);
+  if (duplicate) {
+    if (await assetRepository.isLinkedToProject(projectId, duplicate.id)) throw new DuplicateAssetError(duplicate);
+    await assetRepository.linkToProject(projectId, duplicate.id);
+    return duplicate;
+  }
+  return assetRepository.commit(prepared, projectId);
+}
+
+export async function importAsset(file: File, projectId: string): Promise<AssetMeta> {
   if (file.type.startsWith('video/') || VIDEO_EXTENSIONS.has(extension(file.name))) {
-    const prepared = await prepareVideo(file); const duplicate = await assetRepository.findByHash(prepared.hash);
-    if (duplicate) throw new DuplicateAssetError(duplicate);
-    return assetRepository.commit(prepared);
+    return importPrepared(await prepareVideo(file), projectId);
   }
   if (importer === undefined) importer = typeof Worker !== 'undefined' ? new AssetImportController(assetRepository, 2) : null;
-  if (importer) return importer.import(file);
-  const prepared = await prepareOnMain(file); const duplicate = await assetRepository.findByHash(prepared.hash);
-  if (duplicate) throw new DuplicateAssetError(duplicate);
-  return assetRepository.commit(prepared);
+  if (importer) return importer.import(file, projectId);
+  return importPrepared(await prepareOnMain(file), projectId);
 }
 
 export async function getAsset(assetId: string): Promise<Asset | undefined> {
-  const [meta, blob] = await Promise.all([assetRepository.listMetadata().then((all)=>all.find((x)=>x.id===assetId)), assetRepository.readOriginal(assetId)]);
+  const [meta, blob] = await Promise.all([assetRepository.readMetadata(assetId), assetRepository.readOriginal(assetId)]);
   return meta && blob ? { id: meta.id, name: meta.name, mime: meta.mime, width: meta.width, height: meta.height, size: meta.size, hash: meta.hash, blob, mediaKind: meta.mediaKind, duration: meta.duration } : undefined;
 }
 
-export async function deleteAsset(assetId: string) {
+export async function getAssetMetadata(assetId: string) {
+  return assetRepository.readMetadata(assetId);
+}
+
+export async function deleteAsset(assetId: string, projectId: string) {
+  const removed = await assetRepository.remove(assetId, projectId);
+  if (!removed) return;
   const original = originalUrls.get(assetId); if (original) URL.revokeObjectURL(original.url);
   const thumb = thumbUrls.get(assetId); if (thumb) URL.revokeObjectURL(thumb);
   originalUrls.delete(assetId); thumbUrls.delete(assetId); imageResourceManager.removeAsset(assetId);
-  await assetRepository.remove(assetId);
 }
 
 export async function listAssetIds() { return (await assetRepository.listMetadata()).map((a)=>a.id); }
-export async function listAssets() { return assetRepository.listMetadata(); }
+export async function listAssets(projectId: string) { return assetRepository.listMetadata(projectId); }
 
 export async function getAssetUrl(assetId: string): Promise<string | undefined> {
   const cached = originalUrls.get(assetId); if (cached) { cached.touched = performance.now(); return cached.url; }
@@ -92,10 +106,68 @@ export async function getAssetUrl(assetId: string): Promise<string | undefined> 
   return url;
 }
 
+async function createStoredThumbnail(assetId: string): Promise<Blob | undefined> {
+  const [meta, original] = await Promise.all([
+    assetRepository.readMetadata(assetId),
+    assetRepository.readOriginal(assetId),
+  ]);
+  if (!meta || !original) return undefined;
+  const scale = Math.min(1, 240 / Math.max(meta.width, meta.height));
+  const width = Math.max(1, Math.round(meta.width * scale));
+  const height = Math.max(1, Math.round(meta.height * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+
+  if (meta.mediaKind === 'video' || meta.mime.startsWith('video/')) {
+    const originalUrl = URL.createObjectURL(original);
+    try {
+      const video = document.createElement('video');
+      video.muted = true;
+      video.preload = 'auto';
+      video.src = originalUrl;
+      await new Promise<void>((resolve, reject) => {
+        video.onloadeddata = () => resolve();
+        video.onerror = () => reject(new Error('This browser could not create a video thumbnail.'));
+      });
+      canvas.getContext('2d')?.drawImage(video, 0, 0, width, height);
+    } finally {
+      URL.revokeObjectURL(originalUrl);
+    }
+  } else {
+    const bitmap = await createImageBitmap(original, {
+      resizeWidth: width,
+      resizeHeight: height,
+      resizeQuality: 'high',
+    });
+    canvas.getContext('2d')?.drawImage(bitmap, 0, 0, width, height);
+    bitmap.close();
+  }
+
+  const thumbnail = await canvasBlob(canvas);
+  await assetRepository.writeThumbnail(assetId, thumbnail);
+  return thumbnail;
+}
+
+async function ensureStoredThumbnail(assetId: string) {
+  const existing = await assetRepository.readThumbnail(assetId);
+  if (existing) return existing;
+  let work = generatedThumbnails.get(assetId);
+  if (!work) {
+    work = thumbnailGenerationTail
+      .then(() => createStoredThumbnail(assetId))
+      .finally(() => generatedThumbnails.delete(assetId));
+    thumbnailGenerationTail = work.then(() => undefined, () => undefined);
+    generatedThumbnails.set(assetId, work);
+  }
+  return work;
+}
+
 export async function getAssetThumbUrl(assetId: string): Promise<string | undefined> {
   const cached = thumbUrls.get(assetId); if (cached) return cached;
-  const blob = (await assetRepository.readThumbnail(assetId)) ?? await assetRepository.readOriginal(assetId); if (!blob) return undefined;
-  const url = URL.createObjectURL(blob); thumbUrls.set(assetId, url); return url;
+  const thumbnail = await ensureStoredThumbnail(assetId);
+  if (!thumbnail) return undefined;
+  const url = URL.createObjectURL(thumbnail); thumbUrls.set(assetId, url); return url;
 }
 
 export function getAssetUrlSync(assetId: string) { return originalUrls.get(assetId)?.url; }

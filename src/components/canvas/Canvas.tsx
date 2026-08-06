@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { Group, Layer as KLayer, Line, Rect, Stage, Transformer } from 'react-konva';
 import Konva from 'konva';
 import { useEditor } from '@/store/editor';
+import { useAssets } from '@/store/assets';
 import { useEditorSession } from '@/editor/sessionStore';
 import type { Layer as DocLayer, Slide } from '@/types';
 import { getSlideLayers } from '@/core/document/selectors';
@@ -18,13 +19,14 @@ const SNAP_THRESHOLD_PX = 6;
 const PADDING = 12;
 const MIN_ZOOM = 0.05;
 const MAX_ZOOM = 4;
-const BUFFER_SLIDES = 1;
+const BUFFER_SLIDES = 0;
 const EDITOR_PIXEL_RATIO = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
 Konva.pixelRatio = EDITOR_PIXEL_RATIO;
 
 export function Canvas({ width, height }: { width: number; height: number }) {
   const doc = useEditor((s) => s.doc);
   const selectedSlideId = useEditorSession((s) => s.selectedSlideId);
+  const slideFocusRequest = useEditorSession((s) => s.slideFocusRequest);
   const selectedId = useEditorSession((s) => s.selectedLayerId);
   const active = useEditor((s) => selectedId ? s.doc.layers[selectedId] : undefined);
   const zoom = useEditorSession((s) => s.zoom);
@@ -33,6 +35,7 @@ export function Canvas({ width, height }: { width: number; height: number }) {
   const selectLayer = useEditorSession((s) => s.selectLayer);
   const updateLayer = useEditor((s) => s.updateLayer);
   const setLeftPanel = useEditorSession((s) => s.setLeftPanel);
+  const assets = useAssets((s) => s.assets);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
@@ -40,6 +43,7 @@ export function Canvas({ width, height }: { width: number; height: number }) {
   const layerNodes = useRef(new Map<string, Konva.Node>());
   const scrollPosition = useRef({ left: 0, top: 0 });
   const raf = useRef<number | null>(null);
+  const pendingFocusDraw = useRef<{ x: number; y: number } | null>(null);
   const touch = useRef<{ x:number; y:number; distance:number; zoom:number; left:number; top:number } | null>(null);
   const [visibleRange, setVisibleRange] = useState({ start: 0, end: 0 });
   const [viewportOffset, setViewportOffset] = useState({ x: PADDING, y: PADDING });
@@ -48,6 +52,7 @@ export function Canvas({ width, height }: { width: number; height: number }) {
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [resizeSeams, setResizeSeams] = useState<{ x: number; y: number; height: number }[]>([]);
   const fmt = doc.format;
+  const assetsById = useMemo(() => new Map(assets.map((asset) => [asset.id, asset])), [assets]);
 
   const fitZoom = useMemo(() => !width || !height ? .5 : Math.max(MIN_ZOOM, Math.min((width-PADDING*2)/fmt.width,(height-PADDING*2)/fmt.height)), [width,height,fmt.width,fmt.height]);
   const deckWidth = doc.slideOrder.length * fmt.width;
@@ -84,13 +89,26 @@ export function Canvas({ width, height }: { width: number; height: number }) {
     updateVisible();
   }, [centeredY, updateVisible, zoom]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = scrollRef.current; if (!el) return;
     const index = doc.slideOrder.indexOf(selectedSlideId); if (index < 0) return;
     const center = PADDING + (index + .5) * fmt.width * zoom;
     el.scrollTo({ left: Math.max(0, center - el.clientWidth / 2), behavior: 'auto' });
-    scheduleScrollSync();
-  }, [doc.slideOrder, fmt.width, scheduleScrollSync, selectedSlideId, zoom]);
+    if (raf.current !== null) { cancelAnimationFrame(raf.current); raf.current = null; }
+    const position = { left: el.scrollLeft, top: el.scrollTop };
+    scrollPosition.current = position;
+    const nextOffset = { x: PADDING - position.left, y: centeredY - position.top };
+    pendingFocusDraw.current = nextOffset;
+    setViewportOffset(nextOffset);
+    updateVisible();
+  }, [centeredY, doc.slideOrder, fmt.width, selectedSlideId, slideFocusRequest, updateVisible, zoom]);
+
+  useLayoutEffect(() => {
+    const pending = pendingFocusDraw.current;
+    if (!pending || pending.x !== viewportOffset.x || pending.y !== viewportOffset.y) return;
+    stageRef.current?.draw();
+    pendingFocusDraw.current = null;
+  }, [viewportOffset, visibleRange]);
 
   useEffect(() => {
     const tr = transformerRef.current; if (!tr) return;
@@ -144,7 +162,7 @@ export function Canvas({ width, height }: { width: number; height: number }) {
     const onTransformEnd = (e: Konva.KonvaEventObject<Event>) => { setResizeSeams([]);if(layer.locked)return;const node=e.target;const moving=localMoving(node,layer,true);const result=snap(slide,layer,moving);node.scale({x:1,y:1});updateLayer(layer.id,{x:result.x,y:result.y,width:moving.width,height:moving.height,rotation:node.rotation()});setGuides([]); };
     const ref = (node: Konva.Node|null) => { if(node)layerNodes.current.set(layer.id,node);else layerNodes.current.delete(layer.id); };
     const props={onSelect,onDragStart,onDragMove,onDragEnd,onTransform,onTransformEnd};
-    return <Group key={layer.id} x={offset}>{layer.kind==='image'?<ImageNode {...props} layer={layer} selected={selectedId===layer.id} groupRef={ref} renderScale={zoom*EDITOR_PIXEL_RATIO}/>:layer.kind==='shape'?<ShapeNode {...props} layer={layer} groupRef={ref}/>:<TextNode {...props} layer={layer} onDblClick={()=>setEditingTextId(layer.id)} nodeRef={ref}/>}</Group>;
+    return <Group key={layer.id} x={offset}>{layer.kind==='image'?<ImageNode {...props} layer={layer} asset={layer.assetId ? assetsById.get(layer.assetId) : undefined} activeSlide={selectedSlideId===slideId} selected={selectedId===layer.id} groupRef={ref} renderScale={zoom*EDITOR_PIXEL_RATIO}/>:layer.kind==='shape'?<ShapeNode {...props} layer={layer} groupRef={ref}/>:<TextNode {...props} layer={layer} onDblClick={()=>setEditingTextId(layer.id)} nodeRef={ref}/>}</Group>;
   };
 
   return <div className="relative h-full w-full overflow-hidden bg-bg select-none">

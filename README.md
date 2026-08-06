@@ -19,10 +19,11 @@ Early-stage personal project. Phase 1 MVP is functional:
 - Image, text, shape (rect / ellipse) layers with full inspector panel.
 - Solid + linear gradient backgrounds.
 - Transactional undo / redo (80 steps with a 32 MB patch budget), keyboard shortcuts.
-- Per-slide PNG export and full-project H.264 MP4 export for Instagram.
+- Instagram carousel export packages every slide separately: lossless PNG for static slides and high-quality H.264 MP4 for animated slides.
 - Transactional autosave to IndexedDB; reopens existing projects through a versioned migration.
-- Viewport-sized canvas rendering, worker imports, OPFS-backed originals, and bounded decoded-image memory.
-- Resolution-aware 1024/2048/4096px preview tiers with delayed detail upgrades and a 192 MB LRU-style bitmap budget.
+- Project-scoped media libraries with persistent 240px thumbnails, worker imports, and OPFS-backed originals.
+- Viewport-sized canvas rendering and bounded decoded-image memory.
+- Resolution-aware 512/1024/2048/4096px preview tiers with lightweight navigation frames, selected-item detail upgrades, and a 192 MB LRU-style bitmap budget.
 - Installable PWA.
 
 See `PLAN.md` for the long-term roadmap.

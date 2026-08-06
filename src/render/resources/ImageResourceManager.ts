@@ -1,7 +1,8 @@
 import { assetRepository } from '@/assets/indexeddb/IndexedDbAssetRepository';
+import type { AssetMeta } from '@/types';
 
 interface Entry { key: string; assetId: string; bitmap: ImageBitmap; bytes: number; refs: number; touched: number }
-const BUCKETS = [1024, 2048, 4096];
+const BUCKETS = [512, 1024, 2048, 4096];
 
 export class ImageResourceManager {
   private entries = new Map<string, Entry>();
@@ -10,13 +11,20 @@ export class ImageResourceManager {
   constructor(maxBytes = 192 * 1024 * 1024) { this.maxBytes = maxBytes; }
 
   private bucket(edge: number) { return BUCKETS.find((b) => b >= edge) ?? BUCKETS.at(-1)!; }
-  async acquire(assetId: string, requestedEdge: number): Promise<ImageBitmap> {
+  async acquire(
+    assetId: string,
+    requestedEdge: number,
+    knownMetadata?: Pick<AssetMeta, 'width' | 'height'>,
+  ): Promise<ImageBitmap> {
     const bucket = this.bucket(requestedEdge); const key = `${assetId}:${bucket}`; const cached = this.entries.get(key);
     if (cached) { cached.refs++; cached.touched = performance.now(); return cached.bitmap; }
     let work = this.pending.get(key);
     if (!work) {
       work = (async () => {
-        const [blob, meta] = await Promise.all([assetRepository.readOriginal(assetId), assetRepository.listMetadata().then((all) => all.find((a) => a.id === assetId))]);
+        const [blob, meta] = await Promise.all([
+          assetRepository.readOriginal(assetId),
+          knownMetadata ? Promise.resolve(knownMetadata) : assetRepository.readMetadata(assetId),
+        ]);
         if (!blob || !meta) throw new Error('Asset missing.');
         const scale = Math.min(1, bucket / Math.max(meta.width, meta.height));
         const bitmap = await createImageBitmap(blob, { resizeWidth: Math.max(1, Math.round(meta.width * scale)), resizeHeight: Math.max(1, Math.round(meta.height * scale)), resizeQuality: 'high' });

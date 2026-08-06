@@ -3,14 +3,14 @@ import {
   Download,
   FileImage,
   FilePlus2,
-  Film,
   House,
+  Package,
   Redo2,
   Undo2,
 } from 'lucide-react';
 import { useEditor } from '@/store/editor';
 import { FORMATS } from '@/lib/format';
-import { exportProjectAsVideo, exportSlide } from '@/lib/export';
+import { exportInstagramCarousel, exportSlide } from '@/lib/export';
 import { useEditorSession } from '@/editor/sessionStore';
 import { useToasts } from '@/store/toasts';
 
@@ -28,6 +28,7 @@ export function TopBar() {
   const doc = useEditor((s) => s.doc);
   const selectedSlideId = useEditorSession((s) => s.selectedSlideId);
   const addToast = useToasts((s) => s.addToast);
+  const selectedSlideIndex = doc.slideOrder.indexOf(selectedSlideId);
 
   const [exporting, setExporting] = useState(false);
   const [progress, setProgress] = useState<string>('');
@@ -35,8 +36,7 @@ export function TopBar() {
   const exportCurrent = async () => {
     setExporting(true);
     try {
-      const idx = doc.slideOrder.indexOf(selectedSlideId);
-      await exportSlide(doc, Math.max(0, idx));
+      await exportSlide(doc, Math.max(0, selectedSlideIndex));
     } finally {
       setExporting(false);
     }
@@ -44,11 +44,12 @@ export function TopBar() {
 
   const exportVideo = async () => {
     setExporting(true);
+    setProgress('Preparing…');
     try {
-      await exportProjectAsVideo(doc, (i, t) => setProgress(`${Math.round(i / t * 100)}%`));
-      addToast('MP4 export finished.', 'success');
+      await exportInstagramCarousel(doc, setProgress);
+      addToast('Instagram carousel export finished.', 'success');
     } catch (error) {
-      addToast(error instanceof Error ? error.message : 'Video export failed.', 'error');
+      addToast(error instanceof Error ? error.message : 'Carousel export failed.', 'error');
     } finally {
       setExporting(false);
       setProgress('');
@@ -136,8 +137,9 @@ export function TopBar() {
         className="ctrl-btn ctrl-btn-primary"
         disabled={exporting}
         onClick={exportVideo}
+        title="Export every slide for Instagram as separate PNG or MP4 files"
       >
-        <Film size={14} /> Export MP4
+        <Package size={14} /> Export Carousel
       </button>
     </div>
   );

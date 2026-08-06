@@ -8,6 +8,7 @@ import { migrateDocument } from '@/core/document/migrations';
 import { command, type EditorCommand } from '@/core/document/commands';
 import { getSlideLayers, materializeSlide } from '@/core/document/selectors';
 import { listProjectSummaries, preserveLegacyBackup, readProject, writeProject, type StoredProjectSummary } from '@/storage/database';
+import { assetRepository } from '@/assets/indexeddb/IndexedDbAssetRepository';
 import { useEditorSession } from './sessionStore';
 
 enablePatches();
@@ -149,7 +150,33 @@ export const useDocumentStore = create<EditorState>((set, get) => ({
   selectSlide: (selectedSlideId) => { useEditorSession.getState().selectSlide(selectedSlideId); set({ selectedSlideId, selectedLayerId: null }); },
   selectLayer: (selectedLayerId) => { useEditorSession.getState().selectLayer(selectedLayerId); set({ selectedLayerId }); },
 
-  loadFromDisk: async () => set({ projects: await listProjectSummaries(), ready: true }),
+  loadFromDisk: async () => {
+    const projects = await listProjectSummaries();
+    try {
+      if (await assetRepository.needsProjectScopeMigration()) {
+        const scopes: { projectId: string; assetIds: string[] }[] = [];
+        for (const project of projects) {
+          try {
+            const stored = await readProject(project.id);
+            if (!stored) continue;
+            const doc = migrateDocument(stored);
+            const assetIds = Object.values(doc.layers)
+              .filter((layer): layer is ImageLayer => layer.kind === 'image' && Boolean(layer.assetId))
+              .map((layer) => layer.assetId as string);
+            scopes.push({ projectId: project.id, assetIds });
+          } catch (error) {
+            console.warn(`Could not inspect media references for project ${project.id}.`, error);
+          }
+        }
+        await assetRepository.migrateProjectScopes(scopes, projects[0]?.id);
+      }
+    } catch (error) {
+      // Project loading should never be held hostage by an optional media
+      // migration. The editor can still open and retry on the next launch.
+      console.error('Could not migrate project media libraries.', error);
+    }
+    set({ projects, ready: true });
+  },
   saveToDisk: async () => {
     const { activeProjectId, doc, projects } = get();
     if (!activeProjectId) return;

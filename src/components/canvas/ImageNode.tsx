@@ -1,16 +1,30 @@
 import { useEffect, useRef, useState } from 'react';
 import { Group, Image as KImage, Line, Rect, Text } from 'react-konva';
 import Konva from 'konva';
-import type { ImageLayer } from '@/types';
-import { getAsset, getAssetUrl, listAssets } from '@/lib/assets';
+import type { AssetMeta, ImageLayer } from '@/types';
+import { getAsset, getAssetMetadata, getAssetThumbUrl, getAssetUrl } from '@/lib/assets';
 import { imageResourceManager } from '@/render/resources/ImageResourceManager';
-import { createAnimatedGifCanvas, stopAnimatedGifCanvas } from '@/lib/gif';
+import { getMediaKind, setVideoElementPlaying } from '@/lib/media';
+import {
+  createAnimatedGifCanvas,
+  setAnimatedGifCanvasPlaying,
+  stopAnimatedGifCanvas,
+} from '@/lib/gif';
 
-const BASE_EDITOR_IMAGE_EDGE = 1024;
-const EDITOR_IMAGE_TIERS = [BASE_EDITOR_IMAGE_EDGE, 2048, 4096] as const;
-const DETAIL_UPGRADE_DELAY_MS = 180;
+const NAVIGATION_IMAGE_EDGE = 512;
+const EDITOR_IMAGE_TIERS = [NAVIGATION_IMAGE_EDGE, 1024, 2048, 4096] as const;
+const DETAIL_UPGRADE_DELAY_MS = 400;
 
 type DrawableImage = HTMLImageElement | HTMLVideoElement | HTMLCanvasElement | ImageBitmap;
+
+function loadImage(url: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = reject;
+    image.src = url;
+  });
+}
 
 function chooseEditorImageTier(layer: ImageLayer, renderScale: number) {
   const edge = Math.max(layer.width, layer.height) * renderScale * Math.max(1, layer.cropScale ?? 1);
@@ -19,6 +33,8 @@ function chooseEditorImageTier(layer: ImageLayer, renderScale: number) {
 
 interface Props {
   layer: ImageLayer;
+  asset?: AssetMeta;
+  activeSlide: boolean;
   selected: boolean;
   onSelect: (e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => void;
   onDragStart: () => void;
@@ -30,56 +46,75 @@ interface Props {
   renderScale: number;
 }
 
-export function ImageNode({ layer, selected, onSelect, onDragStart, onDragMove, onDragEnd, onTransform, onTransformEnd, groupRef, renderScale }: Props) {
+export function ImageNode({ layer, asset, activeSlide, selected, onSelect, onDragStart, onDragMove, onDragEnd, onTransform, onTransformEnd, groupRef, renderScale }: Props) {
   const [baseImg, setBaseImg] = useState<DrawableImage | null>(null);
   const [detailImg, setDetailImg] = useState<ImageBitmap | null>(null);
-  const [detailEdge, setDetailEdge] = useState(BASE_EDITOR_IMAGE_EDGE);
+  const [detailEdge, setDetailEdge] = useState(NAVIGATION_IMAGE_EDGE);
   const [animated, setAnimated] = useState(false);
   const [missing, setMissing] = useState(false);
   const imageRef = useRef<Konva.Image | null>(null);
-  const requestedEdge = chooseEditorImageTier(layer, renderScale);
+  const idealEdge = chooseEditorImageTier(layer, renderScale);
+  const requestedEdge = !activeSlide
+    ? NAVIGATION_IMAGE_EDGE
+    : selected
+      ? idealEdge
+      : Math.min(1024, idealEdge);
+  const knownKind = asset ? getMediaKind(asset) : undefined;
+  const loadAnimatedOriginal = selected && knownKind !== 'image';
 
   useEffect(() => {
     let cancelled = false;
     let video: HTMLVideoElement | null = null;
     let gifCanvas: HTMLCanvasElement | null = null;
     let acquiredBase = false;
-    setBaseImg(null); setDetailImg(null); setDetailEdge(BASE_EDITOR_IMAGE_EDGE); setAnimated(false); setMissing(false);
+    setBaseImg(null); setDetailImg(null); setDetailEdge(NAVIGATION_IMAGE_EDGE); setAnimated(false); setMissing(false);
     if (!layer.assetId) { setMissing(true); return; }
     const assetId = layer.assetId;
 
-    listAssets().then((assets) => assets.find((asset) => asset.id === assetId)).then(async (meta) => {
+    Promise.resolve(asset ?? getAssetMetadata(assetId)).then(async (meta) => {
       if (cancelled || !meta) { if (!cancelled) setMissing(true); return; }
-      const kind = meta.mediaKind ?? (meta.mime.startsWith('video/') ? 'video' : meta.mime === 'image/gif' ? 'gif' : 'image');
+      const kind = getMediaKind(meta);
+      setAnimated(kind !== 'image');
+      if (kind !== 'image' && !loadAnimatedOriginal) {
+        const url = await getAssetThumbUrl(assetId); if (cancelled || !url) return;
+        const thumbnail = await loadImage(url); if (!cancelled) setBaseImg(thumbnail);
+        return;
+      }
       if (kind === 'video') {
         const url = await getAssetUrl(assetId); if (cancelled || !url) return;
         video = document.createElement('video'); video.muted = true; video.loop = true; video.playsInline = true; video.preload = 'auto'; video.src = url;
-        video.onloadeddata = () => { if (cancelled || !video) return; video.width = video.videoWidth; video.height = video.videoHeight; setAnimated(true); setBaseImg(video); void video.play().catch(() => undefined); };
+        video.onloadeddata = () => { if (cancelled || !video) return; video.width = video.videoWidth; video.height = video.videoHeight; setBaseImg(video); };
         video.onerror = () => { if (!cancelled) setMissing(true); };
         return;
       }
       if (kind === 'gif') {
         const asset = await getAsset(assetId); if (cancelled || !asset) return;
-        gifCanvas = await createAnimatedGifCanvas(asset.blob, asset.width, asset.height);
+        gifCanvas = await createAnimatedGifCanvas(asset.blob, asset.width, asset.height, false);
         if (cancelled) { stopAnimatedGifCanvas(gifCanvas); return; }
-        setAnimated(true); setBaseImg(gifCanvas); return;
+        setBaseImg(gifCanvas); return;
       }
       acquiredBase = true;
-      const bitmap = await imageResourceManager.acquire(assetId, BASE_EDITOR_IMAGE_EDGE);
-      if (cancelled) imageResourceManager.release(assetId, BASE_EDITOR_IMAGE_EDGE); else setBaseImg(bitmap);
+      const bitmap = await imageResourceManager.acquire(assetId, NAVIGATION_IMAGE_EDGE, meta);
+      if (cancelled) imageResourceManager.release(assetId, NAVIGATION_IMAGE_EDGE); else setBaseImg(bitmap);
     }).catch(() => { if (!cancelled) setMissing(true); });
 
     return () => {
       cancelled = true; video?.pause(); if (gifCanvas) stopAnimatedGifCanvas(gifCanvas);
-      if (acquiredBase) imageResourceManager.release(assetId, BASE_EDITOR_IMAGE_EDGE);
+      if (acquiredBase) imageResourceManager.release(assetId, NAVIGATION_IMAGE_EDGE);
     };
-  }, [layer.assetId]);
+  }, [asset, layer.assetId, loadAnimatedOriginal]);
 
   useEffect(() => {
-    if (!animated || !imageRef.current) return;
+    if (!animated || !baseImg) return;
+    if (baseImg instanceof HTMLVideoElement) {
+      void setVideoElementPlaying(baseImg, selected);
+    } else if (baseImg instanceof HTMLCanvasElement) {
+      setAnimatedGifCanvasPlaying(baseImg, selected, true);
+    }
+    if (!selected || !imageRef.current) return;
     const animation = new Konva.Animation(() => undefined, imageRef.current.getLayer()); animation.start();
     return () => { animation.stop(); };
-  }, [animated, baseImg]);
+  }, [animated, baseImg, selected]);
 
   useEffect(() => {
     if (requestedEdge <= detailEdge) { setDetailEdge(requestedEdge); return; }
@@ -89,11 +124,11 @@ export function ImageNode({ layer, selected, onSelect, onDragStart, onDragMove, 
 
   useEffect(() => {
     let cancelled = false; setDetailImg(null);
-    if (animated || !layer.assetId || detailEdge <= BASE_EDITOR_IMAGE_EDGE) return;
+    if (animated || !layer.assetId || detailEdge <= NAVIGATION_IMAGE_EDGE) return;
     const assetId = layer.assetId;
-    imageResourceManager.acquire(assetId, detailEdge).then((bitmap) => { if (cancelled) imageResourceManager.release(assetId, detailEdge); else setDetailImg(bitmap); }).catch(() => undefined);
+    imageResourceManager.acquire(assetId, detailEdge, asset).then((bitmap) => { if (cancelled) imageResourceManager.release(assetId, detailEdge); else setDetailImg(bitmap); }).catch(() => undefined);
     return () => { cancelled = true; imageResourceManager.release(assetId, detailEdge); };
-  }, [animated, detailEdge, layer.assetId]);
+  }, [animated, asset, detailEdge, layer.assetId]);
 
   const img = detailImg ?? baseImg;
   const crop = img && (() => {

@@ -1,6 +1,12 @@
 import { decompressFrames, parseGIF } from 'gifuct-js';
 
-const cleanupByCanvas = new WeakMap<HTMLCanvasElement, () => void>();
+interface GifPlaybackController {
+  play: (restart?: boolean) => void;
+  pause: (reset?: boolean) => void;
+  stop: () => void;
+}
+
+const playbackByCanvas = new WeakMap<HTMLCanvasElement, GifPlaybackController>();
 
 function copyCanvas(source: HTMLCanvasElement) {
   const copy = document.createElement('canvas');
@@ -14,6 +20,7 @@ export async function createAnimatedGifCanvas(
   blob: Blob,
   width: number,
   height: number,
+  autoPlay = true,
 ): Promise<HTMLCanvasElement> {
   const parsed = parseGIF(await blob.arrayBuffer());
   const decoded = decompressFrames(parsed, true);
@@ -62,26 +69,63 @@ export async function createAnimatedGifCanvas(
   if (!outputContext) throw new Error('Could not create an animated GIF canvas.');
 
   let stopped = false;
+  let playing = false;
   let timer = 0;
   let frameIndex = 0;
-  const drawNext = () => {
-    if (stopped) return;
-    const frame = frames[frameIndex];
+  const drawFrame = (index: number) => {
+    const frame = frames[index];
     outputContext.clearRect(0, 0, output.width, output.height);
     outputContext.drawImage(frame.canvas, 0, 0);
+  };
+  const drawNext = () => {
+    if (stopped || !playing) return;
+    const frame = frames[frameIndex];
+    drawFrame(frameIndex);
     frameIndex = (frameIndex + 1) % frames.length;
     timer = window.setTimeout(drawNext, frame.delay);
   };
-  drawNext();
-  cleanupByCanvas.set(output, () => {
-    stopped = true;
-    window.clearTimeout(timer);
-    frames.length = 0;
-  });
+  const controller: GifPlaybackController = {
+    play: (restart = false) => {
+      if (stopped) return;
+      if (playing && !restart) return;
+      window.clearTimeout(timer);
+      if (restart) frameIndex = 0;
+      playing = true;
+      drawNext();
+    },
+    pause: (reset = false) => {
+      if (stopped) return;
+      playing = false;
+      window.clearTimeout(timer);
+      if (reset) {
+        frameIndex = 0;
+        drawFrame(frameIndex);
+      }
+    },
+    stop: () => {
+      stopped = true;
+      playing = false;
+      window.clearTimeout(timer);
+      frames.length = 0;
+    },
+  };
+  playbackByCanvas.set(output, controller);
+  if (autoPlay) controller.play(true);
+  else controller.pause(true);
   return output;
 }
 
+export function setAnimatedGifCanvasPlaying(
+  canvas: HTMLCanvasElement,
+  playing: boolean,
+  restart = false,
+) {
+  const controller = playbackByCanvas.get(canvas);
+  if (playing) controller?.play(restart);
+  else controller?.pause(restart);
+}
+
 export function stopAnimatedGifCanvas(canvas: HTMLCanvasElement) {
-  cleanupByCanvas.get(canvas)?.();
-  cleanupByCanvas.delete(canvas);
+  playbackByCanvas.get(canvas)?.stop();
+  playbackByCanvas.delete(canvas);
 }

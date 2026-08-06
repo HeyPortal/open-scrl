@@ -16,4 +16,6 @@ export async function renderProjectSlides(doc:ProjectDocumentV2,indexes:number[]
 
 export function downloadBlob(blob:Blob,filename:string){const url=URL.createObjectURL(blob);const anchor=document.createElement('a');anchor.href=url;anchor.download=filename;anchor.click();setTimeout(()=>URL.revokeObjectURL(url),5000);}
 
-export async function zipBlobs(blobs:Blob[],extension:string,onProgress?:(current:number,total:number)=>void){const {BlobReader,BlobWriter,ZipWriter}=await import('@zip.js/zip.js');const writer=new ZipWriter(new BlobWriter('application/zip'));for(let i=0;i<blobs.length;i++){await writer.add(`${String(i+1).padStart(2,'0')}.${extension}`,new BlobReader(blobs[i]));onProgress?.(i+1,blobs.length);}return writer.close();}
+export async function zipNamedBlobs(entries:{name:string;blob:Blob}[],onProgress?:(current:number,total:number)=>void){const {BlobReader,BlobWriter,ZipWriter}=await import('@zip.js/zip.js');const writer=new ZipWriter(new BlobWriter('application/zip'));for(let i=0;i<entries.length;i++){await writer.add(entries[i].name,new BlobReader(entries[i].blob));onProgress?.(i+1,entries.length);}return writer.close();}
+
+export async function zipBlobs(blobs:Blob[],extension:string,onProgress?:(current:number,total:number)=>void){return zipNamedBlobs(blobs.map((blob,index)=>({name:`${String(index+1).padStart(2,'0')}.${extension}`,blob})),onProgress);}

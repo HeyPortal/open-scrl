@@ -1,13 +1,65 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Film, Trash2, Upload } from 'lucide-react';
 import type { AssetMeta } from '@/types';
 import { useAssets } from '@/store/assets';
 import { useEditor } from '@/store/editor';
 import { useEditorSession } from '@/editor/sessionStore';
 
+function MediaThumbnail({
+  asset,
+  broken,
+  onError,
+}: {
+  asset: AssetMeta;
+  broken: boolean;
+  onError: () => void;
+}) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const url = useAssets((state) => state.thumbs[asset.id]);
+  const ensureThumb = useAssets((state) => state.ensureThumb);
+
+  useEffect(() => {
+    if (url) return;
+    const container = containerRef.current;
+    if (!container || typeof IntersectionObserver === 'undefined') {
+      void ensureThumb(asset.id);
+      return;
+    }
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return;
+      observer.disconnect();
+      void ensureThumb(asset.id);
+    }, { rootMargin: '160px' });
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [asset.id, ensureThumb, url]);
+
+  return (
+    <div ref={containerRef} className="h-full w-full">
+      {url && !broken ? (
+        <img
+          src={url}
+          className="w-full h-full object-cover"
+          alt={asset.name}
+          loading="lazy"
+          decoding="async"
+          onError={onError}
+        />
+      ) : (
+        <div className="w-full h-full flex flex-col items-center justify-center px-1 text-center">
+          <span className="text-[10px] text-ink-dim uppercase">Media</span>
+          <span className="text-[9px] text-ink-faint truncate max-w-full">{asset.name}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function PhotosPanel() {
-  const assets = useAssets((s) => s.assets);
-  const thumbs = useAssets((s) => s.thumbs);
+  const activeProjectId = useEditor((s) => s.activeProjectId);
+  const assetProjectId = useAssets((s) => s.projectId);
+  const scopedAssets = useAssets((s) => s.assets);
+  const assets = assetProjectId === activeProjectId ? scopedAssets : [];
   const importFiles = useAssets((s) => s.importFiles);
   const remove = useAssets((s) => s.remove);
   const importMessage = useAssets((s) => s.importMessage);
@@ -97,23 +149,13 @@ export function PhotosPanel() {
               }}
               title={a.name}
             >
-              {thumbs[a.id] && !brokenThumbs.has(a.id) ? (
-                <img
-                  src={thumbs[a.id]}
-                  className="w-full h-full object-cover"
-                  alt={a.name}
-                  loading="lazy"
-                  decoding="async"
-                  onError={() => {
-                    setBrokenThumbs((prev) => new Set(prev).add(a.id));
-                  }}
-                />
-              ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center px-1 text-center">
-                  <span className="text-[10px] text-ink-dim uppercase">Media</span>
-                  <span className="text-[9px] text-ink-faint truncate max-w-full">{a.name}</span>
-                </div>
-              )}
+              <MediaThumbnail
+                asset={a}
+                broken={brokenThumbs.has(a.id)}
+                onError={() => {
+                  setBrokenThumbs((prev) => new Set(prev).add(a.id));
+                }}
+              />
             </button>
             {(a.mediaKind === 'video' || a.mediaKind === 'gif' || a.mime.startsWith('video/') || a.mime === 'image/gif') && (
               <span className="pointer-events-none absolute bottom-1 left-1 flex items-center gap-1 rounded bg-black/65 px-1 py-0.5 text-[9px] font-medium uppercase text-white">

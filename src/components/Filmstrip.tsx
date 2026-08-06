@@ -211,7 +211,7 @@ export function Filmstrip() {
   const format = doc.format;
   const thumbs = useAssets((s) => s.thumbs);
   const selected = useEditorSession((s) => s.selectedSlideId);
-  const select = useEditorSession((s) => s.selectSlide);
+  const focusSlide = useEditorSession((s) => s.focusSlide);
   const addSlide = useEditor((s) => s.addSlide);
   const dup = useEditor((s) => s.duplicateSlide);
   const del = useEditor((s) => s.deleteSlide);
@@ -232,7 +232,7 @@ export function Filmstrip() {
           thumbW={thumbW}
           thumbs={thumbs}
           format={format}
-          onSelect={select}
+          onSelect={focusSlide}
           onDuplicate={dup}
           onDelete={del}
           onMove={moveSlide}
