@@ -29,22 +29,36 @@ async function sha256(blob: Blob) {
 }
 
 export class IndexedDbAssetRepository implements AssetRepository {
-  private migrated = false;
+  private legacyIndexPromise: Promise<void> | null = null;
 
-  private async indexLegacy(): Promise<void> {
-    if (this.migrated) return;
-    this.migrated = true;
+  private async buildLegacyIndex(): Promise<void> {
     const db = await dbPromise;
-    // Snapshot legacy records before hashing. Awaiting crypto inside an open
-    // cursor transaction allows IndexedDB to auto-close the transaction.
-    const legacyAssets = await db.getAll('assets');
-    for (const asset of legacyAssets) {
+    // Read only the small key list up front, then migrate one original at a
+    // time. Loading the entire legacy store here can exhaust browser memory
+    // for projects with a large photo or video library.
+    const legacyAssetIds = await db.getAllKeys('assets');
+    for (const assetId of legacyAssetIds) {
+      const asset = await db.get('assets', assetId);
+      if (!asset) continue;
       if (!(await db.get('metadata', asset.id))) {
         const hash = asset.hash ?? await sha256(asset.blob);
         const meta: AssetMeta = { id: asset.id, blobKey: `legacy:${asset.id}`, thumbnailKey: `thumb:${asset.id}`, hash, name: asset.name, mime: asset.mime, width: asset.width, height: asset.height, size: asset.size ?? asset.blob.size, mediaKind: asset.mediaKind, duration: asset.duration };
         await db.put('metadata', meta, meta.id);
       }
     }
+  }
+
+  private async indexLegacy(): Promise<void> {
+    // Every caller must wait for the same migration. Marking migration as
+    // complete before its asynchronous work finishes lets concurrent reads
+    // observe an empty or partially populated media library.
+    if (!this.legacyIndexPromise) {
+      this.legacyIndexPromise = this.buildLegacyIndex().catch((error) => {
+        this.legacyIndexPromise = null;
+        throw error;
+      });
+    }
+    await this.legacyIndexPromise;
   }
 
   async listMetadata() { await this.indexLegacy(); return (await dbPromise).getAll('metadata'); }
