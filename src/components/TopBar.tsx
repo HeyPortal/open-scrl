@@ -3,14 +3,16 @@ import {
   Download,
   FileImage,
   FilePlus2,
+  Film,
   House,
   Redo2,
   Undo2,
 } from 'lucide-react';
 import { useEditor } from '@/store/editor';
 import { FORMATS } from '@/lib/format';
-import { exportAllAsZip, exportSlide } from '@/lib/export';
+import { exportProjectAsVideo, exportSlide } from '@/lib/export';
 import { useEditorSession } from '@/editor/sessionStore';
+import { useToasts } from '@/store/toasts';
 
 export function TopBar() {
   const docName = useEditor((s) => s.doc.name);
@@ -25,6 +27,7 @@ export function TopBar() {
   const future = useEditor((s) => s.future);
   const doc = useEditor((s) => s.doc);
   const selectedSlideId = useEditorSession((s) => s.selectedSlideId);
+  const addToast = useToasts((s) => s.addToast);
 
   const [exporting, setExporting] = useState(false);
   const [progress, setProgress] = useState<string>('');
@@ -39,10 +42,13 @@ export function TopBar() {
     }
   };
 
-  const exportZip = async () => {
+  const exportVideo = async () => {
     setExporting(true);
     try {
-      await exportAllAsZip(doc, { format: 'png' }, (i, t) => setProgress(`${i}/${t}`));
+      await exportProjectAsVideo(doc, (i, t) => setProgress(`${Math.round(i / t * 100)}%`));
+      addToast('MP4 export finished.', 'success');
+    } catch (error) {
+      addToast(error instanceof Error ? error.message : 'Video export failed.', 'error');
     } finally {
       setExporting(false);
       setProgress('');
@@ -129,9 +135,9 @@ export function TopBar() {
       <button
         className="ctrl-btn ctrl-btn-primary"
         disabled={exporting}
-        onClick={exportZip}
+        onClick={exportVideo}
       >
-        <Download size={14} /> Export Post
+        <Film size={14} /> Export MP4
       </button>
     </div>
   );

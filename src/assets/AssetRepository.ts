@@ -8,6 +8,8 @@ export interface PreparedAsset {
   height: number;
   mime: string;
   name: string;
+  mediaKind?: 'image' | 'gif' | 'video';
+  duration?: number;
 }
 
 export interface AssetRepository {

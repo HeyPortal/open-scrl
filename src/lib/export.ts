@@ -1,5 +1,6 @@
 import type { ProjectDocumentV2 } from '@/types';
 import { downloadBlob, renderProjectSlides, zipBlobs } from '@/export/ExportController';
+export { exportProjectAsVideo } from '@/export/video';
 
 interface ExportOptions { format:'png'|'jpeg';quality:number;pixelRatio:number;signal?:AbortSignal }
 export async function renderSlideToBlob(doc:ProjectDocumentV2,slideIndex:number,options:Partial<ExportOptions>={}){return (await renderProjectSlides(doc,[slideIndex],options))[0];}

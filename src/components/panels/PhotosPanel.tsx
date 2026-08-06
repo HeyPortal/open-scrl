@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Trash2, Upload } from 'lucide-react';
+import { Film, Trash2, Upload } from 'lucide-react';
 import type { AssetMeta } from '@/types';
 import { useAssets } from '@/store/assets';
 import { useEditor } from '@/store/editor';
@@ -56,19 +56,19 @@ export function PhotosPanel() {
         handleFiles(e.dataTransfer.files);
       }}
     >
-      <div className="panel-section">Photos</div>
+      <div className="panel-section">Media</div>
       <div className="px-3 pb-3 flex flex-col gap-2 border-b border-line">
         <button
           className="ctrl-btn justify-center"
           onClick={() => inputRef.current?.click()}
           disabled={busy}
         >
-          <Upload size={14} /> {busy ? 'Importing…' : 'Import images'}
+          <Upload size={14} /> {busy ? 'Importing…' : 'Import media'}
         </button>
         <input
           ref={inputRef}
           type="file"
-          accept="image/*,.heic,.heif,.avif,.webp"
+          accept="image/*,video/*,.heic,.heif,.avif,.webp,.mp4,.mov,.m4v,.webm"
           multiple
           hidden
           onChange={(e) => {
@@ -110,11 +110,16 @@ export function PhotosPanel() {
                 />
               ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center px-1 text-center">
-                  <span className="text-[10px] text-ink-dim uppercase">Image</span>
+                  <span className="text-[10px] text-ink-dim uppercase">Media</span>
                   <span className="text-[9px] text-ink-faint truncate max-w-full">{a.name}</span>
                 </div>
               )}
             </button>
+            {(a.mediaKind === 'video' || a.mediaKind === 'gif' || a.mime.startsWith('video/') || a.mime === 'image/gif') && (
+              <span className="pointer-events-none absolute bottom-1 left-1 flex items-center gap-1 rounded bg-black/65 px-1 py-0.5 text-[9px] font-medium uppercase text-white">
+                <Film size={9} /> {a.mediaKind === 'gif' || a.mime === 'image/gif' ? 'GIF' : 'Video'}
+              </span>
+            )}
             <button
               className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 bg-black/60 rounded p-1 hover:bg-black/80"
               onClick={() => remove(a.id)}
@@ -126,7 +131,7 @@ export function PhotosPanel() {
         ))}
         {assets.length === 0 && (
           <div className="col-span-3 text-center text-xs text-ink-faint py-12 px-3">
-            No photos yet. Drop images here or use the button above.
+            No media yet. Drop images, GIFs, or videos here or use the button above.
           </div>
         )}
       </div>

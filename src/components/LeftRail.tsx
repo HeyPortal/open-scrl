@@ -4,7 +4,7 @@ import { useEditorSession } from '@/editor/sessionStore';
 
 const TABS: { id: LeftPanel; label: string; icon: typeof Image }[] = [
   { id: 'templates', label: 'Grids', icon: Grid3x3 },
-  { id: 'photos', label: 'Photos', icon: Image },
+  { id: 'photos', label: 'Media', icon: Image },
   { id: 'text', label: 'Text', icon: Type },
   { id: 'shapes', label: 'Shapes', icon: Square },
   { id: 'background', label: 'BG', icon: Palette },

@@ -35,15 +35,15 @@ export class IndexedDbAssetRepository implements AssetRepository {
     if (this.migrated) return;
     this.migrated = true;
     const db = await dbPromise;
-    let cursor = await db.transaction('assets').store.openCursor();
-    while (cursor) {
-      const asset = cursor.value;
+    // Snapshot legacy records before hashing. Awaiting crypto inside an open
+    // cursor transaction allows IndexedDB to auto-close the transaction.
+    const legacyAssets = await db.getAll('assets');
+    for (const asset of legacyAssets) {
       if (!(await db.get('metadata', asset.id))) {
         const hash = asset.hash ?? await sha256(asset.blob);
-        const meta: AssetMeta = { id: asset.id, blobKey: `legacy:${asset.id}`, thumbnailKey: `thumb:${asset.id}`, hash, name: asset.name, mime: asset.mime, width: asset.width, height: asset.height, size: asset.size ?? asset.blob.size };
+        const meta: AssetMeta = { id: asset.id, blobKey: `legacy:${asset.id}`, thumbnailKey: `thumb:${asset.id}`, hash, name: asset.name, mime: asset.mime, width: asset.width, height: asset.height, size: asset.size ?? asset.blob.size, mediaKind: asset.mediaKind, duration: asset.duration };
         await db.put('metadata', meta, meta.id);
       }
-      cursor = await cursor.continue();
     }
   }
 
@@ -75,7 +75,7 @@ export class IndexedDbAssetRepository implements AssetRepository {
     const assetId = id(); const blobKey = `asset-${prepared.hash}`; const thumbnailKey = `thumb-${prepared.hash}`;
     const originalInOpfs = await writeOpfsBlob(blobKey, prepared.file);
     const thumbInOpfs = await writeOpfsBlob(thumbnailKey, prepared.thumbnail);
-    const meta: AssetMeta = { id: assetId, blobKey, thumbnailKey, hash: prepared.hash, name: prepared.name, mime: prepared.mime, width: prepared.width, height: prepared.height, size: prepared.file.size };
+    const meta: AssetMeta = { id: assetId, blobKey, thumbnailKey, hash: prepared.hash, name: prepared.name, mime: prepared.mime, width: prepared.width, height: prepared.height, size: prepared.file.size, mediaKind: prepared.mediaKind, duration: prepared.duration };
     const db = await dbPromise; const tx = db.transaction(['metadata', 'blobs', 'thumbnails'], 'readwrite');
     await tx.objectStore('metadata').put(meta, assetId);
     if (!originalInOpfs) await tx.objectStore('blobs').put(prepared.file, blobKey);

@@ -2,10 +2,11 @@ import { type CSSProperties, useState } from 'react';
 import { GRID_TEMPLATES, type GridTemplate } from '@/lib/grids';
 import { useEditor } from '@/store/editor';
 
-function GridThumb({ tpl }: { tpl: GridTemplate }) {
+function GridThumb({ tpl, gap }: { tpl: GridTemplate; gap: number }) {
   const W = 80;
   const H = 100;
-  const cells = tpl.cells(W, H, 4);
+  const previewGap = (gap / 120) * 8;
+  const cells = tpl.cells(W, H, previewGap);
   return (
     <svg
       viewBox={`0 0 ${W} ${H}`}
@@ -14,7 +15,16 @@ function GridThumb({ tpl }: { tpl: GridTemplate }) {
     >
       <rect width={W} height={H} fill="#1d1d27" />
       {cells.map((c, i) => (
-        <rect key={i} x={c.x} y={c.y} width={c.w} height={c.h} fill="#3a3a48" rx="2" />
+        <rect
+          key={i}
+          x={c.x}
+          y={c.y}
+          width={c.w}
+          height={c.h}
+          fill="#3a3a48"
+          stroke={previewGap === 0 ? '#20202a' : undefined}
+          strokeWidth={previewGap === 0 ? 0.6 : 0}
+        />
       ))}
     </svg>
   );
@@ -22,7 +32,7 @@ function GridThumb({ tpl }: { tpl: GridTemplate }) {
 
 export function TemplatesPanel() {
   const applyGrid = useEditor((s) => s.applyGrid);
-  const [gap, setGap] = useState(16);
+  const [gap, setGap] = useState(0);
   const gapFill = `${(gap / 120) * 100}%`;
 
   return (
@@ -54,7 +64,7 @@ export function TemplatesPanel() {
             onClick={() => applyGrid(t, gap)}
           >
             <div className="flex h-28 shrink-0 items-center justify-center bg-bg-inset p-2">
-              <GridThumb tpl={t} />
+              <GridThumb tpl={t} gap={gap} />
             </div>
             <div className="min-h-0 px-2 py-1.5 text-center text-xs">
               <span className="block min-w-0 truncate">{t.name}</span>

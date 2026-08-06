@@ -4,7 +4,7 @@ import type { AssetRepository, PreparedAsset } from './AssetRepository';
 
 export class DuplicateAssetError extends Error {
   readonly existing: AssetMeta;
-  constructor(existing: AssetMeta) { super('Photo has already been imported.'); this.existing = existing; this.name = 'DuplicateAssetError'; }
+  constructor(existing: AssetMeta) { super('Media has already been imported.'); this.existing = existing; this.name = 'DuplicateAssetError'; }
 }
 
 export class AssetImportController {

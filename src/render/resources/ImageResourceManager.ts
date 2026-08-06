@@ -1,13 +1,13 @@
 import { assetRepository } from '@/assets/indexeddb/IndexedDbAssetRepository';
 
 interface Entry { key: string; assetId: string; bitmap: ImageBitmap; bytes: number; refs: number; touched: number }
-const BUCKETS = [256, 512, 1024, 1600];
+const BUCKETS = [1024, 2048, 4096];
 
 export class ImageResourceManager {
   private entries = new Map<string, Entry>();
   private pending = new Map<string, Promise<ImageBitmap>>();
   private readonly maxBytes: number;
-  constructor(maxBytes = 128 * 1024 * 1024) { this.maxBytes = maxBytes; }
+  constructor(maxBytes = 192 * 1024 * 1024) { this.maxBytes = maxBytes; }
 
   private bucket(edge: number) { return BUCKETS.find((b) => b >= edge) ?? BUCKETS.at(-1)!; }
   async acquire(assetId: string, requestedEdge: number): Promise<ImageBitmap> {

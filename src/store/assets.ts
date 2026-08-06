@@ -4,7 +4,7 @@ import {
   deleteAsset as idbDelete,
   getAssetThumbUrl,
   importAsset as idbImport,
-  isLikelyImageFile,
+  isLikelyMediaFile,
   listAssets,
 } from '@/lib/assets';
 import type { AssetMeta } from '@/types';
@@ -42,13 +42,13 @@ export const useAssets = create<AssetsState>((set, get) => ({
 
   importFiles: async (files) => {
     const incoming = Array.from(files);
-    const arr = incoming.filter(isLikelyImageFile);
+    const arr = incoming.filter(isLikelyMediaFile);
     const skipped = incoming.length - arr.length;
     if (arr.length === 0) {
       set({
         importMessage:
           incoming.length > 0
-            ? 'Those files did not look like supported images. Try JPG, PNG, WebP, AVIF, or HEIC.'
+            ? 'Those files did not look supported. Try JPG, PNG, GIF, MP4, MOV, or WebM.'
             : null,
       });
       return [];
@@ -73,11 +73,11 @@ export const useAssets = create<AssetsState>((set, get) => ({
     if (imported.length > 0) {
       const next = [...get().assets, ...imported];
       const parts: string[] = [];
-      parts.push(`Imported ${imported.length} photo${imported.length === 1 ? '' : 's'}.`);
-      if (skipped > 0) parts.push(`Skipped ${skipped} non-image file${skipped === 1 ? '' : 's'}.`);
+      parts.push(`Imported ${imported.length} media file${imported.length === 1 ? '' : 's'}.`);
+      if (skipped > 0) parts.push(`Skipped ${skipped} unsupported file${skipped === 1 ? '' : 's'}.`);
       if (duplicates.length > 0) {
         parts.push(
-          `${duplicates.length} duplicate photo${duplicates.length === 1 ? ' was' : 's were'} already imported.`,
+          `${duplicates.length} duplicate file${duplicates.length === 1 ? ' was' : 's were'} already imported.`,
         );
       }
       if (failed.length > 0) {
@@ -99,10 +99,10 @@ export const useAssets = create<AssetsState>((set, get) => ({
       set({
         importMessage:
           duplicates.length > 0 && failed.length === 0
-            ? `${duplicates.length} duplicate photo${duplicates.length === 1 ? ' was' : 's were'} already imported.`
+            ? `${duplicates.length} duplicate file${duplicates.length === 1 ? ' was' : 's were'} already imported.`
             : failed.length > 0
             ? `Couldn't decode ${failed.length} file${failed.length === 1 ? '' : 's'}. If these are HEIC photos, they should import now; otherwise they may be unsupported.`
-            : 'No photos were imported.',
+            : 'No media was imported.',
       });
     }
     return imported;
@@ -111,7 +111,7 @@ export const useAssets = create<AssetsState>((set, get) => ({
   remove: async (id) => {
     const doc = useEditor.getState().doc;
     const references = Object.values(doc.layers).filter((layer) => layer.kind === 'image' && layer.assetId === id).length;
-    if (references > 0 && !window.confirm(`This photo is used by ${references} layer${references === 1 ? '' : 's'}. Delete it anyway? Those layers will show a missing-photo placeholder.`)) return;
+    if (references > 0 && !window.confirm(`This media file is used by ${references} layer${references === 1 ? '' : 's'}. Delete it anyway? Those layers will show a missing-media placeholder.`)) return;
     await idbDelete(id);
     const next = get().assets.filter((a) => a.id !== id);
     const thumbs = { ...get().thumbs };

@@ -19,7 +19,8 @@ const PADDING = 12;
 const MIN_ZOOM = 0.05;
 const MAX_ZOOM = 4;
 const BUFFER_SLIDES = 1;
-Konva.pixelRatio = 1;
+const EDITOR_PIXEL_RATIO = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+Konva.pixelRatio = EDITOR_PIXEL_RATIO;
 
 export function Canvas({ width, height }: { width: number; height: number }) {
   const doc = useEditor((s) => s.doc);
@@ -143,7 +144,7 @@ export function Canvas({ width, height }: { width: number; height: number }) {
     const onTransformEnd = (e: Konva.KonvaEventObject<Event>) => { setResizeSeams([]);if(layer.locked)return;const node=e.target;const moving=localMoving(node,layer,true);const result=snap(slide,layer,moving);node.scale({x:1,y:1});updateLayer(layer.id,{x:result.x,y:result.y,width:moving.width,height:moving.height,rotation:node.rotation()});setGuides([]); };
     const ref = (node: Konva.Node|null) => { if(node)layerNodes.current.set(layer.id,node);else layerNodes.current.delete(layer.id); };
     const props={onSelect,onDragStart,onDragMove,onDragEnd,onTransform,onTransformEnd};
-    return <Group key={layer.id} x={offset}>{layer.kind==='image'?<ImageNode {...props} layer={layer} selected={selectedId===layer.id} groupRef={ref}/>:layer.kind==='shape'?<ShapeNode {...props} layer={layer} groupRef={ref}/>:<TextNode {...props} layer={layer} onDblClick={()=>setEditingTextId(layer.id)} nodeRef={ref}/>}</Group>;
+    return <Group key={layer.id} x={offset}>{layer.kind==='image'?<ImageNode {...props} layer={layer} selected={selectedId===layer.id} groupRef={ref} renderScale={zoom*EDITOR_PIXEL_RATIO}/>:layer.kind==='shape'?<ShapeNode {...props} layer={layer} groupRef={ref}/>:<TextNode {...props} layer={layer} onDblClick={()=>setEditingTextId(layer.id)} nodeRef={ref}/>}</Group>;
   };
 
   return <div className="relative h-full w-full overflow-hidden bg-bg select-none">

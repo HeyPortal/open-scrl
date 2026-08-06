@@ -109,8 +109,15 @@ export interface Asset {
   width: number;
   height: number;
   blob: Blob;
+  sourceBlob?: Blob;
+  sourceMime?: string;
+  sourceName?: string;
   size?: number;
   hash?: string;
+  /** Missing on projects created before animated media support. */
+  mediaKind?: 'image' | 'gif' | 'video';
+  /** Duration in seconds for GIF/video assets. */
+  duration?: number;
 }
 
 export interface AssetMeta {
@@ -123,4 +130,7 @@ export interface AssetMeta {
   width: number;
   height: number;
   size: number;
+  /** Missing on assets imported before animated media support. */
+  mediaKind?: 'image' | 'gif' | 'video';
+  duration?: number;
 }
