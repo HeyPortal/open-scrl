@@ -16,7 +16,7 @@ Early-stage personal project. Phase 1 MVP is functional:
 - **Smart snapping** — alignment guides between layers + canvas edges/center.
 - **Layer control** — reorder (drag or arrow buttons), lock, hide, rename,
   duplicate, delete.
-- Image, text, shape (rect / ellipse) layers with full inspector panel.
+- Image, text, shape (rect / ellipse) layers with explicit front/back stacking controls and image crop zoom/position controls.
 - Solid + linear gradient backgrounds.
 - Transactional undo / redo (80 steps with a 32 MB patch budget), keyboard shortcuts.
 - Instagram carousel export packages every slide separately: lossless PNG for static slides and high-quality H.264 MP4 for animated slides.

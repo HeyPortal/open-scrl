@@ -10,7 +10,11 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core';
 import {
+  ChevronDown,
   ChevronRight,
+  ChevronsDown,
+  ChevronsUp,
+  ChevronUp,
   Copy,
   Crosshair,
   Eye,
@@ -35,6 +39,8 @@ const layerIcon = (l: Layer) =>
 interface RowProps {
   layer: Layer;
   selected: boolean;
+  stackIndex: number;
+  stackCount: number;
 }
 
 const FOCAL_POINTS = [
@@ -51,8 +57,11 @@ const FOCAL_POINTS = [
 
 function ImageLayerSettings({ layer }: { layer: ImageLayer }) {
   const updateLayer = useEditor((s) => s.updateLayer);
+  const [expanded, setExpanded] = useState(true);
   const radiusMax = Math.max(1, Math.min(layer.width, layer.height) / 2);
   const radiusFillPct = `${Math.min(100, Math.max(0, (layer.cornerRadius / radiusMax) * 100))}%`;
+  const cropScale = Math.min(4, Math.max(1, layer.cropScale || 1));
+  const cropZoomFillPct = `${((cropScale - 1) / 3) * 100}%`;
 
   const patch = (next: Partial<ImageLayer>) => updateLayer(layer.id, next);
   const setFocalPoint = (x: number, y: number) => patch({ cropOffsetX: x, cropOffsetY: y });
@@ -62,6 +71,8 @@ function ImageLayerSettings({ layer }: { layer: ImageLayer }) {
 
   return (
     <details
+      open={expanded}
+      onToggle={(event) => setExpanded(event.currentTarget.open)}
       className="group mx-2 mb-2 overflow-hidden rounded-xl border border-line bg-gradient-to-b from-bg-panel/95 to-bg-inset/90 text-xs shadow-sm ring-1 ring-white/[0.03]"
       onClick={(e) => e.stopPropagation()}
     >
@@ -70,7 +81,7 @@ function ImageLayerSettings({ layer }: { layer: ImageLayer }) {
           <ImageIcon size={16} strokeWidth={1.75} className="text-accent" aria-hidden />
         </span>
         <span className="min-w-0 flex-1 text-left">
-          <span className="block text-[11px] font-semibold tracking-tight text-ink">Photo</span>
+          <span className="block text-[11px] font-semibold tracking-tight text-ink">Crop & corners</span>
         </span>
         <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-line bg-bg/80 text-ink-dim transition-colors group-open:border-accent/35 group-open:text-accent">
           <ChevronRight size={16} strokeWidth={2} className="transition-transform duration-200 group-open:rotate-90" />
@@ -78,6 +89,58 @@ function ImageLayerSettings({ layer }: { layer: ImageLayer }) {
       </summary>
 
       <div className="space-y-3 border-t border-line bg-bg/30 px-3 py-3">
+        <div className="rounded-lg border border-line/90 bg-bg-inset/50 px-3 py-2.5 shadow-inner">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-faint">Crop zoom</span>
+            <span className="rounded-md bg-bg px-2 py-0.5 text-[11px] font-semibold tabular-nums text-ink ring-1 ring-line">
+              {cropScale.toFixed(2)}×
+            </span>
+          </div>
+          <input
+            type="range"
+            min={1}
+            max={4}
+            step={0.05}
+            value={cropScale}
+            onChange={(e) => patch({ cropScale: Number(e.target.value) })}
+            className="layer-radius-range"
+            style={{ '--radius-fill': cropZoomFillPct } as CSSProperties}
+            aria-label="Crop zoom"
+          />
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <label className="min-w-0">
+              <span className="mb-1 flex items-center justify-between text-[10px] text-ink-dim">
+                Horizontal <span className="tabular-nums text-ink-faint">{Math.round(layer.cropOffsetX * 100)}%</span>
+              </span>
+              <input
+                type="range"
+                min={-0.5}
+                max={0.5}
+                step={0.01}
+                value={layer.cropOffsetX}
+                onChange={(e) => patch({ cropOffsetX: Number(e.target.value) })}
+                className="w-full accent-accent"
+                aria-label="Horizontal crop position"
+              />
+            </label>
+            <label className="min-w-0">
+              <span className="mb-1 flex items-center justify-between text-[10px] text-ink-dim">
+                Vertical <span className="tabular-nums text-ink-faint">{Math.round(layer.cropOffsetY * 100)}%</span>
+              </span>
+              <input
+                type="range"
+                min={-0.5}
+                max={0.5}
+                step={0.01}
+                value={layer.cropOffsetY}
+                onChange={(e) => patch({ cropOffsetY: Number(e.target.value) })}
+                className="w-full accent-accent"
+                aria-label="Vertical crop position"
+              />
+            </label>
+          </div>
+        </div>
+
         <div className="rounded-lg border border-line/90 bg-bg-inset/50 px-3 py-2.5 shadow-inner">
           <div className="mb-2 flex items-center justify-between gap-2">
             <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-faint">Corner radius</span>
@@ -147,6 +210,7 @@ function ImageLayerSettings({ layer }: { layer: ImageLayer }) {
               cornerRadius: 0,
               cropOffsetX: 0,
               cropOffsetY: 0,
+              cropScale: 1,
             })
           }
         >
@@ -158,7 +222,42 @@ function ImageLayerSettings({ layer }: { layer: ImageLayer }) {
   );
 }
 
-function LayerRow({ layer, selected }: RowProps) {
+function LayerOrderControls({ layer, stackIndex, stackCount }: { layer: Layer; stackIndex: number; stackCount: number }) {
+  const reorderLayer = useEditor((s) => s.reorderLayer);
+  const atBack = stackIndex <= 0;
+  const atFront = stackIndex >= stackCount - 1;
+  const controls = [
+    { title: 'Send to back', direction: 'bottom' as const, disabled: atBack, Icon: ChevronsDown },
+    { title: 'Send backward', direction: 'down' as const, disabled: atBack, Icon: ChevronDown },
+    { title: 'Bring forward', direction: 'up' as const, disabled: atFront, Icon: ChevronUp },
+    { title: 'Bring to front', direction: 'top' as const, disabled: atFront, Icon: ChevronsUp },
+  ];
+  return (
+    <div className="mx-2 mb-2 rounded-lg border border-line bg-bg-inset/55 p-2" onClick={(e) => e.stopPropagation()}>
+      <div className="mb-1.5 flex items-center justify-between">
+        <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-faint">Layer position</span>
+        <span className="text-[10px] tabular-nums text-ink-faint">{stackIndex + 1} of {stackCount}</span>
+      </div>
+      <div className="grid grid-cols-4 gap-1" role="group" aria-label="Layer position">
+        {controls.map(({ title, direction, disabled, Icon }) => (
+          <button
+            key={title}
+            type="button"
+            className="flex h-8 items-center justify-center rounded-md border border-line bg-bg text-ink-dim transition-colors hover:border-accent/50 hover:text-accent disabled:cursor-not-allowed disabled:opacity-30"
+            title={title}
+            aria-label={title}
+            disabled={disabled}
+            onClick={() => reorderLayer(layer.id, direction)}
+          >
+            <Icon size={15} aria-hidden />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function LayerRow({ layer, selected, stackIndex, stackCount }: RowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: layer.id,
   });
@@ -265,6 +364,7 @@ function LayerRow({ layer, selected }: RowProps) {
         </button>
         </div>
       </div>
+      {selected && <LayerOrderControls layer={layer} stackIndex={stackIndex} stackCount={stackCount} />}
       {selected && layer.kind === 'image' && <ImageLayerSettings layer={layer} />}
     </div>
   );
@@ -313,6 +413,8 @@ export function LayersPanel() {
                 key={l.id}
                 layer={l}
                 selected={l.id === selectedId}
+                stackIndex={slide.layers.findIndex((layer) => layer.id === l.id)}
+                stackCount={slide.layers.length}
               />
             ))}
           </div>
