@@ -1,13 +1,15 @@
 import Konva from 'konva';
-import { ArrayBufferTarget, Muxer } from 'mp4-muxer';
+import { ArrayBufferTarget, FileSystemWritableFileStreamTarget, Muxer } from 'mp4-muxer';
 import { compileScene } from '@/core/scene/compileScene';
 import { getSlideViewport } from '@/core/document/coordinates';
 import type { Asset, Layer, ProjectDocumentV2 } from '@/types';
 import { getAsset, getAssetMetadata } from '@/lib/assets';
 import { getMediaKind, setVideoElementPlaying } from '@/lib/media';
+import { createTemporaryExportFile } from '@/storage/exportTemp';
+import { captureSlotForElapsed } from './timeline';
 import {
   createAnimatedGifCanvas,
-  setAnimatedGifCanvasPlaying,
+  seekAnimatedGifCanvas,
   stopAnimatedGifCanvas,
 } from '@/lib/gif';
 
@@ -61,12 +63,14 @@ async function drawable(asset: Asset): Promise<Drawable> {
 }
 
 async function start(value: Drawable) {
-  if (value instanceof HTMLCanvasElement) {
-    setAnimatedGifCanvasPlaying(value, true, true);
-  } else if (value instanceof HTMLVideoElement) {
+  if (value instanceof HTMLVideoElement) {
     if (value.readyState >= HTMLMediaElement.HAVE_METADATA) value.currentTime = 0;
     await setVideoElementPlaying(value, true);
   }
+}
+
+function seek(value: Drawable, timeSeconds: number) {
+  if (value instanceof HTMLCanvasElement) seekAnimatedGifCanvas(value, timeSeconds);
 }
 
 function release(value: Drawable) {
@@ -232,6 +236,7 @@ async function prepareStage(project: ProjectDocumentV2, slideId: string) {
     stage,
     layer,
     play: () => Promise.all(media.map(start)),
+    seek: (timeSeconds: number) => media.forEach((value) => seek(value, timeSeconds)),
     destroy: () => {
       media.forEach(release);
       stage.destroy();
@@ -260,6 +265,38 @@ function waitUntil(deadline: number) {
   return remaining > 1
     ? new Promise<void>((resolve) => window.setTimeout(resolve, remaining))
     : Promise.resolve();
+}
+
+export interface RenderedSlideVideo {
+  blob: Blob;
+  release: () => Promise<void>;
+}
+
+async function createVideoOutput(preferTemporary: boolean) {
+  const temporary = preferTemporary ? await createTemporaryExportFile('mp4') : undefined;
+  if (temporary && typeof FileSystemWritableFileStream !== 'undefined') {
+    return {
+      target: new FileSystemWritableFileStreamTarget(temporary.writable),
+      complete: async (): Promise<RenderedSlideVideo> => {
+        await temporary.close();
+        return { blob: await temporary.getFile(), release: temporary.remove };
+      },
+      abort: async (reason?: unknown) => {
+        await temporary.abort(reason);
+        await temporary.remove();
+      },
+    };
+  }
+  await temporary?.remove();
+  const target = new ArrayBufferTarget();
+  return {
+    target,
+    complete: async (): Promise<RenderedSlideVideo> => ({
+      blob: new Blob([target.buffer], { type: 'video/mp4' }),
+      release: async () => undefined,
+    }),
+    abort: async () => undefined,
+  };
 }
 
 function encoderConfig(project: ProjectDocumentV2, codec: string, fps: number): VideoEncoderConfig {
@@ -295,11 +332,12 @@ async function bestSupportedConfig(project: ProjectDocumentV2) {
   throw new Error('This device cannot encode an Instagram-compatible H.264 MP4.');
 }
 
-export async function renderSlideAsVideo(
+async function renderSlideVideo(
   project: ProjectDocumentV2,
   slideId: string,
+  preferTemporary: boolean,
   onProgress?: (frame: number, total: number) => void,
-) {
+): Promise<RenderedSlideVideo> {
   if (!('VideoEncoder' in window) || !('VideoFrame' in window)) {
     throw new Error('MP4 export needs a browser with WebCodecs support. Try the latest Chrome or Edge.');
   }
@@ -310,48 +348,98 @@ export async function renderSlideAsVideo(
   if (!animated) throw new Error('Only slides containing a GIF or video need MP4 rendering.');
   const total = Math.max(1, Math.round(duration * fps));
 
-  const target = new ArrayBufferTarget();
+  const output = await createVideoOutput(preferTemporary);
   const muxer = new Muxer({
-    target,
+    target: output.target,
     video: {
       codec: 'avc',
       width: project.format.width,
       height: project.format.height,
       frameRate: fps,
     },
-    fastStart: 'in-memory',
+    // Reserve metadata space up front so encoded samples can be written to
+    // OPFS immediately instead of being retained by the muxer until finalize.
+    fastStart: { expectedVideoChunks: total },
   });
   let encoderError: DOMException | null = null;
   const encoder = new VideoEncoder({
     output: (chunk, metadata) => muxer.addVideoChunk(chunk, metadata),
     error: (error) => { encoderError = error; },
   });
-  encoder.configure(config);
   let prepared: Awaited<ReturnType<typeof prepareStage>> | undefined;
+  let completed = false;
   try {
+    encoder.configure(config);
     prepared = await prepareStage(project, slideId);
     await prepared.play();
     const started = performance.now();
-    for (let frameIndex = 0; frameIndex < total; frameIndex++) {
-      await waitUntil(started + frameIndex * 1000 / fps);
+    const durationMicros = Math.round(duration * 1_000_000);
+    let scheduledSlot = 0;
+    let lastKeyFrameTimestamp = Number.NEGATIVE_INFINITY;
+    let pending: { canvas: HTMLCanvasElement; timestamp: number } | undefined;
+
+    const encodeCanvas = (item: typeof pending, frameDuration: number) => {
+      if (!item) return;
+      const frame = new VideoFrame(item.canvas, {
+        timestamp: item.timestamp,
+        duration: Math.max(1, frameDuration),
+      });
+      const keyFrame = item.timestamp === 0 || item.timestamp - lastKeyFrameTimestamp >= 2_000_000;
+      encoder.encode(frame, { keyFrame });
+      if (keyFrame) lastKeyFrameTimestamp = item.timestamp;
+      frame.close();
+    };
+
+    while (scheduledSlot < total) {
+      await waitUntil(started + scheduledSlot * 1000 / fps);
+      const elapsedMs = performance.now() - started;
+      if (pending && elapsedMs >= duration * 1000) {
+        onProgress?.(total, total);
+        break;
+      }
+      const slot = captureSlotForElapsed(
+        elapsedMs,
+        fps,
+        total,
+        scheduledSlot,
+      );
+      const timestamp = Math.round(slot * 1_000_000 / fps);
+      prepared.seek(slot / fps);
       prepared.layer.draw();
       const canvas = prepared.stage.toCanvas({ pixelRatio: 1, imageSmoothingEnabled: true });
-      const frame = new VideoFrame(canvas, {
-        timestamp: Math.round(frameIndex * 1_000_000 / fps),
-        duration: Math.round(1_000_000 / fps),
-      });
-      encoder.encode(frame, { keyFrame: frameIndex % (fps * 2) === 0 });
-      frame.close();
-      onProgress?.(frameIndex + 1, total);
+      if (pending) encodeCanvas(pending, timestamp - pending.timestamp);
+      pending = { canvas, timestamp };
+      onProgress?.(slot + 1, total);
+      scheduledSlot = slot + 1;
       if (encoder.encodeQueueSize > 8) await encoder.flush();
       if (encoderError) throw encoderError;
     }
+    if (pending) encodeCanvas(pending, durationMicros - pending.timestamp);
     await encoder.flush();
     if (encoderError) throw encoderError;
     muxer.finalize();
-    return new Blob([target.buffer], { type: 'video/mp4' });
+    const result = await output.complete();
+    completed = true;
+    return result;
   } finally {
     prepared?.destroy();
-    encoder.close();
+    if (encoder.state !== 'closed') encoder.close();
+    if (!completed) await output.abort(encoderError);
   }
+}
+
+export async function renderSlideAsVideoResource(
+  project: ProjectDocumentV2,
+  slideId: string,
+  onProgress?: (frame: number, total: number) => void,
+) {
+  return renderSlideVideo(project, slideId, true, onProgress);
+}
+
+export async function renderSlideAsVideo(
+  project: ProjectDocumentV2,
+  slideId: string,
+  onProgress?: (frame: number, total: number) => void,
+) {
+  return (await renderSlideVideo(project, slideId, false, onProgress)).blob;
 }

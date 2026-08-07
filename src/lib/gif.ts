@@ -3,18 +3,11 @@ import { decompressFrames, parseGIF } from 'gifuct-js';
 interface GifPlaybackController {
   play: (restart?: boolean) => void;
   pause: (reset?: boolean) => void;
+  seek: (timeSeconds: number) => void;
   stop: () => void;
 }
 
 const playbackByCanvas = new WeakMap<HTMLCanvasElement, GifPlaybackController>();
-
-function copyCanvas(source: HTMLCanvasElement) {
-  const copy = document.createElement('canvas');
-  copy.width = source.width;
-  copy.height = source.height;
-  copy.getContext('2d')?.drawImage(source, 0, 0);
-  return copy;
-}
 
 export async function createAnimatedGifCanvas(
   blob: Blob,
@@ -23,44 +16,8 @@ export async function createAnimatedGifCanvas(
   autoPlay = true,
 ): Promise<HTMLCanvasElement> {
   const parsed = parseGIF(await blob.arrayBuffer());
-  const decoded = decompressFrames(parsed, true);
-  if (decoded.length === 0) throw new Error('The GIF contains no frames.');
-
-  const composite = document.createElement('canvas');
-  composite.width = width;
-  composite.height = height;
-  const context = composite.getContext('2d');
-  if (!context) throw new Error('Could not create a GIF canvas.');
-
-  const frames: { canvas: HTMLCanvasElement; delay: number }[] = [];
-  let previousFrame: (typeof decoded)[number] | undefined;
-  let restoreImage: ImageData | undefined;
-
-  for (const frame of decoded) {
-    if (previousFrame?.disposalType === 2) {
-      const d = previousFrame.dims;
-      context.clearRect(d.left, d.top, d.width, d.height);
-    } else if (previousFrame?.disposalType === 3 && restoreImage) {
-      context.putImageData(restoreImage, 0, 0);
-    }
-
-    restoreImage = frame.disposalType === 3
-      ? context.getImageData(0, 0, composite.width, composite.height)
-      : undefined;
-    const patchCanvas = document.createElement('canvas');
-    patchCanvas.width = frame.dims.width;
-    patchCanvas.height = frame.dims.height;
-    const pixels = new Uint8ClampedArray(frame.patch.length);
-    pixels.set(frame.patch);
-    patchCanvas.getContext('2d')?.putImageData(
-      new ImageData(pixels, frame.dims.width, frame.dims.height),
-      0,
-      0,
-    );
-    context.drawImage(patchCanvas, frame.dims.left, frame.dims.top);
-    frames.push({ canvas: copyCanvas(composite), delay: Math.max(20, frame.delay || 100) });
-    previousFrame = frame;
-  }
+  const frames = decompressFrames(parsed, true);
+  if (frames.length === 0) throw new Error('The GIF contains no frames.');
 
   const output = document.createElement('canvas');
   output.width = width;
@@ -68,47 +25,131 @@ export async function createAnimatedGifCanvas(
   const outputContext = output.getContext('2d');
   if (!outputContext) throw new Error('Could not create an animated GIF canvas.');
 
+  // A single reusable patch surface keeps playback memory bounded. Previous
+  // versions retained one full-resolution canvas for every GIF frame.
+  const patchCanvas = document.createElement('canvas');
+  const patchContext = patchCanvas.getContext('2d');
+  if (!patchContext) throw new Error('Could not create a GIF patch canvas.');
+
+  const frameEnds: number[] = [];
+  let totalDuration = 0;
+  for (const frame of frames) {
+    totalDuration += Math.max(20, frame.delay || 100);
+    frameEnds.push(totalDuration);
+  }
+
   let stopped = false;
   let playing = false;
   let timer = 0;
-  let frameIndex = 0;
+  let currentIndex = -1;
+  let currentCycle = -1;
+  let restoreImage: ImageData | undefined;
+
+  const clear = () => {
+    outputContext.clearRect(0, 0, output.width, output.height);
+    currentIndex = -1;
+    restoreImage = undefined;
+  };
+
+  const disposeCurrent = () => {
+    if (currentIndex < 0) return;
+    const current = frames[currentIndex];
+    if (current.disposalType === 2) {
+      outputContext.clearRect(
+        current.dims.left,
+        current.dims.top,
+        current.dims.width,
+        current.dims.height,
+      );
+    } else if (current.disposalType === 3 && restoreImage) {
+      outputContext.putImageData(restoreImage, 0, 0);
+    }
+    restoreImage = undefined;
+  };
+
   const drawFrame = (index: number) => {
     const frame = frames[index];
-    outputContext.clearRect(0, 0, output.width, output.height);
-    outputContext.drawImage(frame.canvas, 0, 0);
+    disposeCurrent();
+    restoreImage = frame.disposalType === 3
+      ? outputContext.getImageData(0, 0, output.width, output.height)
+      : undefined;
+
+    if (patchCanvas.width !== frame.dims.width) patchCanvas.width = frame.dims.width;
+    if (patchCanvas.height !== frame.dims.height) patchCanvas.height = frame.dims.height;
+    patchContext.clearRect(0, 0, patchCanvas.width, patchCanvas.height);
+    const pixels = new Uint8ClampedArray(frame.patch.length);
+    pixels.set(frame.patch);
+    patchContext.putImageData(
+      new ImageData(pixels, frame.dims.width, frame.dims.height),
+      0,
+      0,
+    );
+    outputContext.drawImage(patchCanvas, frame.dims.left, frame.dims.top);
+    currentIndex = index;
   };
-  const drawNext = () => {
-    if (stopped || !playing) return;
-    const frame = frames[frameIndex];
-    drawFrame(frameIndex);
-    frameIndex = (frameIndex + 1) % frames.length;
-    timer = window.setTimeout(drawNext, frame.delay);
+
+  const drawThrough = (targetIndex: number) => {
+    while (currentIndex < targetIndex) drawFrame(currentIndex + 1);
   };
+
+  const resetToFirstFrame = () => {
+    clear();
+    currentCycle = 0;
+    drawFrame(0);
+  };
+
+  const scheduleNext = () => {
+    if (stopped || !playing || currentIndex < 0) return;
+    const delay = Math.max(20, frames[currentIndex].delay || 100);
+    timer = window.setTimeout(() => {
+      if (currentIndex >= frames.length - 1) {
+        clear();
+        currentCycle += 1;
+      }
+      drawFrame(currentIndex + 1);
+      scheduleNext();
+    }, delay);
+  };
+
   const controller: GifPlaybackController = {
     play: (restart = false) => {
-      if (stopped) return;
-      if (playing && !restart) return;
+      if (stopped || (playing && !restart)) return;
       window.clearTimeout(timer);
-      if (restart) frameIndex = 0;
+      if (restart || currentIndex < 0) resetToFirstFrame();
       playing = true;
-      drawNext();
+      scheduleNext();
     },
     pause: (reset = false) => {
       if (stopped) return;
       playing = false;
       window.clearTimeout(timer);
-      if (reset) {
-        frameIndex = 0;
-        drawFrame(frameIndex);
+      if (reset) resetToFirstFrame();
+    },
+    seek: (timeSeconds) => {
+      if (stopped) return;
+      playing = false;
+      window.clearTimeout(timer);
+      const elapsed = Math.max(0, timeSeconds * 1000);
+      const cycle = totalDuration > 0 ? Math.floor(elapsed / totalDuration) : 0;
+      const withinCycle = totalDuration > 0 ? elapsed % totalDuration : 0;
+      const targetIndex = Math.max(0, frameEnds.findIndex((end) => withinCycle < end));
+      if (cycle !== currentCycle || targetIndex < currentIndex) {
+        clear();
+        currentCycle = cycle;
       }
+      drawThrough(targetIndex);
     },
     stop: () => {
       stopped = true;
       playing = false;
       window.clearTimeout(timer);
+      clear();
       frames.length = 0;
+      patchCanvas.width = 1;
+      patchCanvas.height = 1;
     },
   };
+
   playbackByCanvas.set(output, controller);
   if (autoPlay) controller.play(true);
   else controller.pause(true);
@@ -123,6 +164,10 @@ export function setAnimatedGifCanvasPlaying(
   const controller = playbackByCanvas.get(canvas);
   if (playing) controller?.play(restart);
   else controller?.pause(restart);
+}
+
+export function seekAnimatedGifCanvas(canvas: HTMLCanvasElement, timeSeconds: number) {
+  playbackByCanvas.get(canvas)?.seek(timeSeconds);
 }
 
 export function stopAnimatedGifCanvas(canvas: HTMLCanvasElement) {
