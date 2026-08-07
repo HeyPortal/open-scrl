@@ -4,7 +4,7 @@ import type { AssetRepository, PreparedAsset } from './AssetRepository';
 
 export class DuplicateAssetError extends Error {
   readonly existing: AssetMeta;
-  constructor(existing: AssetMeta) { super('Photo has already been imported.'); this.existing = existing; this.name = 'DuplicateAssetError'; }
+  constructor(existing: AssetMeta) { super('Media has already been imported.'); this.existing = existing; this.name = 'DuplicateAssetError'; }
 }
 
 export class AssetImportController {
@@ -32,13 +32,17 @@ export class AssetImportController {
     });
   }
 
-  async import(file: File): Promise<AssetMeta> {
+  async import(file: File, projectId: string): Promise<AssetMeta> {
     await this.acquire();
     try {
       const prepared = await this.prepare(file);
       const duplicate = await this.repository.findByHash(prepared.hash);
-      if (duplicate) throw new DuplicateAssetError(duplicate);
-      return await this.repository.commit(prepared);
+      if (duplicate) {
+        if (await this.repository.isLinkedToProject(projectId, duplicate.id)) throw new DuplicateAssetError(duplicate);
+        await this.repository.linkToProject(projectId, duplicate.id);
+        return duplicate;
+      }
+      return await this.repository.commit(prepared, projectId);
     } finally { this.release(); }
   }
 }

@@ -8,6 +8,7 @@ import { migrateDocument } from '@/core/document/migrations';
 import { command, type EditorCommand } from '@/core/document/commands';
 import { getSlideLayers, materializeSlide } from '@/core/document/selectors';
 import { listProjectSummaries, preserveLegacyBackup, readProject, writeProject, type StoredProjectSummary } from '@/storage/database';
+import { assetRepository } from '@/assets/indexeddb/IndexedDbAssetRepository';
 import { useEditorSession } from './sessionStore';
 
 enablePatches();
@@ -138,6 +139,28 @@ function findLayerSlide(doc: ProjectDocumentV2, layerId: string) {
   return doc.slideOrder.find((sid) => doc.slides[sid]?.layerOrder.includes(layerId));
 }
 
+export async function collectProjectAssetScopes(
+  projects: StoredProjectSummary[],
+  loadProject: typeof readProject = readProject,
+) {
+  const scopes: { projectId: string; assetIds: string[] }[] = [];
+  const failures: { projectId: string; error: unknown }[] = [];
+  for (const project of projects) {
+    try {
+      const stored = await loadProject(project.id);
+      if (!stored) throw new Error('The saved project record is missing.');
+      const doc = migrateDocument(stored);
+      const assetIds = Object.values(doc.layers)
+        .filter((layer): layer is ImageLayer => layer.kind === 'image' && Boolean(layer.assetId))
+        .map((layer) => layer.assetId as string);
+      scopes.push({ projectId: project.id, assetIds });
+    } catch (error) {
+      failures.push({ projectId: project.id, error });
+    }
+  }
+  return { scopes, failures };
+}
+
 export const useDocumentStore = create<EditorState>((set, get) => ({
   doc: newDocument(), projects: [], activeProjectId: null,
   selectedSlideId: '', selectedLayerId: null, zoom: 0.5, panOffset: { x: 0, y: 0 }, leftPanel: 'photos',
@@ -149,7 +172,29 @@ export const useDocumentStore = create<EditorState>((set, get) => ({
   selectSlide: (selectedSlideId) => { useEditorSession.getState().selectSlide(selectedSlideId); set({ selectedSlideId, selectedLayerId: null }); },
   selectLayer: (selectedLayerId) => { useEditorSession.getState().selectLayer(selectedLayerId); set({ selectedLayerId }); },
 
-  loadFromDisk: async () => set({ projects: await listProjectSummaries(), ready: true }),
+  loadFromDisk: async () => {
+    const projects = await listProjectSummaries();
+    try {
+      if (await assetRepository.needsProjectScopeMigration()) {
+        const scan = await collectProjectAssetScopes(projects);
+        for (const failure of scan.failures) {
+          console.warn(`Could not inspect media references for project ${failure.projectId}.`, failure.error);
+        }
+        if (scan.failures.length === 0) {
+          await assetRepository.migrateProjectScopes(scan.scopes, projects[0]?.id);
+        } else {
+          // Do not set the one-time migration marker after a partial scan. A
+          // transient read failure must be retried on the next launch.
+          console.warn('Project media migration was deferred until every project can be read.');
+        }
+      }
+    } catch (error) {
+      // Project loading should never be held hostage by an optional media
+      // migration. The editor can still open and retry on the next launch.
+      console.error('Could not migrate project media libraries.', error);
+    }
+    set({ projects, ready: true });
+  },
   saveToDisk: async () => {
     const { activeProjectId, doc, projects } = get();
     if (!activeProjectId) return;

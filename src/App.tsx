@@ -9,8 +9,9 @@ import { useEditorSession } from './editor/sessionStore';
 const EditorShell=lazy(()=>import('./app/EditorShell'));
 
 export default function App(){
-  const ready=useEditor((s)=>s.ready);const activeProjectId=useEditor((s)=>s.activeProjectId);const revision=useEditor((s)=>s.doc.revision);const load=useEditor((s)=>s.loadFromDisk);const save=useEditor((s)=>s.saveToDisk);const loadAssets=useAssets((s)=>s.loadAll);const controller=useRef<PersistenceController|null>(null);
-  useEffect(()=>{void load();void loadAssets();},[load,loadAssets]);
+  const ready=useEditor((s)=>s.ready);const activeProjectId=useEditor((s)=>s.activeProjectId);const revision=useEditor((s)=>s.doc.revision);const load=useEditor((s)=>s.loadFromDisk);const save=useEditor((s)=>s.saveToDisk);const loadAssets=useAssets((s)=>s.loadForProject);const clearAssets=useAssets((s)=>s.clearProject);const controller=useRef<PersistenceController|null>(null);
+  useEffect(()=>{void load();},[load]);
+  useEffect(()=>{if(!ready)return;if(activeProjectId)void loadAssets(activeProjectId);else clearAssets();},[activeProjectId,clearAssets,loadAssets,ready]);
   useEffect(()=>{controller.current=new PersistenceController(save);return()=>controller.current?.dispose();},[save]);
   useEffect(()=>{if(ready&&activeProjectId)controller.current?.markDirty();},[activeProjectId,ready,revision]);
   useEffect(()=>{const flush=()=>{void controller.current?.flush();};const hidden=()=>{if(document.visibilityState==='hidden')flush();};document.addEventListener('visibilitychange',hidden);window.addEventListener('pagehide',flush);return()=>{document.removeEventListener('visibilitychange',hidden);window.removeEventListener('pagehide',flush);};},[]);

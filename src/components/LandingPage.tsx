@@ -260,7 +260,7 @@ export function LandingPage() {
                 <div>
                   <h2 className="text-sm font-semibold tracking-tight">Your projects</h2>
                   <p className="mt-0.5 text-xs leading-relaxed text-ink-dim">
-                    Recent work appears first. Photos you import live in a shared library for all projects.
+                    Recent work appears first. Every project keeps its own media library.
                   </p>
                 </div>
               </div>
