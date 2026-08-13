@@ -70,6 +70,7 @@ export function PhotosPanel() {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const addImageLayer = useEditor((s) => s.addImageLayer);
+  const duplicateLayer = useEditor((s) => s.duplicateLayer);
   const updateLayer = useEditor((s) => s.updateLayer);
   const selectedLayerId = useEditorSession((s) => s.selectedLayerId);
   const selectedLayer = useEditor((s) => selectedLayerId ? s.doc.layers[selectedLayerId] : undefined);
@@ -90,6 +91,10 @@ export function PhotosPanel() {
 
   const handleAssetClick = (asset: AssetMeta) => {
     const sel = findSelectedImageLayer();
+    if (sel?.assetId === asset.id) {
+      duplicateLayer(sel.id);
+      return;
+    }
     if (sel) {
       updateLayer(sel.id, { assetId: asset.id, locked: false });
     } else {

@@ -1,109 +1,130 @@
-# Open-SCRL
+<p align="center">
+  <img src="./public/pwa-192.png" alt="Open-SCRL logo" width="96" height="96" />
+</p>
 
-An open-source, MIT-licensed photo grid + Instagram carousel maker. PWA, runs
-entirely in your browser, no accounts, no subscriptions, no telemetry.
+<h1 align="center">Open-SCRL</h1>
 
-A free alternative to [SCRL](https://scrl.com) (Appostrophe AB).
+<p align="center">
+  A local-first photo grid and social carousel maker.<br />
+  Create polished, multi-slide posts in your browser—without accounts, subscriptions, or telemetry.
+</p>
 
-## Status
+<p align="center">
+  <a href="https://github.com/HeyPortal/open-scrl/actions/workflows/ci.yml">
+    <img src="https://github.com/HeyPortal/open-scrl/actions/workflows/ci.yml/badge.svg" alt="CI status" />
+  </a>
+  <a href="./LICENSE">
+    <img src="https://img.shields.io/badge/license-MIT-8b5cf6.svg" alt="MIT license" />
+  </a>
+  <img src="https://img.shields.io/badge/privacy-local--first-14b8a6.svg" alt="Local-first" />
+  <img src="https://img.shields.io/badge/platform-PWA-f97316.svg" alt="Progressive Web App" />
+</p>
 
-Early-stage personal project. Phase 1 MVP is functional:
+Open-SCRL is a free, open-source alternative to [SCRL](https://scrl.com). It combines
+photo grids, a layer-based editor, and carousel-ready exports in an installable Progressive
+Web App. Your projects and original media stay on your device.
 
-- Multi-slide projects, every Instagram / TikTok / Pinterest format preset.
-- Drop or import photos, animated GIFs, and videos. Stored locally in IndexedDB/OPFS.
-- **Photo grid templates** (1×1, 2×2, 3×3, 1+2, 2+1, L-shape, 1+4, 3+2, 3+3, …)
-  with adjustable gap. Auto-fills with your imported photos.
-- **Smart snapping** — alignment guides between layers + canvas edges/center.
-- **Layer control** — reorder (drag or arrow buttons), lock, hide, rename,
-  duplicate, delete.
-- Image, text, shape (rect / ellipse) layers with explicit front/back stacking controls and image crop zoom/position controls.
-- Solid + linear gradient backgrounds.
-- Transactional undo / redo (80 steps with a 32 MB patch budget), keyboard shortcuts.
-- Instagram carousel export packages every slide separately: lossless PNG for static slides and high-quality H.264 MP4 for animated slides.
-- Transactional autosave to IndexedDB; reopens existing projects through a versioned migration.
-- Project-scoped media libraries with persistent 240px thumbnails, worker imports, and OPFS-backed originals.
-- Viewport-sized canvas rendering and bounded decoded-image memory.
-- Resolution-aware 512/1024/2048/4096px preview tiers with lightweight navigation frames, selected-item detail upgrades, and a 192 MB LRU-style bitmap budget.
-- Installable PWA.
+> [!NOTE]
+> Open-SCRL is in active early development. The Phase 1 editor is functional, but features
+> and file formats may continue to evolve.
 
-See `PLAN.md` for the long-term roadmap.
+## Highlights
 
-## Run it
+- **Built for social formats** — start with presets for Instagram, TikTok, and Pinterest,
+  then create and reorder multi-slide projects.
+- **Flexible canvas tools** — combine images, animated GIFs, videos, text, rectangles, and
+  ellipses with crop, zoom, positioning, and stacking controls.
+- **Fast photo grids** — choose from layouts such as 1×1, 2×2, 3×3, L-shape, 1+4, and more;
+  adjust the gap and auto-fill them with imported photos.
+- **Precise editing** — use smart alignment guides, layer locking, visibility controls,
+  duplication, renaming, drag-to-reorder, and transactional undo/redo.
+- **Local-first persistence** — projects autosave to IndexedDB while original media is kept
+  in OPFS. No account or cloud upload is required.
+- **Carousel-ready export** — export static slides as lossless PNG and animated slides as
+  high-quality H.264 MP4, packaged in posting order.
+- **Designed for larger projects** — tiered previews, worker-backed imports and exports,
+  bounded image memory, and lightweight navigation frames keep the editor responsive.
+- **Installable PWA** — add Open-SCRL to your desktop or home screen for an app-like
+  experience.
+
+## Quick start
+
+### Prerequisites
+
+- [Node.js 22+](https://nodejs.org/)
+- npm
 
 ```bash
+git clone https://github.com/HeyPortal/open-scrl.git
+cd open-scrl
 npm install
 npm run dev
 ```
 
-Open http://localhost:5173.
+Open [http://localhost:5173](http://localhost:5173) in your browser.
 
-```bash
-npm run build      # production build (PWA enabled)
-npm run preview    # preview the build
-```
+### Useful commands
+
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Start the local development server |
+| `npm run build` | Type-check and create a production build |
+| `npm run preview` | Preview the production build locally |
+| `npm run verify` | Run type-checking, linting, unit tests, build, and bundle checks |
+| `npm run test:e2e` | Run the Playwright end-to-end tests |
 
 ## Keyboard shortcuts
 
-| Action | Shortcut |
+| Action | macOS | Windows / Linux |
+| --- | --- | --- |
+| Undo | `⌘ Z` | `Ctrl Z` |
+| Redo | `⌘ ⇧ Z` | `Ctrl Y` |
+| Duplicate selected layer | `⌘ D` | `Ctrl D` |
+| Delete selected layer | `Delete` / `Backspace` | `Delete` / `Backspace` |
+| Pan or zoom the canvas | Scroll / pinch | Scroll / pinch |
+| Faster zoom | `⌘` + scroll | `Ctrl` + scroll |
+| Edit text in place | Double-click a text layer | Double-click a text layer |
+
+## Under the hood
+
+| Area | Implementation |
 | --- | --- |
-| Undo | ⌘Z / Ctrl+Z |
-| Redo | ⌘⇧Z / Ctrl+Y |
-| Duplicate selected layer | ⌘D / Ctrl+D |
-| Delete selected layer | Delete / Backspace |
-| Pan / zoom canvas | scroll / pinch (⌘+scroll = faster zoom) |
-| Edit text in place | double-click a text layer |
+| App | React 19, TypeScript, Vite, Tailwind CSS |
+| Canvas | Konva and `react-konva` |
+| State and history | Zustand with Immer patches |
+| Local storage | IndexedDB via `idb`, plus OPFS for original media |
+| Import and export | Web Workers, Canvas 2D, WebCodecs, MP4 muxing, and Zip.js |
+| PWA | `vite-plugin-pwa` with an auto-updating service worker |
+| Testing | Vitest and Playwright |
 
-## Tech
+<details>
+<summary><strong>Repository layout</strong></summary>
 
-Vite + React 19 + TypeScript · Konva (`react-konva`) for the viewport renderer ·
-Zustand + Immer patches for state/history · Tailwind v3 · `@dnd-kit/sortable`
-for layer reorder · `idb` + OPFS for local persistence · worker-backed Canvas2D
-export + Zip.js · WebCodecs + MP4 muxing for video export · `vite-plugin-pwa` for service worker + manifest.
-
-## Layout
-
-```
+```text
 src/
-  App.tsx                        lazy shell + autosave + global hotkeys
-  app/EditorShell.tsx            editor-only lazy boundary
-  main.tsx                       entry
-  index.css                      tailwind + component classes
-  types.ts                       Document / Slide / Layer model
-  core/                          framework-independent document + scene model
-  editor/                        document/session stores, history, persistence
-  assets/                        metadata repository, OPFS/IDB storage, imports
-  export/                        shared Canvas2D renderer + export worker
-  render/                        Konva viewport + bounded image resources
-  storage/                       transactional IndexedDB database
-  store/                         compatibility exports + asset UI state
-  lib/
-    format.ts                    canvas size presets
-    grids.ts                     photo grid template definitions
-    snap.ts                      snapping math (returns guides)
-    assets.ts                    asset repository compatibility facade
-    export.ts                    image/video export compatibility facade
-    nano.ts                      ids + helpers
-  components/
-    TopBar.tsx                   project name, format, undo/redo, export
-    LeftRail.tsx                 tool tabs
-    RightPanel.tsx               inspector + layers
-    Inspector.tsx                per-layer property inspector
-    LayersPanel.tsx              draggable layer list
-    Filmstrip.tsx                slide thumbnails / reorder
-    canvas/
-      Canvas.tsx                 main Konva stage with snapping
-      ImageNode.tsx              image layer renderer
-      TextNode.tsx               text layer renderer
-      ShapeNode.tsx              shape layer renderer
-      TextEditor.tsx             in-place text editing overlay
-    panels/
-      TemplatesPanel.tsx         photo grid picker
-      PhotosPanel.tsx            asset library
-      TextPanel.tsx              text presets
-      ShapesPanel.tsx            shape picker
-      BackgroundPanel.tsx        solids + gradients
+├── app/          Editor shell and lazy boundaries
+├── assets/       Media metadata, OPFS/IndexedDB storage, and imports
+├── components/   Editor UI, panels, canvas nodes, and filmstrip
+├── core/         Framework-independent document and scene model
+├── editor/       Session state, history, and persistence
+├── export/       Shared Canvas 2D renderer and export worker
+├── lib/          Formats, grids, snapping, IDs, and compatibility facades
+├── render/       Konva viewport and bounded image resources
+├── storage/      Transactional IndexedDB database
+└── store/        Compatibility exports and asset UI state
 ```
+
+</details>
+
+## Roadmap
+
+The Phase 1 MVP is working, with deeper carousel editing, additional creative tools, and
+export improvements planned. See [PLAN.md](./PLAN.md) for the full roadmap and architecture
+notes.
 
 ## License
 
-MIT — see [LICENSE](./LICENSE).
+Open-SCRL is available under the [MIT License](./LICENSE).
+
+Open-SCRL is an independent project and is not affiliated with SCRL or any social platform
+mentioned in this README.
