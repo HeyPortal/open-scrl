@@ -25,6 +25,12 @@ test('imports, deduplicates, persists, and uses asset metadata',async({page})=>{
   await page.getByTitle('Projects').click();await page.getByRole('button',{name:/First project/}).click();await page.getByRole('button',{name:'Media',exact:true}).click();await expect(page.getByAltText('large.png')).toBeVisible();
 });
 
+test('clicking selected media again duplicates its image layer',async({page})=>{
+  await page.goto('/');await page.getByRole('button',{name:/create|start/i}).first().click();
+  const input=page.locator('input[type=file]');await input.setInputFiles({name:'tiny.png',mimeType:'image/png',buffer:tinyPng});const thumbnail=page.getByAltText('tiny.png');await expect(thumbnail).toBeVisible();
+  await thumbnail.click();await expect(page.getByText('1 of 1')).toBeVisible();await thumbnail.click();await expect(page.getByText('2 of 2')).toBeVisible();
+});
+
 test('moves selected layers backward and forward in the canvas stack',async({page})=>{
   await page.goto('/');await page.getByRole('button',{name:/create|start/i}).first().click();await page.getByRole('button',{name:'Shapes'}).click();await page.getByRole('button',{name:'Rectangle'}).first().click();await page.getByRole('button',{name:'Ellipse'}).first().click();await expect(page.getByText('2 of 2')).toBeVisible();await page.getByRole('button',{name:'Send to back'}).click();await expect(page.getByText('1 of 2')).toBeVisible();await page.getByRole('button',{name:'Bring to front'}).click();await expect(page.getByText('2 of 2')).toBeVisible();
 });
