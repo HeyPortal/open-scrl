@@ -25,6 +25,30 @@ test('imports, deduplicates, persists, and uses asset metadata',async({page})=>{
   await page.getByTitle('Projects').click();await page.getByRole('button',{name:/First project/}).click();await page.getByRole('button',{name:'Media',exact:true}).click();await expect(page.getByAltText('large.png')).toBeVisible();
 });
 
+test('removes a still-photo background on this device',async({page})=>{
+  test.setTimeout(180000);
+  const pageErrors:string[]=[];
+  page.on('pageerror',(error)=>pageErrors.push(error.message));
+  page.on('console',(msg)=>{if(msg.type()==='error')pageErrors.push(msg.text());});
+  await page.goto('/');
+  await page.getByRole('button',{name:'Create & open editor'}).click();
+  await expect(page.getByTitle('Zoom out')).toBeVisible();
+  const pngBase64=await page.evaluate(()=>{
+    const canvas=document.createElement('canvas');
+    canvas.width=320;canvas.height=320;
+    const context=canvas.getContext('2d')!;
+    context.fillStyle='#ffffff';context.fillRect(0,0,320,320);
+    context.fillStyle='#7c5cff';context.beginPath();context.arc(160,160,90,0,Math.PI*2);context.fill();
+    return canvas.toDataURL('image/png').split(',')[1];
+  });
+  await page.locator('input[type=file]').setInputFiles({name:'subject.png',mimeType:'image/png',buffer:Buffer.from(pngBase64,'base64')});
+  await page.getByAltText('subject.png').click();
+  await expect(page.getByRole('button',{name:'Remove background'})).toBeVisible();
+  await page.getByRole('button',{name:'Remove background'}).click();
+  await expect(page.getByRole('button',{name:'Restore original'})).toBeVisible({timeout:120000});
+  expect(pageErrors.filter((message)=>!/Download the React DevTools|React Router/i.test(message))).toEqual([]);
+});
+
 test('clicking selected media again duplicates its image layer',async({page})=>{
   await page.goto('/');await page.getByRole('button',{name:/create|start/i}).first().click();
   const input=page.locator('input[type=file]');await input.setInputFiles({name:'tiny.png',mimeType:'image/png',buffer:tinyPng});const thumbnail=page.getByAltText('tiny.png');await expect(thumbnail).toBeVisible();

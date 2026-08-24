@@ -33,6 +33,11 @@ export default defineConfig({
             handler: 'CacheFirst',
             options: { cacheName: 'optional-editor-tools', expiration: { maxEntries: 8, maxAgeSeconds: 60 * 60 * 24 * 30 } },
           },
+          {
+            urlPattern: /\/models\/.*\.onnx$/,
+            handler: 'CacheFirst',
+            options: { cacheName: 'on-device-models', expiration: { maxEntries: 4, maxAgeSeconds: 60 * 60 * 24 * 365 } },
+          },
         ],
       },
     }),
@@ -47,6 +52,10 @@ export default defineConfig({
     host: true,
   },
   worker: { format: 'es' },
+  assetsInclude: ['**/*.wasm'],
+  optimizeDeps: {
+    exclude: ['onnxruntime-web'],
+  },
   build: {
     rollupOptions: {
       output: {

@@ -27,6 +27,8 @@ export interface ImageLayer extends BaseLayer {
   cropOffsetX: number;
   cropOffsetY: number;
   cropScale: number;
+  /** Original photo when this layer is showing a local background-removed cutout. */
+  sourceAssetId?: string;
 }
 
 export interface TextLayer extends BaseLayer {

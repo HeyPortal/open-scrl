@@ -1,9 +1,12 @@
-import { useRef, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
+import { useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
 import { useEditor } from '@/store/editor';
 import { useEditorSession } from '@/editor/sessionStore';
+import { useAssets } from '@/store/assets';
 import { round } from '@/lib/nano';
-import type { Layer, ShapeLayer, TextLayer } from '@/types';
-import { AlignCenter, AlignLeft, AlignRight, Droplet, Italic, Lock } from 'lucide-react';
+import { canRemoveBackground } from '@/assets/backgroundRemoval';
+import { removeLayerBackground, restoreLayerBackground } from '@/assets/removeLayerBackground';
+import type { ImageLayer, Layer, ShapeLayer, TextLayer } from '@/types';
+import { AlignCenter, AlignLeft, AlignRight, Droplet, Italic, Lock, RotateCcw, WandSparkles } from 'lucide-react';
 import { RotationDial } from './RotationDial';
 
 function useLayerGesture(layerId: string, label: string) {
@@ -499,6 +502,74 @@ function ShapeInspector({ layer }: { layer: ShapeLayer }) {
   );
 }
 
+function ImageInspector({ layer }: { layer: ImageLayer }) {
+  const asset = useAssets((s) => (layer.assetId ? s.assets.find((item) => item.id === layer.assetId) : undefined));
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const stillPhoto = !asset || canRemoveBackground(asset);
+  const empty = !layer.assetId;
+  const disabled = busy || empty || !stillPhoto;
+
+  const removeBackground = async () => {
+    setBusy(true);
+    setError(null);
+    setStatus('Starting…');
+    try {
+      await removeLayerBackground(layer.id, setStatus);
+      setStatus(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not remove the background.');
+      setStatus(null);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="border-b border-line px-3 py-3">
+      <div className="mb-3">
+        <h2 className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">Photo</h2>
+      </div>
+      <div className="rounded-lg border border-line/90 bg-bg-inset/50 px-3 py-2.5 shadow-inner">
+        <p className="mb-2 text-[10px] font-medium uppercase tracking-wide text-ink-faint">Background</p>
+        <button
+          type="button"
+          className={`flex w-full items-center justify-center gap-2 rounded-md border px-2.5 py-2 text-xs font-medium transition-colors ${
+            disabled
+              ? 'cursor-not-allowed border-line bg-bg/40 text-ink-faint'
+              : 'border-accent/40 bg-accent/15 text-accent hover:bg-accent/25'
+          }`}
+          disabled={disabled}
+          onClick={() => void removeBackground()}
+        >
+          <WandSparkles size={14} strokeWidth={2} aria-hidden />
+          {busy ? 'Working…' : 'Remove background'}
+        </button>
+        {layer.sourceAssetId ? (
+          <button
+            type="button"
+            className="mt-2 flex w-full items-center justify-center gap-2 rounded-md border border-line bg-bg/60 px-2.5 py-2 text-xs text-ink-dim transition-colors hover:border-line hover:bg-bg-hover hover:text-ink disabled:cursor-not-allowed disabled:opacity-45"
+            disabled={busy}
+            onClick={() => restoreLayerBackground(layer.id)}
+          >
+            <RotateCcw size={14} strokeWidth={2} aria-hidden />
+            Restore original
+          </button>
+        ) : null}
+        <p className="mt-2 text-[10px] leading-relaxed text-ink-faint">
+          {empty
+            ? 'Drop a still photo onto this layer first.'
+            : !stillPhoto
+              ? 'Works on still photos only — not GIF or video.'
+              : status ?? 'Runs on this device. The photo is not uploaded.'}
+        </p>
+        {error ? <p className="mt-1 text-[10px] leading-relaxed text-red-400">{error}</p> : null}
+      </div>
+    </div>
+  );
+}
+
 export function Inspector() {
   const selectedLayerId = useEditorSession((s) => s.selectedLayerId);
   const layer = useEditor((s) => selectedLayerId ? s.doc.layers[selectedLayerId] : undefined);
@@ -518,6 +589,7 @@ export function Inspector() {
     <div className="overflow-auto text-ink scrollbar-thin">
       <LayoutSection layer={layer} onPatch={u} />
 
+      {layer.kind === 'image' && <ImageInspector layer={layer} />}
       {layer.kind === 'text' && <TextInspector layer={layer} />}
       {layer.kind === 'shape' && <ShapeInspector layer={layer} />}
     </div>

@@ -21,6 +21,7 @@ interface AssetsState {
   clearProject: () => void;
   ensureThumb: (id: string) => Promise<string | undefined>;
   importFiles: (files: File[] | FileList) => Promise<AssetMeta[]>;
+  addAsset: (asset: AssetMeta) => void;
   remove: (id: string) => Promise<void>;
   clearImportMessage: () => void;
 }
@@ -163,6 +164,12 @@ export const useAssets = create<AssetsState>((set, get) => ({
       });
     }
     return imported;
+  },
+
+  addAsset: (asset) => {
+    if (!get().projectId || get().assets.some((existing) => existing.id === asset.id)) return;
+    set({ assets: [...get().assets, asset] });
+    void get().ensureThumb(asset.id);
   },
 
   remove: async (id) => {
