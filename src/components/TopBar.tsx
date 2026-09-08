@@ -71,7 +71,7 @@ export function TopBar() {
         className="icon-btn"
         title="Projects"
         onClick={() => {
-          void closeProject();
+          void closeProject().catch(() => addToast('Could not save your project. Please retry before leaving.', 'error'));
         }}
       >
         <House size={16} />
@@ -80,7 +80,7 @@ export function TopBar() {
         className="icon-btn"
         title="New project"
         onClick={() => {
-          if (confirm('Start a new project? Current work is autosaved separately.')) void newProject();
+          if (confirm('Start a new project? Current work is autosaved separately.')) void newProject().catch(() => addToast('Could not save your project. Please retry.', 'error'));
         }}
       >
         <FilePlus2 size={16} />

@@ -7,10 +7,48 @@ import { renderSlides, type ExportProgress, type RenderOptions } from './canvas2
 export interface ExportRequestOptions extends Partial<RenderOptions> { signal?: AbortSignal; onProgress?: (progress: ExportProgress)=>void }
 const defaults:RenderOptions={format:'png',quality:.95,pixelRatio:1};
 
-async function workerRender(doc:ProjectDocumentV2,indexes:number[],options:RenderOptions,request:ExportRequestOptions):Promise<Blob[]>{
-  if(typeof Worker==='undefined'||typeof OffscreenCanvas==='undefined')return renderSlides(doc,indexes,(assetId)=>assetRepository.readOriginal(assetId),(w,h)=>{const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;return canvas;},options,request.signal,request.onProgress);
-  const worker=new Worker(new URL('./export.worker.ts',import.meta.url),{type:'module'});const requestId=id();
-  return new Promise((resolve,reject)=>{const cancel=()=>worker.postMessage({type:'cancel',id:requestId});request.signal?.addEventListener('abort',cancel,{once:true});worker.onmessage=(event:MessageEvent<{id:string;type:string;blobs?:Blob[];error?:string;progress?:ExportProgress}>)=>{if(event.data.id!==requestId)return;if(event.data.type==='progress'&&event.data.progress)request.onProgress?.(event.data.progress);if(event.data.type==='complete'){worker.terminate();resolve(event.data.blobs??[]);}if(event.data.type==='error'){worker.terminate();reject(new Error(event.data.error));}};worker.postMessage({type:'start',id:requestId,doc,indexes,options});});
+async function workerRender(doc: ProjectDocumentV2, indexes: number[], options: RenderOptions, request: ExportRequestOptions): Promise<Blob[]> {
+  if (request.signal?.aborted) throw new DOMException('Export cancelled.', 'AbortError');
+  if (typeof Worker === 'undefined' || typeof OffscreenCanvas === 'undefined') {
+    return renderSlides(doc, indexes, (assetId) => assetRepository.readOriginal(assetId), (w, h) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      return canvas;
+    }, options, request.signal, request.onProgress);
+  }
+  const worker = new Worker(new URL('./export.worker.ts', import.meta.url), { type: 'module' });
+  const requestId = id();
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      request.signal?.removeEventListener('abort', cancel);
+      worker.onmessage = null;
+      worker.onerror = null;
+      worker.onmessageerror = null;
+      worker.terminate();
+    };
+    const fail = (error: unknown) => { cleanup(); reject(error); };
+    // Each export owns its worker, so cancellation can release decoding and
+    // rendering resources immediately, even if the worker is unresponsive.
+    const cancel = () => fail(new DOMException('Export cancelled.', 'AbortError'));
+    request.signal?.addEventListener('abort', cancel, { once: true });
+    worker.onerror = (event) => {
+      event.preventDefault();
+      fail(new Error(event.message || 'Export worker failed.'));
+    };
+    worker.onmessageerror = () => fail(new Error('Could not read the export worker response.'));
+    worker.onmessage = (event: MessageEvent<{ id: string; type: string; blobs?: Blob[]; error?: string; progress?: ExportProgress }>) => {
+      if (event.data.id !== requestId) return;
+      if (event.data.type === 'progress' && event.data.progress) request.onProgress?.(event.data.progress);
+      if (event.data.type === 'complete') { cleanup(); resolve(event.data.blobs ?? []); }
+      if (event.data.type === 'error') fail(new Error(event.data.error ?? 'Export failed.'));
+    };
+    try {
+      worker.postMessage({ type: 'start', id: requestId, doc, indexes, options });
+    } catch (error) {
+      fail(error);
+    }
+  });
 }
 
 export async function renderProjectSlides(doc:ProjectDocumentV2,indexes:number[],request:ExportRequestOptions={}){const {signal,onProgress,...render}=request;void signal;void onProgress;return workerRender(doc,indexes,{...defaults,...render},request);}
