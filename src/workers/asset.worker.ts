@@ -25,20 +25,22 @@ async function gifDuration(blob: Blob) {
 
 self.onmessage = async (event: MessageEvent<{ id: string; file: File }>) => {
   const { id, file } = event.data;
+  let bitmap: ImageBitmap | undefined;
   try {
     const normalized = await normalize(file);
     const mime = normalized.type || file.type || 'image/png';
     const mediaKind = mime === 'image/gif' ? 'gif' : 'image';
-    const bitmap = await createImageBitmap(normalized);
+    bitmap = await createImageBitmap(normalized);
     const scale = Math.min(1, THUMB_SIZE / Math.max(bitmap.width, bitmap.height));
     const canvas = new OffscreenCanvas(Math.max(1, Math.round(bitmap.width * scale)), Math.max(1, Math.round(bitmap.height * scale)));
     const context = canvas.getContext('2d'); if (!context) throw new Error('Thumbnail canvas unavailable.');
     context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
     const thumbnail = await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.78 });
     const result: PreparedAsset = { file: normalized, thumbnail, hash: await hash(normalized), width: bitmap.width, height: bitmap.height, mime, name: file.name.replace(/\.(heic|heif)$/i, '.jpg'), mediaKind, duration: mediaKind === 'gif' ? await gifDuration(normalized) : 0 };
-    bitmap.close();
     self.postMessage({ id, result });
   } catch (error) {
     self.postMessage({ id, error: error instanceof Error ? error.message : String(error) });
+  } finally {
+    bitmap?.close();
   }
 };

@@ -3,7 +3,7 @@ import { Group, Image as KImage, Line, Rect, Text } from 'react-konva';
 import Konva from 'konva';
 import type { AssetMeta, ImageLayer } from '@/types';
 import { getAsset, getAssetMetadata, getAssetThumbUrl, getAssetUrl } from '@/lib/assets';
-import { imageResourceManager } from '@/render/resources/ImageResourceManager';
+import { imageResourceManager, type ImageLease } from '@/render/resources/ImageResourceManager';
 import { getMediaKind, setVideoElementPlaying } from '@/lib/media';
 import {
   createAnimatedGifCanvas,
@@ -66,7 +66,7 @@ export function ImageNode({ layer, asset, activeSlide, selected, onSelect, onDra
     let cancelled = false;
     let video: HTMLVideoElement | null = null;
     let gifCanvas: HTMLCanvasElement | null = null;
-    let acquiredBase = false;
+    let baseLease: ImageLease | undefined;
     setBaseImg(null); setDetailImg(null); setDetailEdge(NAVIGATION_IMAGE_EDGE); setAnimated(false); setMissing(false);
     if (!layer.assetId) { setMissing(true); return; }
     const assetId = layer.assetId;
@@ -93,14 +93,13 @@ export function ImageNode({ layer, asset, activeSlide, selected, onSelect, onDra
         if (cancelled) { stopAnimatedGifCanvas(gifCanvas); return; }
         setBaseImg(gifCanvas); return;
       }
-      acquiredBase = true;
-      const bitmap = await imageResourceManager.acquire(assetId, NAVIGATION_IMAGE_EDGE, meta);
-      if (cancelled) imageResourceManager.release(assetId, NAVIGATION_IMAGE_EDGE); else setBaseImg(bitmap);
+      baseLease = await imageResourceManager.acquire(assetId, NAVIGATION_IMAGE_EDGE, meta);
+      if (cancelled) baseLease.release(); else setBaseImg(baseLease.bitmap);
     }).catch(() => { if (!cancelled) setMissing(true); });
 
     return () => {
       cancelled = true; video?.pause(); if (gifCanvas) stopAnimatedGifCanvas(gifCanvas);
-      if (acquiredBase) imageResourceManager.release(assetId, NAVIGATION_IMAGE_EDGE);
+      baseLease?.release();
     };
   }, [asset, layer.assetId, loadAnimatedOriginal]);
 
@@ -123,11 +122,16 @@ export function ImageNode({ layer, asset, activeSlide, selected, onSelect, onDra
   }, [detailEdge, requestedEdge]);
 
   useEffect(() => {
-    let cancelled = false; setDetailImg(null);
+    let cancelled = false;
+    let detailLease: ImageLease | undefined;
+    setDetailImg(null);
     if (animated || !layer.assetId || detailEdge <= NAVIGATION_IMAGE_EDGE) return;
     const assetId = layer.assetId;
-    imageResourceManager.acquire(assetId, detailEdge, asset).then((bitmap) => { if (cancelled) imageResourceManager.release(assetId, detailEdge); else setDetailImg(bitmap); }).catch(() => undefined);
-    return () => { cancelled = true; imageResourceManager.release(assetId, detailEdge); };
+    imageResourceManager.acquire(assetId, detailEdge, asset).then((lease) => {
+      detailLease = lease;
+      if (cancelled) lease.release(); else setDetailImg(lease.bitmap);
+    }).catch(() => undefined);
+    return () => { cancelled = true; detailLease?.release(); };
   }, [animated, asset, detailEdge, layer.assetId]);
 
   const img = detailImg ?? baseImg;

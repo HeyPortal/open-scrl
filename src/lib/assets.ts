@@ -60,8 +60,6 @@ async function importPrepared(prepared: PreparedAsset, projectId: string) {
   const duplicate = await assetRepository.findByHash(prepared.hash);
   if (duplicate) {
     if (await assetRepository.isLinkedToProject(projectId, duplicate.id)) throw new DuplicateAssetError(duplicate);
-    await assetRepository.linkToProject(projectId, duplicate.id);
-    return duplicate;
   }
   return assetRepository.commit(prepared, projectId);
 }

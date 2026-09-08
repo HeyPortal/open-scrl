@@ -47,7 +47,7 @@ function drawText(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContex
 
 async function toBlob(surface: Surface, options: RenderOptions) {
   const mime=options.format==='jpeg'?'image/jpeg':'image/png';
-  if (surface instanceof OffscreenCanvas) return surface.convertToBlob({type:mime,quality:options.quality});
+  if ('convertToBlob' in surface) return surface.convertToBlob({type:mime,quality:options.quality});
   return new Promise<Blob>((resolve,reject)=>surface.toBlob((blob)=>blob?resolve(blob):reject(new Error('Canvas encoding failed.')),mime,options.quality));
 }
 

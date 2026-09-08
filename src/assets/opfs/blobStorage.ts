@@ -13,11 +13,19 @@ async function directory(): Promise<FileSystemDirectoryHandle | null> {
 export async function writeOpfsBlob(key: string, blob: Blob): Promise<boolean> {
   const dir = await directory();
   if (!dir) return false;
-  const handle = await dir.getFileHandle(key, { create: true });
-  const writer = await handle.createWritable();
-  await writer.write(blob);
-  await writer.close();
-  return true;
+  let writer: FileSystemWritableFileStream | undefined;
+  try {
+    const handle = await dir.getFileHandle(key, { create: true });
+    writer = await handle.createWritable();
+    await writer.write(blob);
+    await writer.close();
+    return true;
+  } catch {
+    // OPFS may be available while writes fail (for example, quota or file
+    // locking). Release the stream and let the repository use IndexedDB.
+    try { await writer?.abort(); } catch { /* stream already closed */ }
+    return false;
+  }
 }
 
 export async function readOpfsBlob(key: string): Promise<Blob | undefined> {

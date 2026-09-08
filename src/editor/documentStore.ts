@@ -16,6 +16,7 @@ enablePatches();
 const HISTORY_LIMIT = 80;
 const HISTORY_BYTE_LIMIT = 32 * 1024 * 1024;
 const MERGE_WINDOW_MS = 750;
+let saveTail: Promise<void> = Promise.resolve();
 
 export type LeftPanel = 'templates' | 'photos' | 'text' | 'shapes' | 'background' | 'export';
 export type ProjectSummary = StoredProjectSummary;
@@ -51,6 +52,7 @@ export interface EditorState {
   future: HistoryEntry[];
   ready: boolean;
   readOnlyError: string | null;
+  saveError: string | null;
   transaction: ActiveTransaction | null;
 
   setLeftPanel(p: LeftPanel): void;
@@ -164,7 +166,7 @@ export async function collectProjectAssetScopes(
 export const useDocumentStore = create<EditorState>((set, get) => ({
   doc: newDocument(), projects: [], activeProjectId: null,
   selectedSlideId: '', selectedLayerId: null, zoom: 0.5, panOffset: { x: 0, y: 0 }, leftPanel: 'photos',
-  past: [], future: [], ready: false, readOnlyError: null, transaction: null,
+  past: [], future: [], ready: false, readOnlyError: null, saveError: null, transaction: null,
 
   setLeftPanel: (leftPanel) => { useEditorSession.getState().setLeftPanel(leftPanel); set({ leftPanel }); },
   setZoom: (zoom) => { useEditorSession.getState().setZoom(zoom); set({ zoom: Math.max(0.05, Math.min(4, zoom)) }); },
@@ -196,11 +198,22 @@ export const useDocumentStore = create<EditorState>((set, get) => ({
     set({ projects, ready: true });
   },
   saveToDisk: async () => {
-    const { activeProjectId, doc, projects } = get();
+    const { activeProjectId, doc } = get();
     if (!activeProjectId) return;
     const s = summary(doc);
-    await writeProject(doc, s);
-    set({ projects: sortProjects([s, ...projects.filter((p) => p.id !== doc.id)]) });
+    // Autosave and navigation both write projects. Preserve invocation order
+    // and merge summaries against current state after each asynchronous write.
+    const work = saveTail.then(async () => {
+      try {
+        await writeProject(doc, s);
+        set((state) => ({ projects: sortProjects([s, ...state.projects.filter((p) => p.id !== doc.id)]), saveError: null }));
+      } catch (error) {
+        set({ saveError: 'Your latest changes could not be saved. Keep this page open and retry saving.' });
+        throw error;
+      }
+    });
+    saveTail = work.catch(() => undefined);
+    await work;
   },
   openProject: async (projectId) => {
     if (get().activeProjectId) await get().saveToDisk();

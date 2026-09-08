@@ -1,4 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
+import { completeTransaction } from './transaction';
 import type { PersistedDocument, ProjectDocumentV2 } from '@/types';
 
 export interface StoredProjectSummary {
@@ -28,17 +29,25 @@ export function getDatabase() {
         if (!db.objectStoreNames.contains('projectIndex')) db.createObjectStore('projectIndex');
         if (!db.objectStoreNames.contains('legacyBackups')) db.createObjectStore('legacyBackups');
       },
-    });
+    }).catch((error) => { dbPromise = null; throw error; });
   }
   return dbPromise;
 }
 
 export async function listProjectSummaries(): Promise<StoredProjectSummary[]> {
   const db = await getDatabase();
-  const current = await db.getAll('projectIndex');
-  if (current.length) return current.sort((a, b) => b.updatedAt - a.updatedAt);
-  const legacy = await db.get('documents', 'projectIndex');
-  return Array.isArray(legacy) ? (legacy as StoredProjectSummary[]).sort((a, b) => b.updatedAt - a.updatedAt) : [];
+  const tx = db.transaction(['projectIndex', 'documents']);
+  const [current, legacy] = await Promise.all([
+    tx.objectStore('projectIndex').getAll(),
+    tx.objectStore('documents').get('projectIndex'),
+  ]);
+  await tx.done;
+  // Projects migrate individually as they are opened. Keep the untouched
+  // legacy projects visible while preferring current summaries by ID.
+  const summaries = new Map<string, StoredProjectSummary>();
+  if (Array.isArray(legacy)) for (const project of legacy) summaries.set(project.id, project);
+  for (const project of current) summaries.set(project.id, project);
+  return [...summaries.values()].sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
 export async function readProject(id: string): Promise<PersistedDocument | undefined> {
@@ -54,9 +63,8 @@ export async function preserveLegacyBackup(id: string, doc: PersistedDocument): 
 export async function writeProject(doc: ProjectDocumentV2, summary: StoredProjectSummary): Promise<void> {
   const db = await getDatabase();
   const tx = db.transaction(['projects', 'projectIndex'], 'readwrite');
-  await Promise.all([
-    tx.objectStore('projects').put(doc, doc.id),
-    tx.objectStore('projectIndex').put(summary, doc.id),
-    tx.done,
-  ]);
+  await completeTransaction(tx, async () => {
+    await tx.objectStore('projects').put(doc, doc.id);
+    await tx.objectStore('projectIndex').put(summary, doc.id);
+  });
 }
