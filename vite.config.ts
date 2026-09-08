@@ -47,6 +47,9 @@ export default defineConfig({
     host: true,
   },
   worker: { format: 'es' },
+  // This worker-only import is missed by the initial dependency scan. Discovering
+  // it during an import otherwise reloads every open page on a cold dev server.
+  optimizeDeps: { include: ['heic2any'] },
   build: {
     rollupOptions: {
       output: {
