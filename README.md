@@ -25,8 +25,8 @@ photo grids, a layer-based editor, and carousel-ready exports in an installable 
 Web App. Your projects and original media stay on your device.
 
 > [!NOTE]
-> Open-SCRL is in active early development. The Phase 1 editor is functional, but features
-> and file formats may continue to evolve.
+> Open-SCRL is in active development. The editor supports local projects, media imports,
+> and carousel exports; features and project formats may continue to evolve.
 
 ## Highlights
 
@@ -35,15 +35,19 @@ Web App. Your projects and original media stay on your device.
 - **Flexible canvas tools** — combine images, animated GIFs, videos, text, rectangles, and
   ellipses with crop, zoom, positioning, and stacking controls.
 - **Fast photo grids** — choose from layouts such as 1×1, 2×2, 3×3, L-shape, 1+4, and more;
-  adjust the gap and auto-fill them with imported photos.
+  adjust the gap, select a photo slot, and choose imported media to fill it.
 - **Precise editing** — use smart alignment guides, layer locking, visibility controls,
   duplication, renaming, drag-to-reorder, and transactional undo/redo.
-- **Local-first persistence** — projects autosave to IndexedDB while original media is kept
-  in OPFS. No account or cloud upload is required.
+- **Reusable media** — imports are deduplicated by content and organized by project.
+  Click the media item used by the selected image layer again to duplicate that layer.
+- **Local-first persistence** — projects autosave in your browser, with IndexedDB fallback
+  for media when OPFS writes are unavailable or fail. Save and load errors include retry
+  controls, and failed import workers recover for subsequent imports.
 - **Carousel-ready export** — export static slides as lossless PNG and animated slides as
-  high-quality H.264 MP4, packaged in posting order.
+  H.264 MP4, packaged as separate, numbered files in a ZIP archive.
 - **Designed for larger projects** — tiered previews, worker-backed imports and exports,
-  bounded image memory, and lightweight navigation frames keep the editor responsive.
+  reusable image resources, and a single-pass scene compiler reduce repeated work.
+  Unused decoded images are released as the cache exceeds its memory budget.
 - **Installable PWA** — add Open-SCRL to your desktop or home screen for an app-like
   experience.
 
@@ -57,7 +61,7 @@ Web App. Your projects and original media stay on your device.
 ```bash
 git clone https://github.com/HeyPortal/open-scrl.git
 cd open-scrl
-npm install
+npm ci
 npm run dev
 ```
 
@@ -71,7 +75,55 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 | `npm run build` | Type-check and create a production build |
 | `npm run preview` | Preview the production build locally |
 | `npm run verify` | Run type-checking, linting, unit tests, build, and bundle checks |
-| `npm run test:e2e` | Run the Playwright end-to-end tests |
+| `npm test` | Run the Vitest unit and regression tests |
+| `npm run test:watch` | Run Vitest in watch mode |
+| `npm run test:e2e` | Run the Playwright browser tests in Chromium |
+
+### Running the checks
+
+Install Playwright's Chromium browser before the first browser-test run:
+
+```bash
+npx playwright install --with-deps chromium
+npm run verify
+npm run test:e2e
+```
+
+The GitHub Actions `verify` job runs both verification commands on Node.js 22.
+`npm run verify` alone does **not** run the browser tests. Playwright starts the
+local development server automatically, or reuses one already running on port 5173.
+
+Vite pre-bundles the worker's HEIC conversion dependency at startup to prevent a
+late dependency-discovery reload during the first media import on a fresh cache.
+
+## Storage and recovery
+
+Projects and media stay in the browser profile and site address where you created
+them. There is no application server, account system, or device-to-device sync.
+Clearing the site's browser data removes its locally saved projects and media.
+
+- Projects autosave to IndexedDB. Media originals and thumbnails use the browser's
+  Origin Private File System (OPFS), with IndexedDB fallback. Older originals already
+  stored in IndexedDB remain readable there.
+- If saving fails, keep the page open and use **Retry saving**. Project-list and
+  media-library load failures also have retry controls.
+- Shared media keeps its other project associations when removed from one project's
+  library. Concurrent imports and deletions use transactional metadata changes and
+  separate staged files to avoid overwriting one another.
+- Opening the same project in multiple tabs does not provide collaborative editing
+  or resolve conflicting edits.
+
+## Browser and export support
+
+The browser test suite runs in Chromium. Media decoding depends on the browser's
+supported image and video codecs. Animated MP4 export requires WebCodecs and an
+available H.264 encoder; the app reports unsupported encoding configurations.
+Static exports can use HTML canvas when workers or OffscreenCanvas are unavailable.
+
+**Slide PNG** downloads the selected slide as an image. **Export Carousel** produces
+one ZIP with a separate file for each slide, in posting order: static slides become
+PNG files and slides containing animated media become MP4 files. Animated exports
+are capped at 60 seconds per slide.
 
 ## Keyboard shortcuts
 
@@ -92,10 +144,10 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 | App | React 19, TypeScript, Vite, Tailwind CSS |
 | Canvas | Konva and `react-konva` |
 | State and history | Zustand with Immer patches |
-| Local storage | IndexedDB via `idb`, plus OPFS for original media |
+| Local storage | Transactional IndexedDB via `idb`; OPFS media files with IndexedDB fallback |
 | Import and export | Web Workers, Canvas 2D, WebCodecs, MP4 muxing, and Zip.js |
 | PWA | `vite-plugin-pwa` with an auto-updating service worker |
-| Testing | Vitest and Playwright |
+| Testing | Vitest regression tests and Playwright Chromium tests, including recovery and cross-tab media flows |
 
 <details>
 <summary><strong>Repository layout</strong></summary>
@@ -109,18 +161,22 @@ src/
 ├── editor/       Session state, history, and persistence
 ├── export/       Shared Canvas 2D renderer and export worker
 ├── lib/          Formats, grids, snapping, IDs, and compatibility facades
-├── render/       Konva viewport and bounded image resources
-├── storage/      Transactional IndexedDB database
-└── store/        Compatibility exports and asset UI state
+├── render/       Shared image resources and memory-budget eviction
+├── storage/      IndexedDB transactions and temporary export files
+├── store/        Compatibility exports and asset UI state
+└── workers/      Media preparation and thumbnail generation
 ```
 
 </details>
 
 ## Roadmap
 
-The Phase 1 MVP is working, with deeper carousel editing, additional creative tools, and
-export improvements planned. See [PLAN.md](./PLAN.md) for the full roadmap and architecture
-notes.
+See [PLAN.md](./PLAN.md) for the original build plan, feature ideas, and architecture
+notes. It includes proposed features and reference-product research, so it is not a
+list of capabilities already implemented.
+
+[PERFORMANCE_REVIEW.md](./PERFORMANCE_REVIEW.md) records the performance and reliability
+review, implemented fixes, validation results, and remaining limitations.
 
 ## License
 
