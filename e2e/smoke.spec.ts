@@ -5,14 +5,68 @@ import { BlobReader, ZipReader } from '@zip.js/zip.js';
 const tinyPng=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=','base64');
 const tinyGif=Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7','base64');
 async function archiveEntries(download:Download){const path=await download.path();expect(path).not.toBeNull();const bytes=await readFile(path!);const reader=new ZipReader(new BlobReader(new Blob([new Uint8Array(bytes)])));const entries=await reader.getEntries();await reader.close();return entries.map((entry)=>entry.filename);}
-test('creates a large project while keeping viewport canvases bounded',async({page})=>{
-  const errors:string[]=[];page.on('pageerror',(error)=>errors.push(error.message));
-  await page.goto('/');await expect(page.getByText('Open-SCRL').first()).toBeVisible();await page.getByRole('button',{name:/create|start/i}).first().click();await expect(page.getByTitle('Zoom out')).toBeVisible();
-  await page.getByRole('button',{name:'Shapes'}).click();const addSlide=page.getByTitle('Add slide');
-  for(let slide=0;slide<20;slide++){for(let layer=0;layer<10;layer++)await page.getByRole('button',{name:'Rectangle'}).first().click();if(slide<19)await addSlide.click();}
-  const canvases=page.locator('canvas');await expect(canvases).toHaveCount(3);const viewport=page.viewportSize()!;const sizes=await canvases.evaluateAll((nodes)=>nodes.map((node)=>({width:(node as HTMLCanvasElement).width,height:(node as HTMLCanvasElement).height})));expect(sizes.every((size)=>size.width<=viewport.width&&size.height<=viewport.height)).toBeTruthy();expect(errors).toEqual([]);
-  const slideDownload=page.waitForEvent('download');await page.getByRole('button',{name:'Slide PNG'}).click();expect((await slideDownload).suggestedFilename()).toMatch(/_20\.png$/);
-  await expect(page.getByRole('button',{name:'Export Carousel'})).toBeVisible();expect(errors).toEqual([]);
+test('creates a large project while keeping viewport canvases bounded', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+
+  await test.step('Create a 20-slide project with 10 layers per slide', async () => {
+    await page.goto('/');
+    await expect(page.getByText('Open-SCRL').first()).toBeVisible();
+    await page.getByRole('button', { name: /create|start/i }).first().click();
+    await expect(page.getByTitle('Zoom out')).toBeVisible();
+    await page.getByRole('button', { name: 'Shapes' }).click();
+    await page.getByRole('button', { name: 'Rectangle' }).first().click();
+    await page.getByTitle('Add slide').click();
+
+    // Exercise creation controls above, then use the same document commands for
+    // bulk setup. Hundreds of separate UI clicks can exhaust the test's budget
+    // on slower runners before it reaches the rendering/export assertions.
+    const size = await page.evaluate(async () => {
+      const path = '/src/editor/documentStore.ts';
+      const { useDocumentStore } = await import(path) as typeof import('../src/editor/documentStore');
+      for (let index = 0; index < 20; index++) {
+        const store = useDocumentStore.getState();
+        const existingSlideId = store.doc.slideOrder[index];
+        if (existingSlideId) store.selectSlide(existingSlideId);
+        else store.addSlide();
+        const slideId = useDocumentStore.getState().selectedSlideId;
+        const count = useDocumentStore.getState().doc.slides[slideId].layerOrder.length;
+        for (let layer = count; layer < 10; layer++) store.addShapeLayer('rect');
+      }
+      const doc = useDocumentStore.getState().doc;
+      return {
+        slides: doc.slideOrder.length,
+        layers: Object.keys(doc.layers).length,
+        layersPerSlide: doc.slideOrder.map((id) => doc.slides[id].layerOrder.length),
+      };
+    });
+    expect(size).toEqual({ slides: 20, layers: 200, layersPerSlide: Array(20).fill(10) });
+  });
+
+  await test.step('Navigate the large project and check viewport canvas bounds', async () => {
+    await page.getByTitle('Slide 1', { exact: true }).click();
+    await page.getByTitle('Slide 20', { exact: true }).click();
+    await expect(page.getByTitle('Slide 20', { exact: true })).toHaveClass(/border-accent/);
+    const canvases = page.locator('canvas');
+    await expect(canvases).toHaveCount(3);
+    const viewport = page.viewportSize()!;
+    const sizes = await canvases.evaluateAll((nodes) => nodes.map((node) => ({
+      width: (node as HTMLCanvasElement).width,
+      height: (node as HTMLCanvasElement).height,
+    })));
+    expect(sizes.every((size) => size.width > 0 && size.height > 0 && size.width <= viewport.width && size.height <= viewport.height)).toBeTruthy();
+    expect(errors).toEqual([]);
+  });
+
+  await test.step('Export the final slide', async () => {
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('button', { name: 'Slide PNG' }).click(),
+    ]);
+    expect(download.suggestedFilename()).toMatch(/_20\.png$/);
+    await expect(page.getByRole('button', { name: 'Export Carousel' })).toBeVisible();
+    expect(errors).toEqual([]);
+  });
 });
 
 test('imports, deduplicates, persists, and uses asset metadata',async({page})=>{
