@@ -1,10 +1,17 @@
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
+import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { ChevronLeft, ChevronRight, Copy, Plus, Trash2 } from 'lucide-react';
 import { useEditor } from '@/store/editor';
 import { useAssets } from '@/store/assets';
 import type { Slide } from '@/types';
 import { materializeSlides } from '@/core/document/selectors';
 import { useEditorSession } from '@/editor/sessionStore';
+import { useContextMenu } from './Menu';
+import { slideMenu } from '@/app/menus';
+
+const THUMB_H = 56;
 
 function SlidePreview({
   slide,
@@ -22,14 +29,14 @@ function SlidePreview({
       ? slide.background.color
       : `linear-gradient(${slide.background.angle}deg, ${slide.background.from}, ${slide.background.to})`;
   const scaleX = thumbW / format.width;
-  const scaleY = 56 / format.height;
+  const scaleY = THUMB_H / format.height;
 
   return (
     <div
       className="absolute inset-0 overflow-hidden"
       style={{
         width: thumbW,
-        height: 56,
+        height: THUMB_H,
         background: bg,
       }}
     >
@@ -114,93 +121,37 @@ interface SlideThumbProps {
   slide: Slide;
   index: number;
   active: boolean;
-  slideCount: number;
   thumbW: number;
   thumbs: Record<string, string>;
   format: { width: number; height: number };
   onSelect: (slideId: string) => void;
-  onDuplicate: (slideId: string) => void;
-  onDelete: (slideId: string) => void;
-  onMove: (from: number, to: number) => void;
+  onMenu: (slideId: string, x: number, y: number) => void;
 }
 
-const SlideThumb = memo(function SlideThumb({
-  slide,
-  index,
-  active,
-  slideCount,
-  thumbW,
-  thumbs,
-  format,
-  onSelect,
-  onDuplicate,
-  onDelete,
-  onMove,
-}: SlideThumbProps) {
+const SlideThumb = memo(function SlideThumb({ slide, index, active, thumbW, thumbs, format, onSelect, onMenu }: SlideThumbProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: slide.id });
   return (
-    <div className="relative group flex flex-col items-center">
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Translate.toString(transform), transition, zIndex: isDragging ? 10 : undefined }}
+      className="flex shrink-0 flex-col items-center gap-1.5"
+    >
       <button
         type="button"
+        {...attributes}
+        {...listeners}
         onClick={() => onSelect(slide.id)}
-        className={`relative rounded border-2 transition-colors ${
-          active ? 'border-accent' : 'border-line hover:border-ink-faint'
-        }`}
-        style={{
-          width: thumbW,
-          height: 56,
-        }}
+        onContextMenu={(e) => { e.preventDefault(); onMenu(slide.id, e.clientX, e.clientY); }}
+        className={`relative overflow-hidden rounded-md border-2 transition-all ${
+          active ? 'border-accent' : 'border-transparent ring-1 ring-line-strong hover:ring-ink-faint'
+        } ${isDragging ? 'scale-105 cursor-grabbing shadow-lift' : 'cursor-pointer'}`}
+        style={{ width: thumbW + 4, height: THUMB_H + 4 }}
         title={`Slide ${index + 1}`}
+        aria-current={active ? 'true' : undefined}
       >
         <SlidePreview slide={slide} thumbs={thumbs} thumbW={thumbW} format={format} />
-        <span className="absolute -top-2 -left-2 z-10 rounded bg-bg-inset px-1.5 text-[10px] font-medium tabular-nums text-ink-dim ring-1 ring-line">
-          {index + 1}
-        </span>
       </button>
-      <div className="mt-1 flex h-5 items-center justify-center">
-        <div
-          className={`flex items-center gap-0.5 transition-opacity ${
-            active
-              ? 'opacity-100'
-              : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100'
-          }`}
-        >
-          <button
-            className="icon-btn !h-5 !w-5"
-            type="button"
-            title="Move left"
-            disabled={index === 0}
-            onClick={() => onMove(index, index - 1)}
-          >
-            <ChevronLeft size={12} aria-hidden />
-          </button>
-          <button
-            className="icon-btn !h-5 !w-5"
-            type="button"
-            title="Duplicate"
-            onClick={() => onDuplicate(slide.id)}
-          >
-            <Copy size={12} aria-hidden />
-          </button>
-          <button
-            className="icon-btn !h-5 !w-5 disabled:opacity-30"
-            type="button"
-            title="Delete"
-            disabled={slideCount <= 1}
-            onClick={() => onDelete(slide.id)}
-          >
-            <Trash2 size={12} aria-hidden />
-          </button>
-          <button
-            className="icon-btn !h-5 !w-5"
-            type="button"
-            title="Move right"
-            disabled={index === slideCount - 1}
-            onClick={() => onMove(index, index + 1)}
-          >
-            <ChevronRight size={12} aria-hidden />
-          </button>
-        </div>
-      </div>
+      <span className={`text-[10px] font-medium tabular-nums ${active ? 'text-ink' : 'text-ink-faint'}`}>{index + 1}</span>
     </div>
   );
 });
@@ -216,39 +167,78 @@ export function Filmstrip() {
   const dup = useEditor((s) => s.duplicateSlide);
   const del = useEditor((s) => s.deleteSlide);
   const moveSlide = useEditor((s) => s.moveSlide);
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  const openMenu = useContextMenu((s) => s.open);
+  const onMenu = useCallback((slideId: string, x: number, y: number) => {
+    focusSlide(slideId);
+    openMenu(x, y, slideMenu(), 'Slide actions');
+  }, [focusSlide, openMenu]);
 
   const ratio = format.width / format.height;
-  const thumbW = 56 * ratio;
+  const thumbW = THUMB_H * ratio;
+  const index = Math.max(0, doc.slideOrder.indexOf(selected));
+  const count = slides.length;
+  const selectedId = doc.slideOrder[index];
+
+  const onDragEnd = (e: DragEndEvent) => {
+    if (!e.over || e.active.id === e.over.id) return;
+    const from = doc.slideOrder.indexOf(String(e.active.id));
+    const to = doc.slideOrder.indexOf(String(e.over.id));
+    if (from >= 0 && to >= 0) moveSlide(from, to);
+  };
 
   return (
-    <div className="h-24 bg-bg-rail border-t border-line flex items-center px-3 gap-2 overflow-x-auto scrollbar-thin">
-      {slides.map((s, i) => (
-        <SlideThumb
-          key={s.id}
-          slide={s}
-          index={i}
-          active={s.id === selected}
-          slideCount={slides.length}
-          thumbW={thumbW}
-          thumbs={thumbs}
-          format={format}
-          onSelect={focusSlide}
-          onDuplicate={dup}
-          onDelete={del}
-          onMove={moveSlide}
-        />
-      ))}
-      <div className="ml-2 flex flex-col items-center">
-        <button
-          type="button"
-          className="flex items-center justify-center rounded border border-dashed border-line text-ink-faint transition-colors hover:border-accent hover:text-accent"
-          style={{ width: thumbW, height: 56 }}
-          onClick={() => addSlide()}
-          title="Add slide"
-        >
-          <Plus size={18} aria-hidden />
-        </button>
-        <div className="mt-1 h-5 shrink-0" aria-hidden />
+    <div className="flex h-[100px] shrink-0 items-stretch border-t border-line bg-bg-rail">
+      <div className="flex min-w-0 flex-1 items-center gap-3 overflow-x-auto px-4 scrollbar-thin">
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+          <SortableContext items={doc.slideOrder} strategy={horizontalListSortingStrategy}>
+            {slides.map((s, i) => (
+              <SlideThumb
+                key={s.id}
+                slide={s}
+                index={i}
+                active={s.id === selected}
+                thumbW={thumbW}
+                thumbs={thumbs}
+                format={format}
+                onSelect={focusSlide}
+                onMenu={onMenu}
+              />
+            ))}
+          </SortableContext>
+        </DndContext>
+        <div className="flex shrink-0 flex-col items-center gap-1.5">
+          <button
+            type="button"
+            className="flex items-center justify-center rounded-md border border-dashed border-line-strong text-ink-faint transition-colors hover:border-accent hover:bg-accent-soft hover:text-accent"
+            style={{ width: thumbW + 4, height: THUMB_H + 4 }}
+            onClick={() => addSlide()}
+            title="Add slide"
+          >
+            <Plus size={20} aria-hidden />
+          </button>
+          <span className="text-[10px] text-transparent" aria-hidden>+</span>
+        </div>
+      </div>
+      <div className="flex shrink-0 flex-col justify-center gap-1.5 border-l border-line px-3">
+        <p className="px-1 text-[11px] text-ink-faint">
+          Slide <span className="font-semibold tabular-nums text-ink">{index + 1}</span>
+          <span className="tabular-nums text-ink-faint"> / {count}</span>
+        </p>
+        <div className="flex items-center gap-0.5 rounded-md bg-bg-inset p-0.5">
+          <button className="icon-btn" type="button" title="Move slide left" aria-label="Move slide left" disabled={index === 0} onClick={() => moveSlide(index, index - 1)}>
+            <ChevronLeft size={16} aria-hidden />
+          </button>
+          <button className="icon-btn" type="button" title="Move slide right" aria-label="Move slide right" disabled={index >= count - 1} onClick={() => moveSlide(index, index + 1)}>
+            <ChevronRight size={16} aria-hidden />
+          </button>
+          <button className="icon-btn" type="button" title="Duplicate slide" aria-label="Duplicate slide" onClick={() => selectedId && dup(selectedId)}>
+            <Copy size={15} aria-hidden />
+          </button>
+          <button className="icon-btn danger-hover" type="button" title="Delete slide" aria-label="Delete slide" disabled={count <= 1} onClick={() => selectedId && del(selectedId)}>
+            <Trash2 size={15} aria-hidden />
+          </button>
+        </div>
       </div>
     </div>
   );

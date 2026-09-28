@@ -23,12 +23,14 @@ type Props = {
   size?: number;
   onInteractionStart?: () => void;
   onInteractionEnd?: (cancelled: boolean) => void;
+  /** Hide the degree readout (the caller shows its own). */
+  compact?: boolean;
 };
 
-export function RotationDial({ value, onChange, disabled, size = 92, onInteractionStart, onInteractionEnd }: Props) {
+export function RotationDial({ value, onChange, disabled, size = 92, onInteractionStart, onInteractionEnd, compact = false }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const display = norm360(value);
-  const r = (size / 2) * 0.72;
+  const r = compact ? size / 2 - 2 : (size / 2) * 0.72;
   const cx = size / 2;
   const cy = size / 2;
   const handRad = ((display - 90) * Math.PI) / 180;
@@ -91,7 +93,7 @@ export function RotationDial({ value, onChange, disabled, size = 92, onInteracti
         y2={cy + r2 * Math.sin(rad)}
         stroke="currentColor"
         strokeWidth={1.5}
-        className="text-line"
+        className="text-line-strong"
       />
     );
   });
@@ -113,12 +115,12 @@ export function RotationDial({ value, onChange, disabled, size = 92, onInteracti
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        className={`touch-none select-none rounded-full outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg-inset ${
+        className={`touch-none select-none rounded-full outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg-panel ${
           disabled ? '' : 'cursor-pointer'
         }`}
       >
         <svg width={size} height={size} className="text-ink-dim" aria-hidden>
-          <circle
+          {!compact && <circle
             cx={cx}
             cy={cy}
             r={r + 6}
@@ -126,8 +128,8 @@ export function RotationDial({ value, onChange, disabled, size = 92, onInteracti
             stroke="currentColor"
             strokeOpacity={0.35}
             strokeWidth={1}
-          />
-          {ticks}
+          />}
+          {!compact && ticks}
           <circle cx={cx} cy={cy} r={r} fill="none" stroke="currentColor" strokeOpacity={0.5} strokeWidth={1} />
           <line
             x1={cx}
@@ -135,16 +137,18 @@ export function RotationDial({ value, onChange, disabled, size = 92, onInteracti
             x2={hx}
             y2={hy}
             stroke="#7c5cff"
-            strokeWidth={2.5}
+            strokeWidth={compact ? 2 : 2.5}
             strokeLinecap="round"
           />
-          <circle cx={cx} cy={cy} r={5} fill="#1d1d27" stroke="#7c5cff" strokeWidth={1.5} />
+          <circle cx={cx} cy={cy} r={compact ? 3 : 5} fill="#18181c" stroke="#7c5cff" strokeWidth={1.5} />
         </svg>
       </div>
-      <div className="flex items-center gap-2 text-[11px] tabular-nums text-ink-dim">
-        <span className="font-medium text-ink">{Math.round(display)}°</span>
-        <span className="text-ink-faint">· drag dial</span>
-      </div>
+      {!compact && (
+        <div className="flex items-center gap-2 text-[11px] tabular-nums text-ink-dim">
+          <span className="font-medium text-ink">{Math.round(display)}°</span>
+          <span className="text-ink-faint">· drag dial</span>
+        </div>
+      )}
     </div>
   );
 }

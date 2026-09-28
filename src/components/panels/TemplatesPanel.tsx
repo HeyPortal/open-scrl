@@ -1,19 +1,17 @@
-import { type CSSProperties, useState } from 'react';
+import { useState } from 'react';
 import { GRID_TEMPLATES, type GridTemplate } from '@/lib/grids';
 import { useEditor } from '@/store/editor';
+import { PanelHeader, Slider } from '../ui';
+import { isMac } from '@/app/actions';
 
-function GridThumb({ tpl, gap }: { tpl: GridTemplate; gap: number }) {
+function GridThumb({ tpl, gap, ratio }: { tpl: GridTemplate; gap: number; ratio: number }) {
   const W = 80;
-  const H = 100;
+  const H = W / ratio;
   const previewGap = (gap / 120) * 8;
   const cells = tpl.cells(W, H, previewGap);
   return (
-    <svg
-      viewBox={`0 0 ${W} ${H}`}
-      className="h-full w-full rounded"
-      preserveAspectRatio="xMidYMid meet"
-    >
-      <rect width={W} height={H} fill="#1d1d27" />
+    <svg viewBox={`0 0 ${W} ${H}`} className="h-full w-full" preserveAspectRatio="xMidYMid meet" aria-hidden>
+      <rect width={W} height={H} rx={2} fill="#141417" />
       {cells.map((c, i) => (
         <rect
           key={i}
@@ -21,9 +19,10 @@ function GridThumb({ tpl, gap }: { tpl: GridTemplate; gap: number }) {
           y={c.y}
           width={c.w}
           height={c.h}
-          fill="#3a3a48"
-          stroke={previewGap === 0 ? '#20202a' : undefined}
-          strokeWidth={previewGap === 0 ? 0.6 : 0}
+          rx={previewGap > 0 ? 1.5 : 0}
+          className="fill-[#3a3a44] transition-colors group-hover:fill-[#7c5cff]"
+          stroke={previewGap === 0 ? '#141417' : undefined}
+          strokeWidth={previewGap === 0 ? 0.8 : 0}
         />
       ))}
     </svg>
@@ -32,43 +31,28 @@ function GridThumb({ tpl, gap }: { tpl: GridTemplate; gap: number }) {
 
 export function TemplatesPanel() {
   const applyGrid = useEditor((s) => s.applyGrid);
+  const format = useEditor((s) => s.doc.format);
   const [gap, setGap] = useState(0);
-  const gapFill = `${(gap / 120) * 100}%`;
+  const ratio = format.width / format.height;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="panel-section">Photo grids</div>
-      <div className="border-b border-line px-3 py-2">
-        <div className="mb-1 flex items-center justify-between gap-2">
-          <span className="text-xs text-ink-dim">Gap</span>
-          <span className="text-xs text-ink-dim">{gap}</span>
-        </div>
-        <div className="rounded-xl border border-line bg-bg/90 px-2 py-1.5 shadow-inner">
-          <input
-            type="range"
-            min={0}
-            max={120}
-            value={gap}
-            onChange={(e) => setGap(Number(e.target.value))}
-            className="inspector-range"
-            style={{ '--range-fill': gapFill } as CSSProperties}
-            aria-valuetext={`${gap} pixels`}
-          />
-        </div>
+      <PanelHeader title="Photo grids" hint={`Replaces the current slide's layers with empty photo slots. Undo with ${isMac ? '⌘' : 'Ctrl'} Z.`} />
+      <div className="px-3 pb-3">
+        <Slider label="Gap between photos" display={`${gap} px`} min={0} max={120} value={gap} onChange={setGap} valueText={`${gap} pixels`} />
       </div>
-      <div className="grid min-h-0 flex-1 grid-cols-2 content-start gap-2 overflow-auto px-3 pb-3 scrollbar-thin">
+      <div className="grid min-h-0 flex-1 grid-cols-3 content-start gap-2 overflow-auto border-t border-line px-3 py-3 scrollbar-thin">
         {GRID_TEMPLATES.map((t) => (
           <button
             key={t.id}
-            className="card flex min-h-[140px] flex-col text-center transition-colors hover:border-accent"
+            className="tile group flex flex-col items-stretch gap-1.5 p-1.5 text-center"
             onClick={() => applyGrid(t, gap)}
+            title={`Apply “${t.name}” grid`}
           >
-            <div className="flex h-28 shrink-0 items-center justify-center bg-bg-inset p-2">
-              <GridThumb tpl={t} gap={gap} />
+            <div className="flex aspect-[4/5] items-center justify-center rounded-lg bg-bg-inset p-1.5">
+              <GridThumb tpl={t} gap={gap} ratio={ratio} />
             </div>
-            <div className="min-h-0 px-2 py-1.5 text-center text-xs">
-              <span className="block min-w-0 truncate">{t.name}</span>
-            </div>
+            <span className="block truncate text-[11px] font-medium text-ink-dim group-hover:text-ink">{t.name}</span>
           </button>
         ))}
       </div>

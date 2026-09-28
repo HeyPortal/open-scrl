@@ -1,5 +1,7 @@
 import { useEditor } from '@/store/editor';
+import { Plus } from 'lucide-react';
 import { useEditorSession } from '@/editor/sessionStore';
+import { PanelHeader } from '../ui';
 
 const PRESETS = [
   { name: 'Big headline', text: 'BIG IDEA', size: 200, weight: 800 },
@@ -30,30 +32,31 @@ export function TextPanel() {
     }
   };
 
+  const editing = selectedLayerId && selectedLayer?.kind === 'text';
+
   return (
-    <div className="flex flex-col h-full">
-      <div className="panel-section">Text</div>
-      <button className="ctrl-btn ctrl-btn-primary mx-3 mb-3 justify-center" onClick={() => addText()}>
-        + Add text
-      </button>
-      <div className="panel-section">Presets</div>
-      <div className="flex flex-col gap-1 px-2 pb-3 overflow-auto scrollbar-thin">
+    <div className="flex h-full flex-col">
+      <PanelHeader title="Text" />
+      <div className="px-3 pb-3">
+        <button className="btn btn-primary w-full" onClick={() => addText()}>
+          <Plus size={16} aria-hidden /> Add text box
+        </button>
+      </div>
+      <div className="flex items-center justify-between border-t border-line px-3 pb-2 pt-3">
+        <h3 className="section-title">Styles</h3>
+        <span className={`text-[11px] ${editing ? 'font-medium text-accent' : 'text-ink-faint'}`}>{editing ? 'Applies to selected text' : 'Click to add'}</span>
+      </div>
+      <div className="flex flex-col gap-2 overflow-auto px-3 pb-4 scrollbar-thin">
         {PRESETS.map((p) => (
-          <button
-            key={p.name}
-            onClick={() => apply(p)}
-            className="card text-left px-3 py-2 hover:border-accent"
-          >
-            <div className="text-[10px] uppercase text-ink-faint tracking-wider">{p.name}</div>
-            <div
-              className="text-ink truncate"
-              style={{ fontSize: Math.min(p.size / 5, 28), fontWeight: p.weight }}
-            >
+          <button key={p.name} onClick={() => apply(p)} className="tile px-3.5 py-3 text-left">
+            <div className="truncate leading-tight text-ink" style={{ fontSize: Math.max(13, Math.min(p.size / 5, 30)), fontWeight: p.weight }}>
               {p.text.split('\n')[0]}
             </div>
+            <div className="mt-1 text-[11px] text-ink-faint">{p.name} · {p.size}px</div>
           </button>
         ))}
       </div>
+      <p className="mt-auto border-t border-line px-3 py-3 text-[11px] leading-relaxed text-ink-faint">Tip: double-click text on the canvas to edit it in place.</p>
     </div>
   );
 }

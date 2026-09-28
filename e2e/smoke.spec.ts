@@ -116,8 +116,24 @@ test('wheel scrolling moves the rendered carousel with the scroll container',asy
   await page.goto('/');await page.getByRole('button',{name:/create|start/i}).first().click();
   const scroll=page.getByTestId('canvas-scroll');await page.getByTitle('Add slide').click();await expect.poll(()=>scroll.evaluate((element)=>element.scrollLeft)).toBeGreaterThan(0);
   const canvasFrame=()=>page.locator('canvas').first().evaluate((canvas)=>{const context=(canvas as HTMLCanvasElement).getContext('2d')!;const {width,height}=canvas as HTMLCanvasElement;const pixels=context.getImageData(0,0,width,height).data;let hash=2166136261;for(let y=0;y<height;y+=17){for(let x=0;x<width;x+=17){const offset=(y*width+x)*4;hash^=pixels[offset];hash=Math.imul(hash,16777619);hash^=pixels[offset+1];hash=Math.imul(hash,16777619);hash^=pixels[offset+2];hash=Math.imul(hash,16777619);}}return(hash>>>0).toString(16);});
-  const beforeColor=await canvasFrame();await page.getByRole('button',{name:'BG'}).click();await page.locator('.grid.grid-cols-6 button').nth(6).click();await expect.poll(canvasFrame).not.toBe(beforeColor);const secondSlideFrame=await canvasFrame();
+  const beforeColor=await canvasFrame();await page.getByRole('button',{name:'Background',exact:true}).click();await page.getByRole('button',{name:'Solid #7c5cff'}).click();await expect.poll(canvasFrame).not.toBe(beforeColor);const secondSlideFrame=await canvasFrame();
   await page.getByTitle('Slide 1').click();await expect.poll(()=>scroll.evaluate((element)=>element.scrollLeft)).toBe(0);await expect.poll(canvasFrame).not.toBe(secondSlideFrame);const firstSlideFrame=await canvasFrame();
   const stage=await page.locator('.konvajs-content').boundingBox();expect(stage).not.toBeNull();await page.mouse.move(stage!.x+stage!.width/2,stage!.y+stage!.height/2);await page.mouse.wheel(0,700);await expect.poll(()=>scroll.evaluate((element)=>element.scrollLeft)).toBeGreaterThan(0);await expect.poll(canvasFrame).not.toBe(firstSlideFrame);
   await page.getByTitle('Slide 1').click();await expect.poll(()=>scroll.evaluate((element)=>element.scrollLeft)).toBe(0);await expect.poll(canvasFrame).toBe(firstSlideFrame);
+});
+
+test('command palette, shortcuts, and context menus drive editor actions',async({page})=>{
+  const errors:string[]=[];page.on('pageerror',(error)=>errors.push(error.message));
+  await page.goto('/');await page.getByRole('button',{name:/create|start/i}).first().click();await expect(page.getByTitle('Projects')).toBeVisible();
+  await page.keyboard.press('Control+k');const palette=page.getByRole('dialog',{name:'Command palette'});await expect(palette).toBeVisible();
+  await page.getByLabel('Search commands').fill('2 × 2');await page.keyboard.press('Enter');await expect(palette).toHaveCount(0);
+  await page.getByRole('tab',{name:/Layers/}).click();await expect(page.getByRole('button',{name:'Photo 4',exact:true})).toBeVisible();
+  await page.getByRole('tab',{name:'Design'}).click();
+  await page.keyboard.press('r');await expect(page.getByLabel('X position')).toHaveValue('324');
+  await page.keyboard.press('Shift+ArrowRight');await expect(page.getByLabel('X position')).toHaveValue('334');
+  await page.keyboard.press('[');await expect(page.getByText('4 of 5')).toBeVisible();
+  const stage=await page.locator('.konvajs-content').boundingBox();await page.mouse.click(stage!.x+stage!.width/2,stage!.y+stage!.height/2,{button:'right'});
+  const menu=page.getByRole('menu',{name:'Canvas actions'});await expect(menu).toBeVisible();await menu.getByRole('menuitem',{name:/Bring to front/}).click();await expect(page.getByText('5 of 5')).toBeVisible();
+  await page.keyboard.press('?');await expect(page.getByRole('dialog',{name:'Keyboard shortcuts'})).toBeVisible();await page.keyboard.press('Escape');await expect(page.getByRole('dialog',{name:'Keyboard shortcuts'})).toHaveCount(0);
+  expect(errors).toEqual([]);
 });

@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
-import { Film, Trash2, Upload } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Check, Film, ImagePlus, Loader2, Trash2, Upload, X } from 'lucide-react';
 import type { AssetMeta } from '@/types';
 import { useAssets } from '@/store/assets';
 import { useEditor } from '@/store/editor';
 import { useEditorSession } from '@/editor/sessionStore';
+import { EmptyState, PanelHeader } from '../ui';
 
 function MediaThumbnail({
   asset,
@@ -47,7 +48,7 @@ function MediaThumbnail({
         />
       ) : (
         <div className="w-full h-full flex flex-col items-center justify-center px-1 text-center">
-          <span className="text-[10px] text-ink-dim uppercase">Media</span>
+          <span className="text-[10px] font-medium text-ink-dim uppercase">Media</span>
           <span className="text-[9px] text-ink-faint truncate max-w-full">{asset.name}</span>
         </div>
       )}
@@ -68,12 +69,22 @@ export function PhotosPanel() {
   const [busy, setBusy] = useState(false);
   const [brokenThumbs, setBrokenThumbs] = useState<Set<string>>(new Set());
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const importRequest = useEditorSession((s) => s.importRequest);
+  const handledRequest = useRef(importRequest);
+  useEffect(() => {
+    // Opens the file picker for "Import media" from the toolbar, palette, or menus.
+    if (importRequest === handledRequest.current) return;
+    handledRequest.current = importRequest;
+    inputRef.current?.click();
+  }, [importRequest]);
 
   const addImageLayer = useEditor((s) => s.addImageLayer);
   const duplicateLayer = useEditor((s) => s.duplicateLayer);
   const updateLayer = useEditor((s) => s.updateLayer);
   const selectedLayerId = useEditorSession((s) => s.selectedLayerId);
   const selectedLayer = useEditor((s) => selectedLayerId ? s.doc.layers[selectedLayerId] : undefined);
+  const layers = useEditor((s) => s.doc.layers);
+  const usedAssets = useMemo(() => new Set(Object.values(layers).flatMap((l) => l.kind === 'image' && l.assetId ? [l.assetId] : [])), [layers]);
 
   const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -102,9 +113,11 @@ export function PhotosPanel() {
     }
   };
 
+  const targetSlot = findSelectedImageLayer();
+
   return (
     <div
-      className="flex flex-col h-full"
+      className="flex h-full flex-col"
       onDragOver={(e) => {
         e.preventDefault();
       }}
@@ -113,14 +126,20 @@ export function PhotosPanel() {
         handleFiles(e.dataTransfer.files);
       }}
     >
-      <div className="panel-section">Media</div>
-      <div className="px-3 pb-3 flex flex-col gap-2 border-b border-line">
+      <PanelHeader title="Media" action={assets.length > 0 ? <span className="text-xs tabular-nums text-ink-faint">{assets.length}</span> : undefined} />
+      <div className="flex flex-col gap-2 px-3 pb-3">
         <button
-          className="ctrl-btn justify-center"
+          className="group flex w-full items-center gap-2.5 rounded-lg border border-dashed border-line-strong px-2.5 py-2 text-left transition-colors hover:border-accent hover:bg-accent-soft disabled:opacity-60"
           onClick={() => inputRef.current?.click()}
           disabled={busy}
         >
-          <Upload size={14} /> {busy ? 'Importing…' : 'Import media'}
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-accent text-white">
+            {busy ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <Upload size={16} aria-hidden />}
+          </span>
+          <span className="min-w-0">
+            <span className="block text-xs font-medium text-ink">{busy ? 'Importing…' : 'Import media'}</span>
+            <span className="block text-[11px] text-ink-faint">or drop photos, GIFs, and videos</span>
+          </span>
         </button>
         <input
           ref={inputRef}
@@ -134,51 +153,71 @@ export function PhotosPanel() {
           }}
         />
         {importMessage && (
-          <div className="text-[11px] text-ink-dim bg-bg-inset border border-line rounded-md px-2 py-2">
-            <div>{importMessage}</div>
-            <button className="mt-1 text-accent hover:text-accent-hover" onClick={clearImportMessage}>
-              dismiss
+          <div className="flex items-start gap-2 rounded-lg bg-bg-inset px-3 py-2 text-xs text-ink-dim">
+            <div className="flex-1 leading-relaxed">{importMessage}</div>
+            <button className="text-ink-faint hover:text-ink" onClick={clearImportMessage} title="Dismiss" aria-label="Dismiss import message">
+              <X size={14} />
             </button>
           </div>
         )}
+        {assets.length > 0 && (
+          <p className={`rounded-lg px-3 py-2 text-[11px] leading-relaxed ${targetSlot ? 'bg-accent-soft text-accent' : 'text-ink-faint'}`}>
+            {targetSlot
+              ? targetSlot.assetId
+                ? <>Click to replace the photo in <strong>{targetSlot.name}</strong>, or click its current photo to duplicate it.</>
+                : <>Click a photo to fill <strong>{targetSlot.name}</strong>.</>
+              : 'Click a photo to add it to the slide.'}
+          </p>
+        )}
       </div>
-      <div className="grid grid-cols-3 gap-1 p-2 overflow-auto scrollbar-thin">
-        {assets.map((a) => (
-          <div key={a.id} className="relative group">
-            <button
-              className="block w-full aspect-square bg-bg-inset overflow-hidden rounded hover:ring-2 hover:ring-accent"
-              onClick={() => handleAssetClick(a)}
-              draggable
-              onDragStart={(e) => {
-                e.dataTransfer.setData('application/x-osc-asset', a.id);
-              }}
-              title={a.name}
-            >
-              <MediaThumbnail
-                asset={a}
-                broken={brokenThumbs.has(a.id)}
-                onError={() => {
-                  setBrokenThumbs((prev) => new Set(prev).add(a.id));
+      <div className="grid grid-cols-3 content-start gap-1.5 overflow-auto border-t border-line px-3 py-3 scrollbar-thin">
+        {assets.map((a) => {
+          const current = targetSlot?.assetId === a.id;
+          return (
+            <div key={a.id} className="group relative">
+              <button
+                className={`block aspect-square w-full overflow-hidden rounded-lg bg-bg-inset transition-shadow hover:ring-2 hover:ring-accent/60 ${current ? 'ring-2 ring-accent ring-offset-1 ring-offset-bg-panel' : ''}`}
+                onClick={() => handleAssetClick(a)}
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('application/x-osc-asset', a.id);
                 }}
-              />
-            </button>
-            {(a.mediaKind === 'video' || a.mediaKind === 'gif' || a.mime.startsWith('video/') || a.mime === 'image/gif') && (
-              <span className="pointer-events-none absolute bottom-1 left-1 flex items-center gap-1 rounded bg-black/65 px-1 py-0.5 text-[9px] font-medium uppercase text-white">
-                <Film size={9} /> {a.mediaKind === 'gif' || a.mime === 'image/gif' ? 'GIF' : 'Video'}
-              </span>
-            )}
-            <button
-              className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 bg-black/60 rounded p-1 hover:bg-black/80"
-              onClick={() => remove(a.id)}
-              title="Delete"
-            >
-              <Trash2 size={12} className="text-white" />
-            </button>
-          </div>
-        ))}
+                title={a.name}
+              >
+                <MediaThumbnail
+                  asset={a}
+                  broken={brokenThumbs.has(a.id)}
+                  onError={() => {
+                    setBrokenThumbs((prev) => new Set(prev).add(a.id));
+                  }}
+                />
+              </button>
+              {(a.mediaKind === 'video' || a.mediaKind === 'gif' || a.mime.startsWith('video/') || a.mime === 'image/gif') && (
+                <span className="pointer-events-none absolute bottom-1 left-1 flex items-center gap-1 rounded-md bg-black/60 px-1 py-0.5 text-[9px] font-semibold uppercase text-white">
+                  <Film size={9} /> {a.mediaKind === 'gif' || a.mime === 'image/gif' ? 'GIF' : 'Video'}
+                </span>
+              )}
+              {usedAssets.has(a.id) && (
+                <span className="pointer-events-none absolute left-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-white shadow" title="Used in this project">
+                  <Check size={10} strokeWidth={3} aria-hidden />
+                </span>
+              )}
+              <button
+                className="absolute right-1 top-1 rounded bg-black/70 p-1 text-white/80 opacity-0 transition-opacity hover:text-red-300 group-hover:opacity-100 focus-visible:opacity-100"
+                onClick={() => remove(a.id)}
+                title="Delete"
+                aria-label={`Remove ${a.name} from this project`}
+              >
+                <Trash2 size={12} />
+              </button>
+            </div>
+          );
+        })}
         {assets.length === 0 && (
-          <div className="col-span-3 text-center text-xs text-ink-faint py-12 px-3">
-            No media yet. Drop images, GIFs, or videos here or use the button above.
+          <div className="col-span-3">
+            <EmptyState icon={<ImagePlus size={22} aria-hidden />} title="No media yet.">
+              Drop images, GIFs, or videos here or use the import button above. Files stay on this device.
+            </EmptyState>
           </div>
         )}
       </div>

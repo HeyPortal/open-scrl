@@ -1,11 +1,11 @@
-import { X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Info, X, XCircle } from 'lucide-react';
 import { useToasts } from '@/store/toasts';
 
-const kindClass = {
-  info: 'border-line',
-  success: 'border-emerald-500/60',
-  warning: 'border-amber-400/70',
-  error: 'border-red-500/70',
+const kindStyle = {
+  info: { Icon: Info, className: 'text-accent' },
+  success: { Icon: CheckCircle2, className: 'text-emerald-400' },
+  warning: { Icon: AlertTriangle, className: 'text-amber-400' },
+  error: { Icon: XCircle, className: 'text-red-400' },
 };
 
 export function ToastViewport() {
@@ -15,24 +15,23 @@ export function ToastViewport() {
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed right-4 bottom-28 z-[1000] flex w-80 flex-col gap-2 pointer-events-none">
-      {toasts.map((toast) => (
-        <div
-          key={toast.id}
-          className={`pointer-events-auto rounded-lg border ${kindClass[toast.kind]} bg-bg-rail/95 px-3 py-2 text-sm text-ink shadow-2xl backdrop-blur`}
-        >
-          <div className="flex items-start gap-2">
+    <div className="pointer-events-none fixed bottom-28 right-4 z-[1000] flex w-80 flex-col gap-2">
+      {toasts.map((toast) => {
+        const { Icon, className } = kindStyle[toast.kind];
+        return (
+          <div
+            key={toast.id}
+            role={toast.kind === 'error' ? 'alert' : 'status'}
+            className="pointer-events-auto flex items-start gap-2.5 rounded-lg border border-line-strong bg-bg-overlay px-3 py-2.5 text-xs text-ink shadow-lift"
+          >
+            <Icon size={17} className={`mt-px shrink-0 ${className}`} aria-hidden />
             <div className="flex-1 leading-snug">{toast.message}</div>
-            <button
-              className="text-ink-faint hover:text-ink"
-              onClick={() => removeToast(toast.id)}
-              title="Dismiss"
-            >
+            <button className="text-ink-faint hover:text-ink" onClick={() => removeToast(toast.id)} title="Dismiss">
               <X size={14} />
             </button>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
