@@ -1,18 +1,13 @@
-import { useState, type FormEvent } from 'react';
-import {
-  FileImage,
-  FilePlus2,
-  FolderOpen,
-  HardDrive,
-  Images,
-  LayoutGrid,
-  Loader2,
-  Sparkles,
-} from 'lucide-react';
+import { useMemo, useState, type FormEvent } from 'react';
+import { ArrowRight, HardDrive, Images, LayoutGrid, List, Loader2, Search } from 'lucide-react';
 import type { Format } from '@/types';
 import { FORMATS } from '@/lib/format';
 import { useEditor } from '@/store/editor';
 import type { ProjectSummary } from '@/store/editor';
+
+type SortKey = 'updated' | 'created' | 'name';
+type View = 'grid' | 'list';
+const VIEW_KEY = 'open-scrl:project-view';
 
 const formatDate = (value: number) =>
   new Intl.DateTimeFormat(undefined, {
@@ -23,96 +18,110 @@ const formatDate = (value: number) =>
     minute: '2-digit',
   }).format(value);
 
-function formatPreviewSize(format: Format, maxW: number, maxH: number) {
-  const r = format.width / format.height;
-  const boxR = maxW / maxH;
-  if (r >= boxR) {
-    const w = maxW;
-    return { width: w, height: w / r };
-  }
-  const h = maxH;
-  return { width: h * r, height: h };
+const COVERS = [
+  ['#f59e0b', '#e11d48'],
+  ['#8b5cf6', '#4f46e5'],
+  ['#0ea5e9', '#10b981'],
+  ['#f472b6', '#8b5cf6'],
+  ['#f97316', '#db2777'],
+  ['#14b8a6', '#6366f1'],
+];
+
+/** Stable decorative cover colours per project (projects have no stored thumbnail). */
+function coverFor(id: string) {
+  let hash = 0;
+  for (const ch of id) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  const [from, to] = COVERS[hash % COVERS.length];
+  return `linear-gradient(135deg, ${from}, ${to})`;
 }
 
-function FormatPreview({ format, label }: { format: Format; label?: string }) {
-  const { width, height } = formatPreviewSize(format, 112, 72);
+function fitBox(format: Format, maxW: number, maxH: number) {
+  const r = format.width / format.height;
+  return r >= maxW / maxH ? { width: maxW, height: maxW / r } : { width: maxH * r, height: maxH };
+}
+
+function FormatOption({ format, selected, onSelect }: { format: Format; selected: boolean; onSelect: () => void }) {
+  const box = fitBox(format, 28, 34);
   return (
-    <div
-      className="flex flex-col items-center gap-2 rounded-xl border border-line bg-bg-inset/80 p-4"
-      aria-hidden
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      onClick={onSelect}
+      className={`flex flex-col items-center gap-2 rounded-lg px-1 pb-2 pt-3 text-center ring-1 ring-inset transition-colors ${
+        selected ? 'bg-accent-soft ring-accent' : 'bg-bg-inset ring-transparent hover:bg-bg-hover hover:ring-line-strong'
+      }`}
     >
-      <div className="flex h-[88px] w-[128px] items-center justify-center rounded-lg bg-bg-rail ring-1 ring-line/60">
-        <div
-          className="rounded-md bg-gradient-to-br from-accent/25 via-accent/10 to-transparent shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ring-1 ring-accent/30"
-          style={{ width, height }}
-        />
-      </div>
-      {label ? (
-        <p className="text-center text-[11px] leading-snug text-ink-dim">{label}</p>
-      ) : (
-        <p className="text-center font-mono text-[10px] text-ink-faint">
-          {format.width}×{format.height}
-        </p>
-      )}
-    </div>
+      <span className="flex h-9 items-center justify-center">
+        <span className={`block rounded-[3px] ${selected ? 'bg-accent' : 'bg-line-strong'}`} style={box} aria-hidden />
+      </span>
+      <span className="w-full">
+        <span className={`block truncate text-[11px] font-medium ${selected ? 'text-ink' : 'text-ink-dim'}`}>{format.name}</span>
+        <span className="block text-[10px] tabular-nums text-ink-faint">{format.width}×{format.height}</span>
+      </span>
+    </button>
   );
 }
 
-function ProjectCard({
-  project,
-  busy,
-  isOpening,
-  onOpen,
-}: {
+function Cover({ project, size }: { project: ProjectSummary; size: { w: number; h: number } }) {
+  const box = fitBox(project.format, size.w, size.h);
+  return <div className="rounded-[3px] ring-1 ring-inset ring-white/10" style={{ ...box, background: coverFor(project.id) }} aria-hidden />;
+}
+
+interface CardProps {
   project: ProjectSummary;
   busy: boolean;
   isOpening: boolean;
   onOpen: () => void;
-}) {
-  const { width, height } = formatPreviewSize(project.format, 100, 56);
+}
+
+function ProjectCard({ project, busy, isOpening, onOpen }: CardProps) {
   return (
     <button
       type="button"
-      className="group relative flex flex-col overflow-hidden rounded-xl border border-line bg-bg-panel text-left shadow-sm transition-all duration-200 hover:border-accent/45 hover:bg-bg-hover hover:shadow-md hover:shadow-black/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg disabled:pointer-events-none disabled:opacity-40"
+      className="group flex flex-col overflow-hidden rounded-lg border border-line bg-bg-panel text-left transition-colors hover:border-line-strong hover:bg-bg-inset disabled:pointer-events-none disabled:opacity-50"
       onClick={onOpen}
       disabled={busy}
       aria-busy={isOpening}
     >
-      <div className="relative border-b border-line bg-gradient-to-b from-bg-inset/50 to-bg-rail px-4 py-5">
-        <div className="mx-auto flex h-[72px] w-[120px] items-center justify-center rounded-lg bg-bg/90 ring-1 ring-line/50">
-          <div
-            className="rounded-md bg-gradient-to-br from-white/[0.08] via-accent/20 to-transparent shadow-inner ring-1 ring-white/5 transition-transform duration-200 group-hover:scale-[1.02]"
-            style={{ width, height }}
-          />
+      <div className="relative flex h-32 items-center justify-center border-b border-line bg-bg">
+        <div className="transition-transform duration-200 group-hover:scale-[1.04]">
+          <Cover project={project} size={{ w: 120, h: 92 }} />
         </div>
         {isOpening && (
-          <div className="absolute inset-0 flex items-center justify-center bg-bg/60 backdrop-blur-[2px]">
-            <Loader2 className="h-6 w-6 animate-spin text-accent" aria-hidden />
+          <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+            <Loader2 className="h-5 w-5 animate-spin text-accent" aria-hidden />
             <span className="sr-only">Opening project</span>
           </div>
         )}
       </div>
-
-      <div className="flex flex-1 flex-col gap-3 p-4">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <h3 className="truncate text-sm font-semibold tracking-tight text-ink group-hover:text-white">
-              {project.name}
-            </h3>
-            <p className="mt-0.5 truncate text-xs text-ink-dim">{project.format.name}</p>
-          </div>
-          <span className="shrink-0 rounded-lg bg-bg-inset p-2 text-ink-dim ring-1 ring-line transition-colors group-hover:text-accent group-hover:ring-accent/25">
-            <FolderOpen size={16} strokeWidth={1.75} />
-          </span>
-        </div>
-
-        <div className="mt-auto flex items-center justify-between gap-2 border-t border-line/80 pt-3 text-[11px] text-ink-faint">
-          <span className="tabular-nums">
-            {project.slideCount} slide{project.slideCount === 1 ? '' : 's'}
-          </span>
-          <span className="truncate text-ink-dim">{formatDate(project.updatedAt)}</span>
-        </div>
+      <div className="flex flex-col gap-0.5 px-3 py-2.5">
+        <h3 className="truncate text-xs font-semibold text-ink">{project.name}</h3>
+        <p className="truncate text-[11px] text-ink-faint">
+          {project.format.name} · {project.slideCount} slide{project.slideCount === 1 ? '' : 's'} · {formatDate(project.updatedAt)}
+        </p>
       </div>
+    </button>
+  );
+}
+
+function ProjectRow({ project, busy, isOpening, onOpen }: CardProps) {
+  return (
+    <button
+      type="button"
+      className="group grid w-full grid-cols-[40px_minmax(0,1fr)_140px_70px_170px_20px] items-center gap-3 rounded-md px-2 py-1.5 text-left text-xs transition-colors hover:bg-bg-hover disabled:pointer-events-none disabled:opacity-50"
+      onClick={onOpen}
+      disabled={busy}
+      aria-busy={isOpening}
+    >
+      <span className="flex h-8 w-10 items-center justify-center rounded bg-bg">
+        <Cover project={project} size={{ w: 30, h: 26 }} />
+      </span>
+      <span className="truncate font-medium text-ink">{project.name}</span>
+      <span className="truncate text-ink-dim">{project.format.name}</span>
+      <span className="tabular-nums text-ink-dim">{project.slideCount}</span>
+      <span className="truncate tabular-nums text-ink-faint">{formatDate(project.updatedAt)}</span>
+      {isOpening ? <Loader2 size={14} className="animate-spin text-accent" aria-hidden /> : <ArrowRight size={14} className="text-ink-faint opacity-0 group-hover:opacity-100" aria-hidden />}
     </button>
   );
 }
@@ -126,9 +135,25 @@ export function LandingPage() {
   const [formatName, setFormatName] = useState(FORMATS[0].name);
   const [busyProjectId, setBusyProjectId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [query, setQuery] = useState('');
+  const [sort, setSort] = useState<SortKey>('updated');
+  const [view, setView] = useState<View>(() => (localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'grid'));
 
   const selectedFormat = FORMATS.find((f) => f.name === formatName) ?? FORMATS[0];
   const openingBusy = busyProjectId !== null;
+  const visibleProjects = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const found = q ? projects.filter((p) => p.name.toLowerCase().includes(q) || p.format.name.toLowerCase().includes(q)) : [...projects];
+    if (sort === 'name') found.sort((a, b) => a.name.localeCompare(b.name));
+    else if (sort === 'created') found.sort((a, b) => b.createdAt - a.createdAt);
+    else found.sort((a, b) => b.updatedAt - a.updatedAt);
+    return found;
+  }, [projects, query, sort]);
+
+  const chooseView = (next: View) => {
+    setView(next);
+    localStorage.setItem(VIEW_KEY, next);
+  };
 
   const createProject = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -149,154 +174,117 @@ export function LandingPage() {
     }
   };
 
+  const itemProps = (project: ProjectSummary) => ({
+    project,
+    busy: openingBusy,
+    isOpening: busyProjectId === project.id,
+    onOpen: () => { void open(project.id); },
+  });
+
   return (
-    <div className="relative min-h-full w-full overflow-auto bg-bg text-ink">
-      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
-        <div className="absolute -left-24 -top-32 h-[420px] w-[420px] rounded-full bg-accent/[0.12] blur-3xl" />
-        <div className="absolute -bottom-40 right-0 h-[360px] w-[360px] rounded-full bg-accent/[0.06] blur-3xl" />
-        <div
-          className="absolute inset-0 opacity-[0.035]"
-          style={{
-            backgroundImage: `linear-gradient(rgba(232,232,238,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(232,232,238,0.5) 1px, transparent 1px)`,
-            backgroundSize: '48px 48px',
-          }}
-        />
-      </div>
+    <div className="flex h-full w-full flex-col bg-bg text-ink">
+      <nav className="flex h-12 shrink-0 items-center justify-between border-b border-line bg-bg-rail px-4">
+        <div className="flex items-center gap-2">
+          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-accent text-white">
+            <LayoutGrid size={13} strokeWidth={2.25} aria-hidden />
+          </span>
+          <span className="text-[13px] font-semibold">Open-SCRL</span>
+        </div>
+        <span className="inline-flex items-center gap-1.5 text-[11px] text-ink-faint">
+          <HardDrive size={12} aria-hidden />
+          Saved on this device — never uploaded
+        </span>
+      </nav>
 
-      <div className="relative mx-auto flex min-h-full w-full max-w-6xl flex-col px-4 py-8 sm:px-6 sm:py-10">
-        <header className="mb-10 flex flex-col gap-6 sm:mb-12 sm:flex-row sm:items-end sm:justify-between">
-          <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-accent to-accent-hover shadow-lg shadow-accent/25 ring-1 ring-white/10">
-              <FileImage size={24} className="text-white" strokeWidth={1.75} />
-            </div>
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-2xl font-semibold tracking-tight sm:text-[1.65rem]">Open-SCRL</h1>
-                <span className="rounded-full border border-line bg-bg-panel px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-ink-dim">
-                  Projects
-                </span>
-              </div>
-              <p className="mt-1.5 max-w-md text-sm leading-relaxed text-ink-dim">
-                Open an existing carousel or start fresh. Everything stays on this device in your browser.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 self-start rounded-xl border border-line bg-bg-panel/80 px-3 py-2 text-xs text-ink-dim backdrop-blur-sm sm:self-auto">
-            <HardDrive size={14} className="shrink-0 text-ink-faint" aria-hidden />
-            <span>Saved in IndexedDB — not uploaded</span>
-          </div>
-        </header>
-
-        <div className="grid flex-1 gap-8 lg:grid-cols-[minmax(0,380px)_1fr] lg:gap-10">
-          <section className="lg:sticky lg:top-8 lg:self-start">
-            <div className="overflow-hidden rounded-2xl border border-line bg-bg-panel/90 shadow-xl shadow-black/20 ring-1 ring-white/[0.04] backdrop-blur-md">
-              <div className="border-b border-line bg-gradient-to-r from-accent/15 via-transparent to-transparent px-5 py-4">
-                <div className="flex items-center gap-2 text-accent">
-                  <Sparkles size={18} strokeWidth={1.75} aria-hidden />
-                  <h2 className="text-sm font-semibold tracking-tight text-ink">New project</h2>
-                </div>
-                <p className="mt-1 text-xs leading-relaxed text-ink-dim">
-                  Name it, pick a canvas size, then jump into the editor.
-                </p>
-              </div>
-
-              <form className="space-y-5 p-5" onSubmit={createProject}>
-                <FormatPreview format={selectedFormat} label={selectedFormat.name} />
-
-                <label className="block">
-                  <span className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-ink-faint">
-                    Project name
-                  </span>
+      <div className="min-h-0 flex-1 overflow-auto scrollbar-thin">
+        <div className="mx-auto w-full max-w-6xl px-6 py-8">
+          <form className="rounded-xl border border-line bg-bg-panel p-4" onSubmit={createProject}>
+            <div className="grid gap-5 lg:grid-cols-[260px_minmax(0,1fr)]">
+              <div className="flex flex-col">
+                <h1 className="text-sm font-semibold">New project</h1>
+                <p className="mt-0.5 text-[11px] text-ink-faint">Pick a canvas size. You can change it later.</p>
+                <label className="mt-4 block">
+                  <span className="field-label mb-1 block">Project name</span>
                   <input
-                    className="input py-2"
+                    className="input h-8"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="My carousel"
                     autoComplete="off"
                   />
                 </label>
-
-                <label className="block">
-                  <span className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-ink-faint">
-                    Canvas format
-                  </span>
-                  <select
-                    className="input py-2"
-                    value={formatName}
-                    onChange={(e) => setFormatName(e.target.value)}
-                  >
-                    {FORMATS.map((format) => (
-                      <option key={format.name} value={format.name}>
-                        {format.name} · {format.width}×{format.height}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <button
-                  type="submit"
-                  className="ctrl-btn ctrl-btn-primary flex h-11 w-full items-center justify-center gap-2 text-sm font-medium shadow-md shadow-accent/20 transition hover:shadow-lg hover:shadow-accent/25 disabled:opacity-60"
-                  disabled={creating}
-                  aria-busy={creating}
-                >
-                  {creating ? (
-                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                  ) : (
-                    <FilePlus2 size={16} strokeWidth={1.75} aria-hidden />
-                  )}
+                <button type="submit" className="btn btn-primary mt-3 w-full" disabled={creating} aria-busy={creating}>
+                  {creating ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : null}
                   {creating ? 'Creating…' : 'Create & open editor'}
+                  {!creating && <ArrowRight size={14} aria-hidden />}
                 </button>
-              </form>
-            </div>
-          </section>
-
-          <section className="min-w-0 pb-8">
-            <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-              <div className="flex items-start gap-3">
-                <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-bg-inset text-accent ring-1 ring-line">
-                  <LayoutGrid size={18} strokeWidth={1.75} aria-hidden />
-                </span>
-                <div>
-                  <h2 className="text-sm font-semibold tracking-tight">Your projects</h2>
-                  <p className="mt-0.5 text-xs leading-relaxed text-ink-dim">
-                    Recent work appears first. Every project keeps its own media library.
-                  </p>
+              </div>
+              <div>
+                <span className="field-label mb-1 block" id="format-label">Canvas format</span>
+                <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6" role="radiogroup" aria-labelledby="format-label">
+                  {FORMATS.map((format) => (
+                    <FormatOption key={format.name} format={format} selected={format.name === formatName} onSelect={() => setFormatName(format.name)} />
+                  ))}
                 </div>
               </div>
-              <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-line bg-bg-panel px-3 py-1.5 text-xs font-medium tabular-nums text-ink-dim">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400/90 shadow-[0_0_8px_rgba(52,211,153,0.5)]" />
-                {projects.length} saved
-              </span>
+            </div>
+          </form>
+
+          <section className="mt-8">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <h2 className="mr-auto flex items-baseline gap-2 text-sm font-semibold">
+                Your projects <span className="text-xs font-normal tabular-nums text-ink-faint">{projects.length}</span>
+              </h2>
+              {projects.length > 0 && (
+                <>
+                  <label className="relative block w-56">
+                    <Search size={13} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-ink-faint" aria-hidden />
+                    <input className="input pl-7" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search projects" aria-label="Search projects" type="search" />
+                  </label>
+                  <select className="input w-auto" value={sort} onChange={(e) => setSort(e.target.value as SortKey)} aria-label="Sort projects">
+                    <option value="updated">Last edited</option>
+                    <option value="created">Date created</option>
+                    <option value="name">Name</option>
+                  </select>
+                  <div className="segmented grid-cols-2" role="group" aria-label="Project view">
+                    <button type="button" className={`segmented-btn w-7 ${view === 'grid' ? 'segmented-btn-active' : ''}`} aria-pressed={view === 'grid'} aria-label="Grid view" title="Grid view" onClick={() => chooseView('grid')}>
+                      <LayoutGrid size={13} aria-hidden />
+                    </button>
+                    <button type="button" className={`segmented-btn w-7 ${view === 'list' ? 'segmented-btn-active' : ''}`} aria-pressed={view === 'list'} aria-label="List view" title="List view" onClick={() => chooseView('list')}>
+                      <List size={13} aria-hidden />
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
 
             {projects.length === 0 ? (
-              <div className="relative overflow-hidden rounded-2xl border border-dashed border-line/80 bg-bg-panel/40 px-6 py-16 text-center sm:py-20">
-                <div className="pointer-events-none absolute left-1/2 top-1/2 h-48 w-48 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent/10 blur-3xl" />
-                <div className="relative mx-auto flex max-w-sm flex-col items-center">
-                  <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-bg-inset ring-1 ring-line">
-                    <Images size={32} className="text-ink-faint" strokeWidth={1.25} aria-hidden />
-                  </div>
-                  <h3 className="text-base font-semibold tracking-tight">No projects yet</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-ink-dim">
-                    Use the panel on the left to create your first project. You can always come back here to
-                    switch carousels.
-                  </p>
+              <div className="flex flex-col items-center rounded-xl border border-dashed border-line-strong px-6 py-16 text-center">
+                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-bg-inset text-ink-dim ring-1 ring-line-strong">
+                  <Images size={18} aria-hidden />
                 </div>
+                <h3 className="text-xs font-semibold">No projects yet</h3>
+                <p className="mt-1 max-w-sm text-[11px] leading-relaxed text-ink-faint">
+                  Create your first project above. Projects you make will appear here.
+                </p>
+              </div>
+            ) : visibleProjects.length === 0 ? (
+              <p className="rounded-lg border border-line px-6 py-10 text-center text-xs text-ink-faint">No projects match “{query}”.</p>
+            ) : view === 'grid' ? (
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                {visibleProjects.map((project) => <ProjectCard key={project.id} {...itemProps(project)} />)}
               </div>
             ) : (
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                {projects.map((project) => (
-                  <ProjectCard
-                    key={project.id}
-                    project={project}
-                    busy={openingBusy}
-                    isOpening={busyProjectId === project.id}
-                    onOpen={() => {
-                      void open(project.id);
-                    }}
-                  />
-                ))}
+              <div className="rounded-lg border border-line bg-bg-panel p-1">
+                <div className="grid grid-cols-[40px_minmax(0,1fr)_140px_70px_170px_20px] gap-3 border-b border-line px-2 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-wider text-ink-faint" aria-hidden>
+                  <span />
+                  <span>Name</span>
+                  <span>Format</span>
+                  <span>Slides</span>
+                  <span>Last edited</span>
+                  <span />
+                </div>
+                {visibleProjects.map((project) => <ProjectRow key={project.id} {...itemProps(project)} />)}
               </div>
             )}
           </section>

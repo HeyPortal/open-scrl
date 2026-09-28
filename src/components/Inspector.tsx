@@ -1,12 +1,44 @@
-import { useRef, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
+import { useRef, useState } from 'react';
+import {
+  AlignCenter,
+  AlignCenterHorizontal,
+  AlignCenterVertical,
+  AlignEndHorizontal,
+  AlignEndVertical,
+  AlignLeft,
+  AlignRight,
+  AlignStartHorizontal,
+  AlignStartVertical,
+  ChevronsDown,
+  ChevronsUp,
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  Eye,
+  EyeOff,
+  Image as ImageIcon,
+  ImagePlus,
+  LayoutGrid,
+  Italic,
+  Layers,
+  Lock,
+  LockOpen,
+  MousePointerClick,
+  Plus,
+  RotateCcw,
+  Square,
+  Trash2,
+  Type,
+} from 'lucide-react';
 import { useEditor } from '@/store/editor';
 import { useEditorSession } from '@/editor/sessionStore';
-import { round } from '@/lib/nano';
-import type { Layer, ShapeLayer, TextLayer } from '@/types';
-import { AlignCenter, AlignLeft, AlignRight, Droplet, Italic, Lock } from 'lucide-react';
+import type { ImageLayer, Layer, ShapeLayer, TextLayer } from '@/types';
+import { GRADIENT_SWATCHES, SOLID_SWATCHES, backgroundCss, sameBackground } from '@/lib/palette';
 import { RotationDial } from './RotationDial';
+import { ColorField, NumberField, Section, Slider, type Gesture } from './ui';
+import { isMac } from '@/app/actions';
 
-function useLayerGesture(layerId: string, label: string) {
+function useLayerGesture(layerId: string, label: string): Gesture {
   const beginTransaction = useEditor((s) => s.beginTransaction);
   const commitTransaction = useEditor((s) => s.commitTransaction);
   const cancelTransaction = useEditor((s) => s.cancelTransaction);
@@ -18,227 +50,296 @@ function useLayerGesture(layerId: string, label: string) {
   };
 }
 
-function clampNum(n: number, min?: number, max?: number) {
-  let v = n;
-  if (min !== undefined) v = Math.max(min, v);
-  if (max !== undefined) v = Math.min(max, v);
-  return v;
-}
+const KIND_META = {
+  image: { label: 'Photo', Icon: ImageIcon },
+  text: { label: 'Text', Icon: Type },
+  shape: { label: 'Shape', Icon: Square },
+} as const;
 
-function ValueChip({ children }: { children: ReactNode }) {
+function LayerHeader({ layer }: { layer: Layer }) {
+  const duplicateLayer = useEditor((s) => s.duplicateLayer);
+  const deleteLayer = useEditor((s) => s.deleteLayer);
+  const toggleLocked = useEditor((s) => s.toggleLocked);
+  const toggleVisible = useEditor((s) => s.toggleVisible);
+  const renameLayer = useEditor((s) => s.renameLayer);
+  const [renaming, setRenaming] = useState(false);
+  const { label, Icon } = KIND_META[layer.kind];
   return (
-    <span className="rounded-md bg-bg px-2 py-0.5 text-[11px] font-semibold tabular-nums text-ink ring-1 ring-line">
-      {children}
-    </span>
-  );
-}
-
-function ColorSwatch({
-  value,
-  onChange,
-  'aria-label': ariaLabel,
-}: {
-  value: string;
-  onChange: (hex: string) => void;
-  'aria-label'?: string;
-}) {
-  return (
-    <div className="flex min-w-0 flex-1 items-center gap-2">
-      <label className="relative h-7 w-9 shrink-0 cursor-pointer overflow-hidden rounded-md border border-line ring-1 ring-line/50">
-        <span className="absolute inset-0" style={{ backgroundColor: value }} aria-hidden />
-        <input
-          type="color"
-          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          aria-label={ariaLabel ?? 'Pick color'}
-        />
-      </label>
-      <span className="truncate font-mono text-[11px] text-ink-dim">{value.toUpperCase()}</span>
+    <div className="flex items-center gap-2 border-b border-line px-3 py-2.5">
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-accent-soft text-accent" title={label}>
+        <Icon size={15} strokeWidth={1.9} aria-hidden />
+      </span>
+      <div className="min-w-0 flex-1">
+        {renaming ? (
+          <input
+            autoFocus
+            className="input h-6 px-1.5 font-semibold"
+            defaultValue={layer.name}
+            aria-label="Layer name"
+            onFocus={(e) => e.currentTarget.select()}
+            onBlur={(e) => { renameLayer(layer.id, e.target.value.trim() || layer.name); setRenaming(false); }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') e.currentTarget.blur();
+              if (e.key === 'Escape') setRenaming(false);
+            }}
+          />
+        ) : (
+          <button className="block max-w-full truncate rounded px-0.5 text-left text-xs font-semibold text-ink hover:bg-bg-hover" title="Rename layer" onClick={() => setRenaming(true)}>
+            {layer.name}
+          </button>
+        )}
+        <p className="truncate px-0.5 text-[11px] tabular-nums text-ink-faint">{Math.round(layer.width)} × {Math.round(layer.height)}{layer.locked ? ' · Locked' : ''}{layer.visible ? '' : ' · Hidden'}</p>
+      </div>
+      <div className="flex shrink-0 items-center">
+        <button className={`icon-btn ${layer.locked ? 'icon-btn-active' : ''}`} title={layer.locked ? 'Unlock layer' : 'Lock layer'} aria-pressed={layer.locked} onClick={() => toggleLocked(layer.id)}>
+          {layer.locked ? <Lock size={14} /> : <LockOpen size={14} />}
+        </button>
+        <button className={`icon-btn ${layer.visible ? '' : 'icon-btn-active'}`} title={layer.visible ? 'Hide layer' : 'Show layer'} aria-pressed={!layer.visible} onClick={() => toggleVisible(layer.id)}>
+          {layer.visible ? <Eye size={14} /> : <EyeOff size={14} />}
+        </button>
+        <button className="icon-btn" title={`Duplicate layer (${isMac ? '⌘' : 'Ctrl'} D)`} onClick={() => duplicateLayer(layer.id)}>
+          <Copy size={14} />
+        </button>
+        <button className="icon-btn danger-hover" title="Delete layer (Del)" onClick={() => deleteLayer(layer.id)}>
+          <Trash2 size={14} />
+        </button>
+      </div>
     </div>
   );
 }
 
-function NumberInput({
-  value,
-  step = 1,
-  min,
-  max,
-  onChange,
-  disabled,
-  className = '',
-  nudgeWithArrows = false,
-}: {
-  value: number;
-  step?: number;
-  min?: number;
-  max?: number;
-  onChange: (v: number) => void;
-  disabled?: boolean;
-  className?: string;
-  /** When focused, ArrowUp/Right and ArrowDown/Left nudge the value (Shift = 10). */
-  nudgeWithArrows?: boolean;
-}) {
-  const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (!nudgeWithArrows || disabled) return;
-    const delta = e.shiftKey ? 10 : 1;
-    if (e.key === 'ArrowUp' || e.key === 'ArrowRight') {
-      e.preventDefault();
-      onChange(clampNum(value + delta, min, max));
-    } else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') {
-      e.preventDefault();
-      onChange(clampNum(value - delta, min, max));
-    }
-  };
-
+function ArrangeSection({ layer }: { layer: Layer }) {
+  const reorderLayer = useEditor((s) => s.reorderLayer);
+  const updateLayer = useEditor((s) => s.updateLayer);
+  const format = useEditor((s) => s.doc.format);
+  const order = useEditor((s) => {
+    const slideId = s.doc.slideOrder.find((id) => s.doc.slides[id].layerOrder.includes(layer.id));
+    return slideId ? s.doc.slides[slideId].layerOrder : [];
+  });
+  const stackIndex = order.indexOf(layer.id);
+  const stackCount = order.length;
+  const atBack = stackIndex <= 0;
+  const atFront = stackIndex >= stackCount - 1;
+  const stack = [
+    { title: 'Send to back', direction: 'bottom' as const, disabled: atBack, Icon: ChevronsDown },
+    { title: 'Send backward', direction: 'down' as const, disabled: atBack, Icon: ChevronDown },
+    { title: 'Bring forward', direction: 'up' as const, disabled: atFront, Icon: ChevronUp },
+    { title: 'Bring to front', direction: 'top' as const, disabled: atFront, Icon: ChevronsUp },
+  ];
+  const align = [
+    { title: 'Align to slide left', Icon: AlignStartVertical, patch: { x: 0 } },
+    { title: 'Center horizontally on slide', Icon: AlignCenterVertical, patch: { x: (format.width - layer.width) / 2 } },
+    { title: 'Align to slide right', Icon: AlignEndVertical, patch: { x: format.width - layer.width } },
+    { title: 'Align to slide top', Icon: AlignStartHorizontal, patch: { y: 0 } },
+    { title: 'Center vertically on slide', Icon: AlignCenterHorizontal, patch: { y: (format.height - layer.height) / 2 } },
+    { title: 'Align to slide bottom', Icon: AlignEndHorizontal, patch: { y: format.height - layer.height } },
+  ];
   return (
-    <input
-      type="number"
-      className={`input h-8 min-w-0 py-0 tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${disabled ? 'cursor-not-allowed opacity-45' : ''} ${className}`}
-      value={Number.isFinite(value) ? round(value) : 0}
-      step={step}
-      min={min}
-      max={max}
-      disabled={disabled}
-      onChange={(e) => onChange(Number(e.target.value))}
-      onKeyDown={onKeyDown}
-    />
+    <Section title="Arrange" action={<span className="text-[11px] tabular-nums text-ink-faint">{stackIndex + 1} of {stackCount}</span>}>
+      <div className="segmented grid-cols-4" role="group" aria-label="Layer position">
+        {stack.map(({ title, direction, disabled, Icon }) => (
+          <button key={title} type="button" className="segmented-btn" title={title} aria-label={title} disabled={disabled} onClick={() => reorderLayer(layer.id, direction)}>
+            <Icon size={15} aria-hidden />
+          </button>
+        ))}
+      </div>
+      <div className="segmented grid-cols-6" role="group" aria-label="Align to slide">
+        {align.map(({ title, Icon, patch }) => (
+          <button key={title} type="button" className="segmented-btn" title={title} aria-label={title} disabled={layer.locked} onClick={() => updateLayer(layer.id, patch)}>
+            <Icon size={15} aria-hidden />
+          </button>
+        ))}
+      </div>
+    </Section>
   );
 }
 
-function LayoutSection({
-  layer,
-  onPatch,
-}: {
-  layer: Layer;
-  onPatch: (patch: Partial<Layer>) => void;
-}) {
+function LayoutSection({ layer, onPatch }: { layer: Layer; onPatch: (patch: Partial<Layer>) => void }) {
   const locked = layer.locked;
   const opacityPct = Math.round(layer.opacity * 100);
   const opacityGesture = useLayerGesture(layer.id, 'Change opacity');
   const rotationGesture = useLayerGesture(layer.id, 'Rotate layer');
+  const moveGesture = useLayerGesture(layer.id, 'Move layer');
+  const sizeGesture = useLayerGesture(layer.id, 'Resize layer');
 
   return (
-    <div className="border-b border-line px-3 py-3">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <div>
-          <h2 className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">Layout</h2>
+    <Section title="Position & size" action={locked ? <span className="inline-flex items-center gap-1 text-[11px] text-ink-faint"><Lock size={11} aria-hidden />Locked</span> : undefined}>
+      <div className="grid grid-cols-2 gap-2">
+        <NumberField prefix="X" ariaLabel="X position" value={layer.x} onChange={(v) => onPatch({ x: v })} disabled={locked} gesture={moveGesture} />
+        <NumberField prefix="Y" ariaLabel="Y position" value={layer.y} onChange={(v) => onPatch({ y: v })} disabled={locked} gesture={moveGesture} />
+        <NumberField prefix="W" ariaLabel="Width" value={layer.width} min={1} onChange={(v) => onPatch({ width: v })} disabled={locked} gesture={sizeGesture} />
+        <NumberField prefix="H" ariaLabel="Height" value={layer.height} min={1} onChange={(v) => onPatch({ height: v })} disabled={locked} gesture={sizeGesture} />
+      </div>
+      <div className="flex items-center gap-2">
+        <div className="flex-1">
+          <NumberField
+            prefix={<RotateCcw size={11} className="-scale-x-100" aria-hidden />}
+            ariaLabel="Rotation"
+            suffix="°"
+            value={Math.round(layer.rotation)}
+            onChange={(v) => onPatch({ rotation: v })}
+            disabled={locked}
+            gesture={rotationGesture}
+          />
         </div>
-        {locked ? (
-          <span
-            className="inline-flex shrink-0 items-center gap-1 rounded-md border border-line bg-bg-inset px-2 py-1 text-[10px] font-medium text-ink-dim"
-            title="This layer is locked. Unlock it in the layer list to move or resize."
+        <RotationDial
+          compact
+          size={32}
+          value={layer.rotation}
+          onChange={(v) => onPatch({ rotation: v })}
+          disabled={locked}
+          onInteractionStart={rotationGesture.begin}
+          onInteractionEnd={(cancelled) => cancelled ? rotationGesture.cancel() : rotationGesture.end()}
+        />
+      </div>
+      <Slider
+        label="Opacity"
+        display={`${opacityPct}%`}
+        min={0}
+        max={1}
+        step={0.01}
+        value={layer.opacity}
+        onChange={(v) => onPatch({ opacity: v })}
+        gesture={opacityGesture}
+        valueText={`${opacityPct} percent`}
+      />
+    </Section>
+  );
+}
+
+const FOCAL_POINTS = [
+  { label: 'Top left', x: -0.5, y: -0.5 },
+  { label: 'Top', x: 0, y: -0.5 },
+  { label: 'Top right', x: 0.5, y: -0.5 },
+  { label: 'Left', x: -0.5, y: 0 },
+  { label: 'Center', x: 0, y: 0 },
+  { label: 'Right', x: 0.5, y: 0 },
+  { label: 'Bottom left', x: -0.5, y: 0.5 },
+  { label: 'Bottom', x: 0, y: 0.5 },
+  { label: 'Bottom right', x: 0.5, y: 0.5 },
+];
+
+function ImageInspector({ layer }: { layer: ImageLayer }) {
+  const updateLayer = useEditor((s) => s.updateLayer);
+  const setLeftPanel = useEditorSession((s) => s.setLeftPanel);
+  const patch = (next: Partial<ImageLayer>) => updateLayer(layer.id, next);
+  const radiusMax = Math.max(1, Math.min(layer.width, layer.height) / 2);
+  const cropScale = Math.min(4, Math.max(1, layer.cropScale || 1));
+  const cropGesture = useLayerGesture(layer.id, 'Change crop');
+  const radiusGesture = useLayerGesture(layer.id, 'Change corner radius');
+  const activeFocalPoint = FOCAL_POINTS.find(
+    (p) => Math.abs(p.x - layer.cropOffsetX) < 0.01 && Math.abs(p.y - layer.cropOffsetY) < 0.01,
+  );
+
+  return (
+    <>
+      <Section
+        title="Photo"
+        action={
+          <button className="text-xs font-medium text-accent hover:text-accent-hover" onClick={() => setLeftPanel('photos')}>
+            {layer.assetId ? 'Replace' : 'Choose photo'}
+          </button>
+        }
+      >
+        {!layer.assetId && (
+          <p className="rounded-lg bg-accent-soft px-3 py-2 text-xs leading-relaxed text-accent">
+            This slot is empty. Pick an item in <strong>Media</strong> to fill it.
+          </p>
+        )}
+        <Slider
+          label="Crop zoom"
+          display={`${cropScale.toFixed(2)}×`}
+          min={1}
+          max={4}
+          step={0.05}
+          value={cropScale}
+          onChange={(v) => patch({ cropScale: v })}
+          gesture={cropGesture}
+          ariaLabel="Crop zoom"
+        />
+        <div className="grid grid-cols-2 gap-3">
+          <Slider
+            label="Horizontal"
+            display={`${Math.round(layer.cropOffsetX * 100)}%`}
+            min={-0.5}
+            max={0.5}
+            step={0.01}
+            value={layer.cropOffsetX}
+            onChange={(v) => patch({ cropOffsetX: v })}
+            gesture={cropGesture}
+            ariaLabel="Horizontal crop position"
+          />
+          <Slider
+            label="Vertical"
+            display={`${Math.round(layer.cropOffsetY * 100)}%`}
+            min={-0.5}
+            max={0.5}
+            step={0.01}
+            value={layer.cropOffsetY}
+            onChange={(v) => patch({ cropOffsetY: v })}
+            gesture={cropGesture}
+            ariaLabel="Vertical crop position"
+          />
+        </div>
+        <div className="flex items-start gap-3">
+          <div className="grid w-[84px] shrink-0 grid-cols-3 gap-1 rounded-lg bg-bg-inset p-1" role="group" aria-label="Focal point">
+            {FOCAL_POINTS.map((point) => {
+              const active = point === activeFocalPoint;
+              return (
+                <button
+                  key={point.label}
+                  type="button"
+                  title={point.label}
+                  aria-label={point.label}
+                  aria-pressed={active}
+                  className={`flex aspect-square items-center justify-center rounded-md transition-colors ${
+                    active ? 'bg-accent text-white' : 'text-ink-faint hover:bg-bg-hover hover:text-ink-dim'
+                  }`}
+                  onClick={() => patch({ cropOffsetX: point.x, cropOffsetY: point.y })}
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                </button>
+              );
+            })}
+          </div>
+          <div className="min-w-0 flex-1 pt-0.5">
+            <p className="field-label">Focal point</p>
+            <p className="mt-0.5 text-xs text-ink">{activeFocalPoint?.label ?? 'Custom'}</p>
+            <p className="mt-1 text-[11px] leading-snug text-ink-faint">Keeps this part of the photo in view when cropping.</p>
+          </div>
+        </div>
+      </Section>
+      <Section
+        title="Corners"
+        action={
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 text-xs font-medium text-ink-dim hover:text-ink"
+            onClick={() => patch({ cornerRadius: 0, cropOffsetX: 0, cropOffsetY: 0, cropScale: 1 })}
+            title="Reset crop and corners"
           >
-            <Lock size={11} strokeWidth={2} className="text-ink-faint" aria-hidden />
-            Locked
-          </span>
-        ) : null}
-      </div>
-
-      <div className="rounded-lg border border-line bg-bg-inset/60 p-3">
-        <p className="mb-2 text-[10px] font-medium uppercase tracking-wide text-ink-faint">Position</p>
-        <div className="grid grid-cols-2 gap-2">
-          <label className="flex min-w-0 flex-col gap-1">
-            <span className="text-[10px] text-ink-dim">X</span>
-            <NumberInput
-              value={layer.x}
-              onChange={(v) => onPatch({ x: v })}
-              disabled={locked}
-              nudgeWithArrows
-            />
-          </label>
-          <label className="flex min-w-0 flex-col gap-1">
-            <span className="text-[10px] text-ink-dim">Y</span>
-            <NumberInput
-              value={layer.y}
-              onChange={(v) => onPatch({ y: v })}
-              disabled={locked}
-              nudgeWithArrows
-            />
-          </label>
-        </div>
-
-        <p className="mb-2 mt-3 text-[10px] font-medium uppercase tracking-wide text-ink-faint">Size</p>
-        <div className="grid grid-cols-2 gap-2">
-          <label className="flex min-w-0 flex-col gap-1">
-            <span className="text-[10px] text-ink-dim">Width</span>
-            <NumberInput value={layer.width} min={1} onChange={(v) => onPatch({ width: v })} disabled={locked} />
-          </label>
-          <label className="flex min-w-0 flex-col gap-1">
-            <span className="text-[10px] text-ink-dim">Height</span>
-            <NumberInput value={layer.height} min={1} onChange={(v) => onPatch({ height: v })} disabled={locked} />
-          </label>
-        </div>
-
-        <p className="mb-2 mt-3 text-[10px] font-medium uppercase tracking-wide text-ink-faint">Transform</p>
-        <div className="flex flex-col items-stretch gap-1">
-          <span className="text-[10px] text-ink-dim">Rotation</span>
-          <div className="flex justify-center py-1">
-            <RotationDial
-              value={layer.rotation}
-              onChange={(v) => onPatch({ rotation: v })}
-              disabled={locked}
-              onInteractionStart={rotationGesture.begin}
-              onInteractionEnd={(cancelled) => cancelled ? rotationGesture.cancel() : rotationGesture.end()}
-            />
-          </div>
-        </div>
-        <label className="mt-3 flex min-w-0 flex-col gap-2">
-          <div className="flex items-center justify-between gap-2">
-            <span className="flex items-center gap-1.5 text-[10px] text-ink-dim">
-              <Droplet size={12} className="shrink-0 text-accent/85" strokeWidth={2} aria-hidden />
-              Opacity
-            </span>
-            <ValueChip>{opacityPct}%</ValueChip>
-          </div>
-          <div className="rounded-xl border border-line bg-bg/90 px-2.5 py-2 shadow-inner">
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.01}
-              value={layer.opacity}
-              onChange={(e) => onPatch({ opacity: Number(e.target.value) })}
-              onPointerDown={opacityGesture.begin}
-              onPointerUp={opacityGesture.end}
-              onPointerCancel={opacityGesture.cancel}
-              className="opacity-range"
-              style={{ '--opacity-fill': `${opacityPct}%` } as CSSProperties}
-              aria-valuetext={`${opacityPct} percent`}
-            />
-          </div>
-        </label>
-      </div>
-    </div>
+            <RotateCcw size={12} aria-hidden /> Reset photo
+          </button>
+        }
+      >
+        <Slider
+          label="Corner radius"
+          display={`${Math.round(layer.cornerRadius)} px`}
+          min={0}
+          max={radiusMax}
+          value={layer.cornerRadius}
+          onChange={(v) => patch({ cornerRadius: v })}
+          gesture={radiusGesture}
+          valueText={`${Math.round(layer.cornerRadius)} pixels`}
+        />
+      </Section>
+    </>
   );
 }
 
 const FONT_SIZE_MIN = 8;
 const FONT_SIZE_MAX = 400;
-const LINE_HEIGHT_MIN = 0.8;
-const LINE_HEIGHT_MAX = 2.5;
-const LETTER_SPACING_MIN = -10;
-const LETTER_SPACING_MAX = 50;
-
-function fontSizeFillPct(size: number) {
-  const span = FONT_SIZE_MAX - FONT_SIZE_MIN;
-  return `${Math.min(100, Math.max(0, ((size - FONT_SIZE_MIN) / span) * 100))}%`;
-}
-
-function lineHeightFillPct(h: number) {
-  const span = LINE_HEIGHT_MAX - LINE_HEIGHT_MIN;
-  return `${Math.min(100, Math.max(0, ((h - LINE_HEIGHT_MIN) / span) * 100))}%`;
-}
-
-function letterSpacingFillPct(s: number) {
-  const span = LETTER_SPACING_MAX - LETTER_SPACING_MIN;
-  return `${Math.min(100, Math.max(0, ((s - LETTER_SPACING_MIN) / span) * 100))}%`;
-}
-
-function cornerRadiusFillPct(radius: number, max: number) {
-  if (max <= 0) return '0%';
-  return `${Math.min(100, Math.max(0, (radius / max) * 100))}%`;
-}
+const FONTS = ['Inter', 'Helvetica', 'Arial', 'Georgia', 'Times New Roman', 'Courier New', 'system-ui'];
 
 function TextInspector({ layer }: { layer: TextLayer }) {
   const updateLayer = useEditor((s) => s.updateLayer);
@@ -246,188 +347,81 @@ function TextInspector({ layer }: { layer: TextLayer }) {
   const sizeGesture = useLayerGesture(layer.id, 'Change font size');
   const lineGesture = useLayerGesture(layer.id, 'Change line height');
   const spacingGesture = useLayerGesture(layer.id, 'Change letter spacing');
+  const alignments = [
+    { align: 'left' as const, Icon: AlignLeft, label: 'Align left' },
+    { align: 'center' as const, Icon: AlignCenter, label: 'Align center' },
+    { align: 'right' as const, Icon: AlignRight, label: 'Align right' },
+  ];
 
   return (
-    <div className="border-b border-line px-3 py-3">
-      <div className="mb-3">
-        <h2 className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">Text</h2>
-      </div>
-
-      <div className="space-y-3">
-        <div className="rounded-lg border border-line/90 bg-bg-inset/50 px-3 py-2.5 shadow-inner">
-          <p className="mb-2 text-[10px] font-medium uppercase tracking-wide text-ink-faint">Content</p>
-          <textarea
-            className="input min-h-[4.5rem] resize-y"
-            rows={3}
-            value={layer.text}
-            onChange={(e) => u({ text: e.target.value })}
-          />
+    <>
+      <Section title="Text">
+        <textarea className="input min-h-[4.5rem] resize-y" rows={3} value={layer.text} onChange={(e) => u({ text: e.target.value })} aria-label="Text content" />
+      </Section>
+      <Section title="Typography">
+        <select className="input" value={layer.fontFamily} onChange={(e) => u({ fontFamily: e.target.value })} aria-label="Font" style={{ fontFamily: layer.fontFamily }}>
+          {FONTS.map((f) => (
+            <option key={f} style={{ fontFamily: f }}>{f}</option>
+          ))}
+        </select>
+        <div className="grid grid-cols-2 gap-2">
+          <select className="input" value={layer.fontWeight} onChange={(e) => u({ fontWeight: Number(e.target.value) })} aria-label="Font weight">
+            {[300, 400, 500, 600, 700, 800, 900].map((w) => (
+              <option key={w} value={w}>{w}</option>
+            ))}
+          </select>
+          <NumberField prefix="Aa" ariaLabel="Font size" suffix="px" value={layer.fontSize} min={FONT_SIZE_MIN} max={FONT_SIZE_MAX} onChange={(v) => u({ fontSize: v })} gesture={sizeGesture} />
         </div>
-
-        <div className="rounded-lg border border-line/90 bg-bg-inset/50 px-3 py-2.5 shadow-inner">
-          <p className="mb-2 text-[10px] font-medium uppercase tracking-wide text-ink-faint">Typography</p>
-          <label className="flex min-w-0 flex-col gap-1">
-            <span className="text-[10px] text-ink-dim">Font</span>
-            <select
-              className="input"
-              value={layer.fontFamily}
-              onChange={(e) => u({ fontFamily: e.target.value })}
-            >
-              {[
-                'Inter',
-                'Helvetica',
-                'Arial',
-                'Georgia',
-                'Times New Roman',
-                'Courier New',
-                'system-ui',
-              ].map((f) => (
-                <option key={f}>{f}</option>
-              ))}
-            </select>
-          </label>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            <label className="flex min-w-0 flex-col gap-1">
-              <span className="text-[10px] text-ink-dim">Weight</span>
-              <select
-                className="input"
-                value={layer.fontWeight}
-                onChange={(e) => u({ fontWeight: Number(e.target.value) })}
-              >
-                {[300, 400, 500, 600, 700, 800, 900].map((w) => (
-                  <option key={w} value={w}>
-                    {w}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <div className="flex min-w-0 flex-col gap-1">
-              <div className="flex items-center justify-between gap-1">
-                <span className="text-[10px] text-ink-dim">Size</span>
-                <ValueChip>{layer.fontSize}</ValueChip>
-              </div>
-              <div className="rounded-xl border border-line bg-bg/90 px-2 py-1.5 shadow-inner">
-                <input
-                  type="range"
-                  min={FONT_SIZE_MIN}
-                  max={FONT_SIZE_MAX}
-                  value={layer.fontSize}
-                  onChange={(e) => u({ fontSize: Number(e.target.value) })}
-                  onPointerDown={sizeGesture.begin}
-                  onPointerUp={sizeGesture.end}
-                  onPointerCancel={sizeGesture.cancel}
-                  className="inspector-range"
-                  style={{ '--range-fill': fontSizeFillPct(layer.fontSize) } as CSSProperties}
-                  aria-valuetext={`${layer.fontSize} pixels`}
-                />
-              </div>
-            </div>
+        <Slider
+          label="Size"
+          display={layer.fontSize}
+          min={FONT_SIZE_MIN}
+          max={FONT_SIZE_MAX}
+          value={layer.fontSize}
+          onChange={(v) => u({ fontSize: v })}
+          gesture={sizeGesture}
+          valueText={`${layer.fontSize} pixels`}
+        />
+        <div className="flex items-center gap-2">
+          <div className="segmented flex-1 grid-cols-3" role="group" aria-label="Text alignment">
+            {alignments.map(({ align, Icon, label }) => (
+              <button key={align} type="button" title={label} aria-label={label} aria-pressed={layer.align === align} className={`segmented-btn ${layer.align === align ? 'segmented-btn-active' : ''}`} onClick={() => u({ align })}>
+                <Icon size={15} strokeWidth={1.9} aria-hidden />
+              </button>
+            ))}
           </div>
-          <div className="mt-2">
-            <button
-              type="button"
-              className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs transition-colors ${
-                layer.italic
-                  ? 'border-accent bg-accent/15 text-accent shadow-[inset_0_0_0_1px_rgba(124,92,255,0.35)]'
-                  : 'border-transparent bg-bg-inset hover:border-line hover:bg-bg-hover text-ink'
-              }`}
-              onClick={() => u({ italic: !layer.italic })}
-              aria-pressed={layer.italic}
-            >
-              <Italic size={14} strokeWidth={2} aria-hidden />
-              Italic
+          <div className="segmented">
+            <button type="button" className={`segmented-btn w-9 ${layer.italic ? 'segmented-btn-active' : ''}`} onClick={() => u({ italic: !layer.italic })} aria-pressed={layer.italic} title="Italic" aria-label="Italic">
+              <Italic size={15} strokeWidth={2} aria-hidden />
             </button>
           </div>
         </div>
-
-        <div className="rounded-lg border border-line/90 bg-bg-inset/50 px-3 py-2.5 shadow-inner">
-          <p className="mb-2 text-[10px] font-medium uppercase tracking-wide text-ink-faint">Alignment</p>
-          <div
-            className="grid grid-cols-3 gap-1 rounded-md border border-line/80 bg-bg-rail/40 p-1.5"
-            role="group"
-            aria-label="Text alignment"
-          >
-            {(
-              [
-                { align: 'left' as const, Icon: AlignLeft, label: 'Align left' },
-                { align: 'center' as const, Icon: AlignCenter, label: 'Align center' },
-                { align: 'right' as const, Icon: AlignRight, label: 'Align right' },
-              ] as const
-            ).map(({ align, Icon, label }) => {
-              const active = layer.align === align;
-              return (
-                <button
-                  key={align}
-                  type="button"
-                  title={label}
-                  aria-label={label}
-                  aria-pressed={active}
-                  className={`flex min-h-[30px] items-center justify-center rounded-md border transition-all ${
-                    active
-                      ? 'border-accent bg-accent/15 text-accent shadow-[inset_0_0_0_1px_rgba(124,92,255,0.35)]'
-                      : 'border-transparent bg-bg/60 text-ink-faint hover:border-line hover:bg-bg-hover hover:text-ink-dim'
-                  }`}
-                  onClick={() => u({ align })}
-                >
-                  <Icon size={16} strokeWidth={1.75} aria-hidden />
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-line/90 bg-bg-inset/50 px-3 py-2.5 shadow-inner">
-          <p className="mb-2 text-[10px] font-medium uppercase tracking-wide text-ink-faint">Color & spacing</p>
-          <div className="mb-3 flex items-center gap-2">
-            <span className="text-[10px] text-ink-dim shrink-0">Fill</span>
-            <ColorSwatch value={layer.fill} onChange={(hex) => u({ fill: hex })} aria-label="Text color" />
-          </div>
-          <label className="flex min-w-0 flex-col gap-2">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[10px] text-ink-dim">Line height</span>
-              <ValueChip>{layer.lineHeight.toFixed(2)}</ValueChip>
-            </div>
-            <div className="rounded-xl border border-line bg-bg/90 px-2.5 py-2 shadow-inner">
-              <input
-                type="range"
-                min={LINE_HEIGHT_MIN}
-                max={LINE_HEIGHT_MAX}
-                step={0.05}
-                value={layer.lineHeight}
-                onChange={(e) => u({ lineHeight: Number(e.target.value) })}
-                onPointerDown={lineGesture.begin}
-                onPointerUp={lineGesture.end}
-                onPointerCancel={lineGesture.cancel}
-                className="inspector-range"
-                style={{ '--range-fill': lineHeightFillPct(layer.lineHeight) } as CSSProperties}
-                aria-valuetext={String(layer.lineHeight)}
-              />
-            </div>
-          </label>
-          <label className="mt-3 flex min-w-0 flex-col gap-2">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[10px] text-ink-dim">Letter spacing</span>
-              <ValueChip>{layer.letterSpacing}</ValueChip>
-            </div>
-            <div className="rounded-xl border border-line bg-bg/90 px-2.5 py-2 shadow-inner">
-              <input
-                type="range"
-                min={LETTER_SPACING_MIN}
-                max={LETTER_SPACING_MAX}
-                value={layer.letterSpacing}
-                onChange={(e) => u({ letterSpacing: Number(e.target.value) })}
-                onPointerDown={spacingGesture.begin}
-                onPointerUp={spacingGesture.end}
-                onPointerCancel={spacingGesture.cancel}
-                className="inspector-range"
-                style={{ '--range-fill': letterSpacingFillPct(layer.letterSpacing) } as CSSProperties}
-                aria-valuetext={`${layer.letterSpacing} pixels`}
-              />
-            </div>
-          </label>
-        </div>
-      </div>
-    </div>
+      </Section>
+      <Section title="Color & spacing">
+        <ColorField value={layer.fill} onChange={(hex) => u({ fill: hex })} label="Text color" />
+        <Slider
+          label="Line height"
+          display={layer.lineHeight.toFixed(2)}
+          min={0.8}
+          max={2.5}
+          step={0.05}
+          value={layer.lineHeight}
+          onChange={(v) => u({ lineHeight: v })}
+          gesture={lineGesture}
+          valueText={String(layer.lineHeight)}
+        />
+        <Slider
+          label="Letter spacing"
+          display={layer.letterSpacing}
+          min={-10}
+          max={50}
+          value={layer.letterSpacing}
+          onChange={(v) => u({ letterSpacing: v })}
+          gesture={spacingGesture}
+          valueText={`${layer.letterSpacing} pixels`}
+        />
+      </Section>
+    </>
   );
 }
 
@@ -436,90 +430,157 @@ function ShapeInspector({ layer }: { layer: ShapeLayer }) {
   const u = (patch: Partial<ShapeLayer>) => updateLayer(layer.id, patch);
   const strokePickerValue = layer.stroke === 'transparent' ? '#000000' : layer.stroke;
   const cornerMax = Math.min(layer.width, layer.height) / 2;
-  const cornerFill = cornerRadiusFillPct(layer.cornerRadius, cornerMax);
   const cornerGesture = useLayerGesture(layer.id, 'Change corner radius');
 
   return (
-    <div className="border-b border-line px-3 py-3">
-      <div className="mb-3">
-        <h2 className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">Shape</h2>
+    <Section title={layer.shape === 'ellipse' ? 'Ellipse' : 'Rectangle'}>
+      <div>
+        <p className="field-label mb-1">Fill</p>
+        <ColorField value={layer.fill} onChange={(hex) => u({ fill: hex })} label="Shape fill" />
       </div>
-
-      <div className="space-y-3">
-        <div className="rounded-lg border border-line/90 bg-bg-inset/50 px-3 py-2.5 shadow-inner">
-          <p className="mb-2 text-[10px] font-medium uppercase tracking-wide text-ink-faint">Fill</p>
-          <div className="flex items-center gap-2">
-            <ColorSwatch value={layer.fill} onChange={(hex) => u({ fill: hex })} aria-label="Shape fill" />
-          </div>
+      <div>
+        <p className="field-label mb-1">Stroke</p>
+        <div className="grid grid-cols-[1fr_88px] gap-2">
+          <ColorField value={strokePickerValue} onChange={(hex) => u({ stroke: hex })} label="Stroke color" />
+          <NumberField prefix="W" ariaLabel="Stroke width" suffix="px" value={layer.strokeWidth} min={0} onChange={(v) => u({ strokeWidth: v })} />
         </div>
+      </div>
+      {layer.shape === 'rect' && (
+        <Slider
+          label="Corner radius"
+          display={`${Math.round(layer.cornerRadius)} px`}
+          min={0}
+          max={cornerMax}
+          value={layer.cornerRadius}
+          onChange={(v) => u({ cornerRadius: v })}
+          gesture={cornerGesture}
+          valueText={`${Math.round(layer.cornerRadius)} pixels`}
+        />
+      )}
+    </Section>
+  );
+}
 
-        <div className="rounded-lg border border-line/90 bg-bg-inset/50 px-3 py-2.5 shadow-inner">
-          <p className="mb-2 text-[10px] font-medium uppercase tracking-wide text-ink-faint">Stroke</p>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="flex min-w-0 flex-col gap-1">
-              <span className="text-[10px] text-ink-dim">Color</span>
-              <ColorSwatch
-                value={strokePickerValue}
-                onChange={(hex) => u({ stroke: hex })}
-                aria-label="Stroke color"
-              />
-            </div>
-            <label className="flex min-w-0 flex-col gap-1">
-              <span className="text-[10px] text-ink-dim">Width</span>
-              <NumberInput value={layer.strokeWidth} min={0} onChange={(v) => u({ strokeWidth: v })} />
-            </label>
-          </div>
+/** Shown when no layer is selected: settings for the current slide. */
+function SlideInspector({ onShowLayers }: { onShowLayers: () => void }) {
+  const selectedSlideId = useEditorSession((s) => s.selectedSlideId);
+  const setLeftPanel = useEditorSession((s) => s.setLeftPanel);
+  const slideOrder = useEditor((s) => s.doc.slideOrder);
+  const slideId = selectedSlideId || slideOrder[0];
+  const slide = useEditor((s) => s.doc.slides[slideId]);
+  const setBackground = useEditor((s) => s.setBackground);
+  const setBackgroundForAllSlides = useEditor((s) => s.setBackgroundForAllSlides);
+  const addSlide = useEditor((s) => s.addSlide);
+  const duplicateSlide = useEditor((s) => s.duplicateSlide);
+  const deleteSlide = useEditor((s) => s.deleteSlide);
+  const addTextLayer = useEditor((s) => s.addTextLayer);
+  const requestImport = useEditorSession((s) => s.requestImport);
+  if (!slide) return null;
+  const index = slideOrder.indexOf(slideId);
+  const quick = [
+    ...SOLID_SWATCHES.slice(0, 5).map((color) => ({ kind: 'solid' as const, color })),
+    ...GRADIENT_SWATCHES.slice(0, 3).map((g) => ({ kind: 'gradient' as const, ...g })),
+  ];
+
+  const empty = slide.layerOrder.length === 0;
+  const quickStart = [
+    { label: 'Photo grid', Icon: LayoutGrid, run: () => setLeftPanel('templates') },
+    { label: 'Import media', Icon: ImagePlus, run: requestImport },
+    { label: 'Text', Icon: Type, run: () => addTextLayer() },
+    { label: 'Shape', Icon: Square, run: () => setLeftPanel('shapes') },
+  ];
+
+  return (
+    <div>
+      <div className="flex items-center gap-2.5 border-b border-line px-3 py-2.5">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md ring-1 ring-inset ring-white/15" style={{ background: backgroundCss(slide.background) }}>
+          <span className="rounded bg-black/60 px-1 text-[10px] font-semibold tabular-nums text-white">{index + 1}</span>
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold text-ink">Slide {index + 1}</p>
+          <p className="text-[11px] text-ink-faint">{slideOrder.length} slide{slideOrder.length === 1 ? '' : 's'} · {slide.layerOrder.length} layer{slide.layerOrder.length === 1 ? '' : 's'}</p>
         </div>
-
-        {layer.shape === 'rect' && (
-          <div className="rounded-lg border border-line/90 bg-bg-inset/50 px-3 py-2.5 shadow-inner">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-faint">Corner radius</span>
-              <ValueChip>{Math.round(layer.cornerRadius)} px</ValueChip>
-            </div>
-            <div className="rounded-xl border border-line bg-bg/90 px-2.5 py-2 shadow-inner">
-              <input
-                type="range"
-                min={0}
-                max={cornerMax}
-                value={layer.cornerRadius}
-                onChange={(e) => u({ cornerRadius: Number(e.target.value) })}
-                onPointerDown={cornerGesture.begin}
-                onPointerUp={cornerGesture.end}
-                onPointerCancel={cornerGesture.cancel}
-                className="inspector-range"
-                style={{ '--range-fill': cornerFill } as CSSProperties}
-                aria-valuetext={`${Math.round(layer.cornerRadius)} pixels`}
-              />
-            </div>
+      </div>
+      {empty && (
+        <Section title="Start this slide">
+          <div className="grid grid-cols-2 gap-1.5">
+            {quickStart.map(({ label, Icon, run }) => (
+              <button key={label} className="tile flex h-14 flex-col items-center justify-center gap-1 text-[11px] text-ink-dim hover:text-ink" onClick={run}>
+                <Icon size={16} aria-hidden /> {label}
+              </button>
+            ))}
           </div>
+        </Section>
+      )}
+      <Section title="Background" action={<button className="text-[11px] font-medium text-accent hover:text-accent-hover" onClick={() => setLeftPanel('background')}>More</button>}>
+        <div className="grid grid-cols-8 gap-1.5">
+          {quick.map((bg) => {
+            const active = sameBackground(slide.background, bg);
+            return (
+              <button
+                key={backgroundCss(bg)}
+                type="button"
+                className={`aspect-square rounded ring-1 ring-inset ring-white/10 transition-transform hover:scale-110 ${active ? 'outline outline-2 outline-offset-2 outline-accent' : ''}`}
+                style={{ background: backgroundCss(bg) }}
+                onClick={() => setBackground(bg)}
+                aria-label={`Use background ${bg.kind === 'solid' ? bg.color : `${bg.from} to ${bg.to}`}`}
+                aria-pressed={active}
+              />
+            );
+          })}
+        </div>
+        {slideOrder.length > 1 && (
+          <button className="btn btn-secondary btn-sm w-full" onClick={() => setBackgroundForAllSlides(slide.background)}>
+            Apply to all {slideOrder.length} slides
+          </button>
         )}
+      </Section>
+      <Section title="Slide">
+        <div className="grid grid-cols-3 gap-1.5">
+          <button className="btn btn-secondary btn-sm" onClick={() => addSlide(slideId)} title="Add a slide after this one">
+            <Plus size={13} className="shrink-0" aria-hidden /> Add
+          </button>
+          <button className="btn btn-secondary btn-sm" onClick={() => duplicateSlide(slideId)}>
+            <Copy size={13} className="shrink-0" aria-hidden /> Copy
+          </button>
+          <button className="btn btn-secondary btn-sm danger-hover" disabled={slideOrder.length <= 1} onClick={() => deleteSlide(slideId)}>
+            <Trash2 size={13} className="shrink-0" aria-hidden /> Delete
+          </button>
+        </div>
+      </Section>
+      <div className="p-3">
+        <div className="flex gap-2.5 rounded-lg border border-line p-3 text-[11px] leading-relaxed text-ink-faint">
+          <MousePointerClick size={14} className="mt-0.5 shrink-0 text-ink-dim" aria-hidden />
+          <p>
+            Click something on the canvas to edit it, right-click for actions, or open the{' '}
+            <button className="inline-flex items-center gap-0.5 font-medium text-accent hover:text-accent-hover" onClick={onShowLayers}>
+              <Layers size={11} aria-hidden /> layer list
+            </button>
+            . Press <kbd className="kbd">{isMac ? '⌘' : 'Ctrl'} K</kbd> for every command.
+          </p>
+        </div>
       </div>
     </div>
   );
 }
 
-export function Inspector() {
+export function Inspector({ onShowLayers }: { onShowLayers: () => void }) {
   const selectedLayerId = useEditorSession((s) => s.selectedLayerId);
   const layer = useEditor((s) => selectedLayerId ? s.doc.layers[selectedLayerId] : undefined);
   const updateLayer = useEditor((s) => s.updateLayer);
 
-  if (!layer) {
-    return (
-      <div className="p-3 text-xs text-ink-faint">
-        Nothing selected. Click a layer to edit its properties.
-      </div>
-    );
-  }
+  if (!layer) return <SlideInspector onShowLayers={onShowLayers} />;
 
   const u = (patch: Parameters<typeof updateLayer>[1]) => updateLayer(layer.id, patch);
 
   return (
-    <div className="overflow-auto text-ink scrollbar-thin">
-      <LayoutSection layer={layer} onPatch={u} />
-
+    <div className="text-ink">
+      <LayerHeader layer={layer} />
+      {layer.kind === 'image' && <ImageInspector key={layer.id} layer={layer} />}
       {layer.kind === 'text' && <TextInspector layer={layer} />}
       {layer.kind === 'shape' && <ShapeInspector layer={layer} />}
+      <LayoutSection layer={layer} onPatch={u} />
+      <ArrangeSection layer={layer} />
     </div>
   );
 }

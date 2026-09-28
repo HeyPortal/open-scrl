@@ -85,6 +85,7 @@ export interface EditorState {
   toggleLocked(id: string): void;
   renameLayer(id: string, name: string): void;
   setBackground(bg: Background): void;
+  setBackgroundForAllSlides(bg: Background): void;
   execute(command: EditorCommand): void;
   beginTransaction(label: string, mergeKey?: string): TransactionId;
   updateTransaction(id: TransactionId, command: EditorCommand): void;
@@ -344,6 +345,7 @@ export const useDocumentStore = create<EditorState>((set, get) => ({
   toggleLocked: (layerId) => get().execute(command('Toggle layer lock',(d)=>{if(d.layers[layerId])d.layers[layerId].locked=!d.layers[layerId].locked;})),
   renameLayer: (layerId,name) => get().execute(command('Rename layer',(d)=>{if(d.layers[layerId])d.layers[layerId].name=name;},`layer:${layerId}:name`)),
   setBackground: (background) => {const sid=useEditorSession.getState().selectedSlideId;get().execute(command('Change background',(d)=>{if(d.slides[sid])d.slides[sid].background=background;}));},
+  setBackgroundForAllSlides: (background) => get().execute(command('Change all backgrounds',(d)=>{for(const sid of d.slideOrder)d.slides[sid].background={...background};})),
   undo: () => set((s)=>{const entry=s.past.at(-1);if(!entry)return{};const doc=produce(applyPatches(s.doc,entry.inverse),(d)=>{d.revision+=1;d.updatedAt=Date.now();});return{doc,past:s.past.slice(0,-1),future:[entry,...s.future].slice(0,HISTORY_LIMIT)};}),
   redo: () => set((s)=>{const entry=s.future[0];if(!entry)return{};const doc=produce(applyPatches(s.doc,entry.patches),(d)=>{d.revision+=1;d.updatedAt=Date.now();});return{doc,past:trimHistory([...s.past,entry]),future:s.future.slice(1)};}),
 }));

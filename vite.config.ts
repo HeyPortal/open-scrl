@@ -13,8 +13,8 @@ export default defineConfig({
         name: 'Open-SCRL',
         short_name: 'Open-SCRL',
         description: 'Open-source photo grid + Instagram carousel maker',
-        theme_color: '#0b0b0f',
-        background_color: '#0b0b0f',
+        theme_color: '#0f0f12',
+        background_color: '#0f0f12',
         display: 'standalone',
         start_url: '/',
         icons: [

@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { AlertTriangle, LayoutGrid, Loader2 } from 'lucide-react';
 import { LandingPage } from './components/LandingPage';
 import { ToastViewport } from './components/ToastViewport';
 import { useEditor } from './store/editor';
@@ -32,12 +33,13 @@ export default function App(){
     } else clearAssets();
     return () => { cancelled = true; };
   }, [activeProjectId, clearAssets, loadAssets, ready, mediaAttempt]);
-  useEffect(()=>{controller.current=new PersistenceController(save, 750, () => { /* saveToDisk exposes failures through saveError */ });return()=>controller.current?.dispose();},[save]);
-  useEffect(()=>{if(ready&&activeProjectId)controller.current?.markDirty();},[activeProjectId,ready,revision]);
+  useEffect(()=>{const setStatus=useEditorSession.getState().setSaveStatus;const tracked=async()=>{setStatus('saving');try{await save();}finally{setStatus('saved');}};controller.current=new PersistenceController(tracked, 750, () => { /* saveToDisk exposes failures through saveError */ });return()=>controller.current?.dispose();},[save]);
+  useEffect(()=>{if(ready&&activeProjectId){useEditorSession.getState().setSaveStatus('pending');controller.current?.markDirty();}},[activeProjectId,ready,revision]);
   useEffect(()=>{const flush=()=>{void controller.current?.flush().catch(() => undefined);};const hidden=()=>{if(document.visibilityState==='hidden')flush();};document.addEventListener('visibilitychange',hidden);window.addEventListener('pagehide',flush);return()=>{document.removeEventListener('visibilitychange',hidden);window.removeEventListener('pagehide',flush);};},[]);
-  useEffect(()=>{const onKey=(e:KeyboardEvent)=>{const target=e.target as HTMLElement|null;const inField=target?.tagName==='INPUT'||target?.tagName==='TEXTAREA'||target?.isContentEditable;const meta=e.metaKey||e.ctrlKey;if(meta&&e.key.toLowerCase()==='z'){e.preventDefault();if(e.shiftKey)useEditor.getState().redo();else useEditor.getState().undo();return;}if(meta&&e.key.toLowerCase()==='y'){e.preventDefault();useEditor.getState().redo();return;}if(inField)return;const selected=useEditorSession.getState().selectedLayerId;if(!selected)return;if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();useEditor.getState().deleteLayer(selected);}if(meta&&e.key.toLowerCase()==='d'){e.preventDefault();useEditor.getState().duplicateLayer(selected);}};window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey);},[]);
-  if (!ready) return <div className="h-full w-full flex flex-col gap-4 items-center justify-center text-ink-dim">
-    {loadError ? <><p role="alert">Your projects could not be loaded. Your saved data has not been changed.</p><button className="ctrl-btn ctrl-btn-primary shrink-0 disabled:opacity-50" onClick={() => { setLoadError(false); setLoadAttempt((n) => n + 1); }}>Retry loading</button></> : 'Loading…'}
+  // Editor keyboard shortcuts live in EditorShell (see src/app/actions.ts).
+  if (!ready) return <div className="flex h-full w-full flex-col items-center justify-center gap-4 text-ink-dim">
+    <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-accent text-white"><LayoutGrid size={22} strokeWidth={2} aria-hidden /></div>
+    {loadError ? <><p role="alert" className="max-w-sm text-center text-sm text-ink">Your projects could not be loaded. Your saved data has not been changed.</p><button className="btn btn-primary" onClick={() => { setLoadError(false); setLoadAttempt((n) => n + 1); }}>Retry loading</button></> : <span className="flex items-center gap-2 text-sm"><Loader2 size={16} className="animate-spin" aria-hidden />Loading…</span>}
   </div>;
   const retrySave = async () => {
     setRetryingSave(true);
@@ -45,11 +47,11 @@ export default function App(){
     finally { setRetryingSave(false); }
   };
   return <>
-    {saveError && <div role="alert" className="absolute top-12 inset-x-0 z-50 flex items-center justify-center gap-3 bg-bg-panel border-b border-line p-3 text-sm">
-      <span>{saveError}</span><button className="ctrl-btn ctrl-btn-primary shrink-0 disabled:opacity-50" disabled={retryingSave} onClick={() => void retrySave()}>{retryingSave ? 'Saving…' : 'Retry saving'}</button>
+    {saveError && <div role="alert" className="fixed left-1/2 top-14 z-50 flex max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-3 rounded-lg border border-red-500/40 bg-[#2a1618] py-1.5 pl-3 pr-1.5 text-xs text-red-100 shadow-lift">
+      <AlertTriangle size={15} className="shrink-0 text-red-400" aria-hidden /><span>{saveError}</span><button className="btn btn-sm shrink-0 bg-red-500 text-white hover:bg-red-400" disabled={retryingSave} onClick={() => void retrySave()}>{retryingSave ? 'Saving…' : 'Retry saving'}</button>
     </div>}
-    {mediaError && mediaError === activeProjectId && <div role="alert" className="absolute bottom-0 inset-x-0 z-50 flex items-center justify-center gap-3 bg-bg-panel border-t border-line p-3 text-sm">
-      <span>Your media library could not be loaded.</span><button className="ctrl-btn ctrl-btn-primary shrink-0 disabled:opacity-50" onClick={() => { setMediaError(null); setMediaAttempt((n) => n + 1); }}>Retry media</button>
+    {mediaError && mediaError === activeProjectId && <div role="alert" className="fixed bottom-28 left-1/2 z-50 flex max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-3 rounded-lg border border-amber-500/40 bg-[#2a2214] py-1.5 pl-3 pr-1.5 text-xs text-amber-100 shadow-lift">
+      <AlertTriangle size={15} className="shrink-0 text-amber-400" aria-hidden /><span>Your media library could not be loaded.</span><button className="btn btn-sm shrink-0 bg-amber-500 text-black hover:bg-amber-400" onClick={() => { setMediaError(null); setMediaAttempt((n) => n + 1); }}>Retry media</button>
     </div>}
-    {activeProjectId?<Suspense fallback={<div className="h-full w-full flex items-center justify-center text-ink-dim">Opening editor…</div>}><EditorShell/></Suspense>:<LandingPage/>}<ToastViewport/></>;
+    {activeProjectId?<Suspense fallback={<div className="flex h-full w-full items-center justify-center gap-2 text-sm text-ink-dim"><Loader2 size={16} className="animate-spin" aria-hidden />Opening editor…</div>}><EditorShell/></Suspense>:<LandingPage/>}<ToastViewport/></>;
 }

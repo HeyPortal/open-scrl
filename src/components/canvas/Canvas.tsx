@@ -3,7 +3,9 @@ import { Group, Layer as KLayer, Line, Rect, Stage, Transformer } from 'react-ko
 import Konva from 'konva';
 import { useEditor } from '@/store/editor';
 import { useAssets } from '@/store/assets';
-import { useEditorSession } from '@/editor/sessionStore';
+import { MAX_ZOOM, MIN_ZOOM, useEditorSession } from '@/editor/sessionStore';
+import { useContextMenu } from '@/components/Menu';
+import { layerMenu } from '@/app/menus';
 import type { Layer as DocLayer, Slide } from '@/types';
 import { getSlideLayers } from '@/core/document/selectors';
 import { compileScene } from '@/core/scene/compileScene';
@@ -16,9 +18,7 @@ import { ShapeNode } from './ShapeNode';
 import { TextEditor } from './TextEditor';
 
 const SNAP_THRESHOLD_PX = 6;
-const PADDING = 12;
-const MIN_ZOOM = 0.05;
-const MAX_ZOOM = 4;
+const PADDING = 32;
 const BUFFER_SLIDES = 0;
 const EDITOR_PIXEL_RATIO = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
 Konva.pixelRatio = EDITOR_PIXEL_RATIO;
@@ -37,6 +37,7 @@ export function Canvas({ width, height }: { width: number; height: number }) {
   const setLeftPanel = useEditorSession((s) => s.setLeftPanel);
   const assets = useAssets((s) => s.assets);
 
+  const openContextMenu = useContextMenu((s) => s.open);
   const scrollRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
   const transformerRef = useRef<Konva.Transformer>(null);
@@ -59,15 +60,18 @@ export function Canvas({ width, height }: { width: number; height: number }) {
   const spacerWidth = Math.max(width, deckWidth * zoom + PADDING * 2);
   const spacerHeight = Math.max(height, fmt.height * zoom + PADDING * 2);
   const centeredY = Math.max(PADDING, Math.round((height - fmt.height * zoom) / 2));
+  // Center the deck horizontally when it is narrower than the viewport.
+  const originXFor = useCallback((z: number) => Math.max(PADDING, Math.round((width - deckWidth * z) / 2)), [deckWidth, width]);
+  const originX = originXFor(zoom);
 
   const updateVisible = useCallback(() => {
     const el = scrollRef.current; if (!el) return;
-    const left = Math.max(0, (el.scrollLeft - PADDING) / zoom);
-    const right = Math.max(0, (el.scrollLeft + el.clientWidth - PADDING) / zoom);
+    const left = Math.max(0, (el.scrollLeft - originX) / zoom);
+    const right = Math.max(0, (el.scrollLeft + el.clientWidth - originX) / zoom);
     const start = Math.max(0, Math.floor(left / fmt.width) - BUFFER_SLIDES);
     const end = Math.min(doc.slideOrder.length - 1, Math.floor(right / fmt.width) + BUFFER_SLIDES);
     setVisibleRange((old) => old.start === start && old.end === end ? old : { start, end });
-  }, [doc.slideOrder.length, fmt.width, zoom]);
+  }, [doc.slideOrder.length, fmt.width, originX, zoom]);
 
   const scheduleScrollSync = useCallback(() => {
     const el = scrollRef.current; if (!el) return;
@@ -76,32 +80,33 @@ export function Canvas({ width, height }: { width: number; height: number }) {
     raf.current = requestAnimationFrame(() => {
       raf.current = null;
       const position = scrollPosition.current;
-      setViewportOffset({ x: PADDING - position.left, y: centeredY - position.top });
+      setViewportOffset({ x: originX - position.left, y: centeredY - position.top });
       updateVisible();
     });
-  }, [centeredY, updateVisible]);
+  }, [centeredY, originX, updateVisible]);
 
   useEffect(() => () => { if (raf.current !== null) cancelAnimationFrame(raf.current); }, []);
-  useLayoutEffect(() => { setZoom(fitZoom); }, [fitZoom, setZoom]);
+  const setFitZoom = useEditorSession((s) => s.setFitZoom);
+  useLayoutEffect(() => { setFitZoom(fitZoom); setZoom(fitZoom); }, [fitZoom, setFitZoom, setZoom]);
   useLayoutEffect(() => {
     const position = scrollPosition.current;
-    setViewportOffset({ x: PADDING - position.left, y: centeredY - position.top });
+    setViewportOffset({ x: originX - position.left, y: centeredY - position.top });
     updateVisible();
-  }, [centeredY, updateVisible, zoom]);
+  }, [centeredY, originX, updateVisible, zoom]);
 
   useLayoutEffect(() => {
     const el = scrollRef.current; if (!el) return;
     const index = doc.slideOrder.indexOf(selectedSlideId); if (index < 0) return;
-    const center = PADDING + (index + .5) * fmt.width * zoom;
+    const center = originX + (index + .5) * fmt.width * zoom;
     el.scrollTo({ left: Math.max(0, center - el.clientWidth / 2), behavior: 'auto' });
     if (raf.current !== null) { cancelAnimationFrame(raf.current); raf.current = null; }
     const position = { left: el.scrollLeft, top: el.scrollTop };
     scrollPosition.current = position;
-    const nextOffset = { x: PADDING - position.left, y: centeredY - position.top };
+    const nextOffset = { x: originX - position.left, y: centeredY - position.top };
     pendingFocusDraw.current = nextOffset;
     setViewportOffset(nextOffset);
     updateVisible();
-  }, [centeredY, doc.slideOrder, fmt.width, selectedSlideId, slideFocusRequest, updateVisible, zoom]);
+  }, [centeredY, doc.slideOrder, fmt.width, originX, selectedSlideId, slideFocusRequest, updateVisible, zoom]);
 
   useLayoutEffect(() => {
     const pending = pendingFocusDraw.current;
@@ -126,18 +131,18 @@ export function Canvas({ width, height }: { width: number; height: number }) {
       const intent=getCanvasScrollIntent({deltaX:event.evt.deltaX,deltaY:event.evt.deltaY,canScrollX:deckWidth*zoom+PADDING*2>width+1,canScrollY:fmt.height*zoom+PADDING*2>height+1,shiftKey:event.evt.shiftKey});
       const left=Math.max(0,Math.min(el.scrollWidth-el.clientWidth,el.scrollLeft+intent.left));
       const top=Math.max(0,Math.min(el.scrollHeight-el.clientHeight,el.scrollTop+intent.top));
-      el.scrollTo({left,top});scrollPosition.current={left,top};setViewportOffset({x:PADDING-left,y:centeredY-top});updateVisible();return;
+      el.scrollTo({left,top});scrollPosition.current={left,top};setViewportOffset({x:originX-left,y:centeredY-top});updateVisible();return;
     }
     const rect = el.getBoundingClientRect(); const pointerX = event.evt.clientX - rect.left; const pointerY = event.evt.clientY - rect.top;
-    const contentX = (el.scrollLeft + pointerX - PADDING) / zoom; const contentY = (el.scrollTop + pointerY - centeredY) / zoom;
+    const contentX = (el.scrollLeft + pointerX - originX) / zoom; const contentY = (el.scrollTop + pointerY - centeredY) / zoom;
     const next = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom * Math.exp(-event.evt.deltaY * .00115)));
     setZoom(next);
-    requestAnimationFrame(() => { el.scrollLeft = Math.max(0, PADDING + contentX * next - pointerX); el.scrollTop = Math.max(0, centeredY + contentY * next - pointerY); scheduleScrollSync(); });
+    requestAnimationFrame(() => { el.scrollLeft = Math.max(0, originXFor(next) + contentX * next - pointerX); el.scrollTop = Math.max(0, centeredY + contentY * next - pointerY); scheduleScrollSync(); });
   };
 
   const selectPageAtPointer = () => {
     const pointer=stageRef.current?.getPointerPosition();if(!pointer)return;
-    const globalX=(pointer.x-PADDING+scrollPosition.current.left)/zoom;const index=Math.max(0,Math.min(doc.slideOrder.length-1,Math.floor(globalX/fmt.width)));const slideId=doc.slideOrder[index];if(slideId){selectSlide(slideId);selectLayer(null);}
+    const globalX=(pointer.x-originX+scrollPosition.current.left)/zoom;const index=Math.max(0,Math.min(doc.slideOrder.length-1,Math.floor(globalX/fmt.width)));const slideId=doc.slideOrder[index];if(slideId){selectSlide(slideId);selectLayer(null);}
   };
   const onTouchStart=(event:Konva.KonvaEventObject<TouchEvent>)=>{const touches=event.evt.touches;const el=scrollRef.current;if(!el)return;if(touches.length===1&&event.target!==event.target.getStage())return;const x=[...touches].reduce((n,p)=>n+p.clientX,0)/touches.length;const y=[...touches].reduce((n,p)=>n+p.clientY,0)/touches.length;const distance=touches.length>1?Math.hypot(touches[0].clientX-touches[1].clientX,touches[0].clientY-touches[1].clientY):0;touch.current={x,y,distance,zoom,left:el.scrollLeft,top:el.scrollTop};};
   const onTouchMove=(event:Konva.KonvaEventObject<TouchEvent>)=>{const start=touch.current;const el=scrollRef.current;const touches=event.evt.touches;if(!start||!el||!touches.length)return;event.evt.preventDefault();const x=[...touches].reduce((n,p)=>n+p.clientX,0)/touches.length;const y=[...touches].reduce((n,p)=>n+p.clientY,0)/touches.length;if(touches.length>1&&start.distance>0){const distance=Math.hypot(touches[0].clientX-touches[1].clientX,touches[0].clientY-touches[1].clientY);setZoom(Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,start.zoom*distance/start.distance)));}el.scrollLeft=start.left-(x-start.x);el.scrollTop=start.top-(y-start.y);scheduleScrollSync();};
@@ -165,18 +170,17 @@ export function Canvas({ width, height }: { width: number; height: number }) {
     return <Group key={layer.id} x={offset}>{layer.kind==='image'?<ImageNode {...props} layer={layer} asset={layer.assetId ? assetsById.get(layer.assetId) : undefined} activeSlide={selectedSlideId===slideId} selected={selectedId===layer.id} groupRef={ref} renderScale={zoom*EDITOR_PIXEL_RATIO}/>:layer.kind==='shape'?<ShapeNode {...props} layer={layer} groupRef={ref}/>:<TextNode {...props} layer={layer} onDblClick={()=>setEditingTextId(layer.id)} nodeRef={ref}/>}</Group>;
   };
 
-  return <div className="relative h-full w-full overflow-hidden bg-bg select-none">
+  return <div className="workspace relative h-full w-full overflow-hidden select-none">
     <div ref={scrollRef} data-testid="canvas-scroll" onScroll={scheduleScrollSync} className="absolute inset-0 overflow-auto scrollbar-thin"><div style={{width:spacerWidth,height:spacerHeight}} /></div>
     <div className="absolute inset-0 pointer-events-auto overflow-hidden">
-      <Stage ref={stageRef} width={Math.max(1,width)} height={Math.max(1,height)} onWheel={onWheel} onMouseDown={(e)=>{if(e.target===e.target.getStage())selectPageAtPointer();}} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={()=>{if(touch.current)selectPageAtPointer();touch.current=null;}}>
-        <KLayer listening={false}><Group x={viewportOffset.x} y={viewportOffset.y} scaleX={zoom} scaleY={zoom}>{visibleSlides.map(({slide,index})=>{const x=index*fmt.width;return <Group key={slide.id} x={x}><Rect width={fmt.width} height={fmt.height} fill={slide.background.kind==='solid'?slide.background.color:'#fff'}/>{slide.background.kind==='gradient'&&<Rect width={fmt.width} height={fmt.height} fillLinearGradientStartPoint={{x:0,y:0}} fillLinearGradientEndPoint={{x:fmt.width*Math.cos(slide.background.angle*Math.PI/180),y:fmt.height*Math.sin(slide.background.angle*Math.PI/180)}} fillLinearGradientColorStops={[0,slide.background.from,1,slide.background.to]}/>}<Rect width={fmt.width} height={fmt.height} stroke={slide.id===selectedSlideId?'#7c5cff':'#2b2b35'} strokeWidth={(slide.id===selectedSlideId?3:1)/zoom}/></Group>;})}</Group></KLayer>
-        <KLayer><Group x={viewportOffset.x} y={viewportOffset.y} scaleX={zoom} scaleY={zoom}>{visibleItems.map((item)=>renderNode(item.slideId,item.layer))}<Transformer ref={transformerRef} rotateEnabled anchorSize={10} anchorStroke="#7c5cff" anchorFill="#0b0b0f" borderStroke="#7c5cff" borderDash={[4,4]} keepRatio={active?.kind==='image'} ignoreStroke /></Group></KLayer>
+      <Stage ref={stageRef} width={Math.max(1,width)} height={Math.max(1,height)} onWheel={onWheel} onContextMenu={(e)=>{e.evt.preventDefault();openContextMenu(e.evt.clientX,e.evt.clientY,layerMenu(),'Canvas actions');}} onMouseDown={(e)=>{if(e.target===e.target.getStage())selectPageAtPointer();}} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={()=>{if(touch.current)selectPageAtPointer();touch.current=null;}}>
+        <KLayer listening={false}><Group x={viewportOffset.x} y={viewportOffset.y} scaleX={zoom} scaleY={zoom}>{visibleSlides.map(({slide,index})=>{const x=index*fmt.width;return <Group key={slide.id} x={x}><Rect width={fmt.width} height={fmt.height} fill={slide.background.kind==='solid'?slide.background.color:'#fff'} shadowColor="#000000" shadowOpacity={0.55} shadowBlur={32/zoom} shadowOffsetY={8/zoom}/>{slide.background.kind==='gradient'&&<Rect width={fmt.width} height={fmt.height} fillLinearGradientStartPoint={{x:0,y:0}} fillLinearGradientEndPoint={{x:fmt.width*Math.cos(slide.background.angle*Math.PI/180),y:fmt.height*Math.sin(slide.background.angle*Math.PI/180)}} fillLinearGradientColorStops={[0,slide.background.from,1,slide.background.to]}/>}<Rect width={fmt.width} height={fmt.height} stroke={slide.id===selectedSlideId?'#7c5cff':'#2a2a31'} strokeWidth={(slide.id===selectedSlideId?3:1)/zoom}/></Group>;})}</Group></KLayer>
+        <KLayer><Group x={viewportOffset.x} y={viewportOffset.y} scaleX={zoom} scaleY={zoom}>{visibleItems.map((item)=>renderNode(item.slideId,item.layer))}<Transformer ref={transformerRef} rotateEnabled anchorSize={10} anchorCornerRadius={3} anchorStroke="#7c5cff" anchorFill="#ffffff" borderStroke="#7c5cff" borderStrokeWidth={1.5} keepRatio={active?.kind==='image'} ignoreStroke /></Group></KLayer>
         <KLayer listening={false}><Group x={viewportOffset.x} y={viewportOffset.y} scaleX={zoom} scaleY={zoom}>{resizeSeams.map((seam)=><Group key={`seam-${seam.x}`}><Rect x={seam.x-6/zoom} y={seam.y} width={12/zoom} height={seam.height} fill="#ff3b8a" opacity={0.2}/><Line points={[seam.x,seam.y,seam.x,seam.y+seam.height]} stroke="#ff3b8a" strokeWidth={3/zoom} dash={[10/zoom,6/zoom]}/></Group>)}{guides.map((g,i)=>g.orientation==='v'?<Line key={i} points={[guideOffsetX+g.position,g.start,guideOffsetX+g.position,g.end]} stroke="#ff3b8a" strokeWidth={1/zoom}/>:<Line key={i} points={[guideOffsetX+g.start,g.position,guideOffsetX+g.end,g.position]} stroke="#ff3b8a" strokeWidth={1/zoom}/>)}</Group></KLayer>
       </Stage>
     </div>
     {editingTextId&&active?.kind==='text'&&stageRef.current&&(
-      <TextEditor layer={active} stage={stageRef.current} offsetX={pageX(doc.slideOrder.find((sid)=>doc.slides[sid].layerOrder.includes(active.id))??selectedSlideId)} scale={zoom} viewportOffset={{x:PADDING-scrollPosition.current.left,y:centeredY-scrollPosition.current.top}} onClose={()=>setEditingTextId(null)}/>
+      <TextEditor layer={active} stage={stageRef.current} offsetX={pageX(doc.slideOrder.find((sid)=>doc.slides[sid].layerOrder.includes(active.id))??selectedSlideId)} scale={zoom} viewportOffset={{x:originX-scrollPosition.current.left,y:centeredY-scrollPosition.current.top}} onClose={()=>setEditingTextId(null)}/>
     )}
-    <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-bg-rail/90 border border-line rounded-md px-1 py-1 text-[11px] text-ink-dim"><button title="Zoom out" className="icon-btn !h-6 !w-6" onClick={()=>setZoom(Math.max(MIN_ZOOM,zoom/1.2))}>−</button><button title="Fit to screen" className="px-2 py-0.5" onClick={()=>setZoom(fitZoom)}>{Math.round(zoom*100)}%</button><button title="Zoom in" className="icon-btn !h-6 !w-6" onClick={()=>setZoom(Math.min(MAX_ZOOM,zoom*1.2))}>+</button><button className="ctrl-btn !py-1 !px-2" onClick={()=>setZoom(fitZoom)}>Fit</button></div>
   </div>;
 }
