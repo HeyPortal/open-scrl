@@ -82,9 +82,9 @@ The web app and the Mac app store projects separately; projects don't move betwe
 
 ### Download
 
-Download `Open-SCRL-macOS-<version>.zip` from
-[Releases](https://github.com/HeyPortal/open-scrl/releases), unzip it, and move
-**Open-SCRL** to your Applications folder. It requires macOS 27 on a Mac with Apple silicon.
+Download `Open-SCRL-<version>.dmg` from
+[Releases](https://github.com/HeyPortal/open-scrl/releases), open it, and drag **Open-SCRL**
+onto the **Applications** folder. It requires macOS 27 on a Mac with Apple silicon.
 
 Preview builds are ad-hoc signed and not notarized, so macOS blocks the first launch. Open
 **System Settings ▸ Privacy & Security** and click **Open Anyway**, or remove the download
@@ -104,6 +104,9 @@ cd macos
 xcodebuild -project OpenSCRL.xcodeproj -scheme OpenSCRL -configuration Release -derivedDataPath build build
 open build/Build/Products/Release/Open-SCRL.app
 ```
+
+To package that build as a release disk image, run `macos/Scripts/make-dmg.sh`. It writes a
+compressed `Open-SCRL-<version>.dmg` with a branded install window to `macos/build/dmg/`.
 
 The project signs to run locally and doesn't use the App Sandbox. The app icon's source is
 [`macos/Design/AppIcon.icon`](./macos/Design/AppIcon.icon), an Icon Composer document; the
@@ -244,6 +247,7 @@ src/
 macos/
 ├── OpenSCRL.xcodeproj
 ├── Design/       Icon Composer source for the app icon
+├── Scripts/      Release packaging: styled installer disk image
 └── OpenSCRL/
     ├── App/        App scenes, menu commands, settings, and preferences
     ├── Document/   Project packages, media storage, and imports
