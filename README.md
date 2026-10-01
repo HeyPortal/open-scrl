@@ -6,7 +6,7 @@
 
 <p align="center">
   A local-first photo grid and social carousel maker.<br />
-  Create polished, multi-slide posts in your browser—without accounts, subscriptions, or telemetry.
+  Create polished, multi-slide posts in your browser or on your Mac—without accounts, subscriptions, or telemetry.
 </p>
 
 <p align="center">
@@ -18,11 +18,17 @@
   </a>
   <img src="https://img.shields.io/badge/privacy-local--first-14b8a6.svg" alt="Local-first" />
   <img src="https://img.shields.io/badge/platform-PWA-f97316.svg" alt="Progressive Web App" />
+  <a href="#mac-app">
+    <img src="https://img.shields.io/badge/platform-macOS%2027-0a84ff.svg" alt="Native macOS app" />
+  </a>
+  <a href="https://github.com/HeyPortal/open-scrl/releases">
+    <img src="https://img.shields.io/github/v/release/HeyPortal/open-scrl?include_prereleases&label=release" alt="Latest release" />
+  </a>
 </p>
 
 Open-SCRL is a free, open-source alternative to [SCRL](https://scrl.com). It combines
 photo grids, a layer-based editor, and carousel-ready exports in an installable Progressive
-Web App. Your projects and original media stay on your device.
+Web App and a [native Mac app](#mac-app). Your projects and original media stay on your device.
 
 > [!NOTE]
 > Open-SCRL is in active development. The editor supports local projects, media imports,
@@ -51,7 +57,61 @@ Web App. Your projects and original media stay on your device.
 - **Installable PWA** — add Open-SCRL to your desktop or home screen for an app-like
   experience.
 
+## Mac app
+
+A native version for macOS 27 lives in [`macos/`](./macos). It keeps the same editor, photo
+grids, and carousel export, and works the way a Mac app should:
+
+- **Projects are files.** Each project is an `.openscrl` package you can rename, move, back
+  up, or share. Autosave, **File ▸ Revert To**, **Open Recent**, and Finder previews come
+  from macOS. The `project.json` inside uses the same schema as the web app.
+- **A Mac-native workspace.** A Liquid Glass toolbar and floating filmstrip, a tool sidebar,
+  an inspector with **Design** and **Layers** tabs, full menu-bar commands, a `⌘ K` command
+  palette, and a welcome window with your recent projects.
+- **Direct editing.** Move, resize, and rotate with smart guides; Option-drag to duplicate;
+  double-click text to type in place or a photo to reposition its crop; pinch or `⌘`-scroll
+  to zoom; Space-drag to pan; copy and paste layers and images; drag photos in from Finder.
+- **Instant carousels.** Drop photos or videos on the Dock icon to start a carousel with one
+  slide per item. Panoramas spread across slides automatically so the swipe stays seamless.
+  Import directly from your Photos library, including HEIC photos.
+- **Fast export.** Export to a folder or ZIP as PNG, JPEG, or HEIC at 1× or 2×. Slides with
+  GIFs or videos render to H.264 MP4 faster than real time. **Share Carousel** sends every
+  slide with AirDrop, Messages, or Mail.
+
+The web app and the Mac app store projects separately; projects don't move between them yet.
+
+### Download
+
+Download `Open-SCRL-macOS-<version>.zip` from
+[Releases](https://github.com/HeyPortal/open-scrl/releases), unzip it, and move
+**Open-SCRL** to your Applications folder. It requires macOS 27 on a Mac with Apple silicon.
+
+Preview builds are ad-hoc signed and not notarized, so macOS blocks the first launch. Open
+**System Settings ▸ Privacy & Security** and click **Open Anyway**, or remove the download
+quarantine flag:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Open-SCRL.app
+```
+
+### Build from source
+
+Requires Xcode 27. Open `macos/OpenSCRL.xcodeproj` and choose **Product ▸ Run**, or build
+from the command line:
+
+```bash
+cd macos
+xcodebuild -project OpenSCRL.xcodeproj -scheme OpenSCRL -configuration Release -derivedDataPath build build
+open build/Build/Products/Release/Open-SCRL.app
+```
+
+The project signs to run locally and doesn't use the App Sandbox. The app icon's source is
+[`macos/Design/AppIcon.icon`](./macos/Design/AppIcon.icon), an Icon Composer document; the
+bundled icon set is rendered from it with Icon Composer's `ictool`.
+
 ## Quick start
+
+The steps below run the web app. For the Mac app, see [Mac app](#mac-app).
 
 ### Prerequisites
 
@@ -98,6 +158,9 @@ late dependency-discovery reload during the first media import on a fresh cache.
 
 ## Storage and recovery
 
+This section describes the web app. The Mac app saves each project, including its media,
+as a single `.openscrl` file wherever you choose.
+
 Projects and media stay in the browser profile and site address where you created
 them. There is no application server, account system, or device-to-device sync.
 Clearing the site's browser data removes its locally saved projects and media.
@@ -137,6 +200,8 @@ are capped at 60 seconds per slide.
 | Faster zoom | `⌘` + scroll | `Ctrl` + scroll |
 | Edit text in place | Double-click a text layer | Double-click a text layer |
 
+The Mac app shows its shortcuts in the menu bar and in **Help ▸ Keyboard Shortcuts** (`⌘ /`).
+
 ## Under the hood
 
 | Area | Implementation |
@@ -148,6 +213,16 @@ are capped at 60 seconds per slide.
 | Import and export | Web Workers, Canvas 2D, WebCodecs, MP4 muxing, and Zip.js |
 | PWA | `vite-plugin-pwa` with an auto-updating service worker |
 | Testing | Vitest regression tests and Playwright Chromium tests, including recovery and cross-tab media flows |
+
+The Mac app is a separate Swift codebase:
+
+| Area | Implementation |
+| --- | --- |
+| App | SwiftUI with AppKit for the canvas, menus, and text editing |
+| Documents | macOS 27 SwiftUI `Document` API with file-wrapper packages and Quick Look thumbnails |
+| Rendering | One Core Graphics and Core Text renderer shared by the canvas, thumbnails, and export |
+| Media | ImageIO (including HEIC and animated GIF, PNG, and WebP) and AVFoundation |
+| Export | AVFoundation H.264 MP4, ImageIO PNG, JPEG, and HEIC, and system ZIP archives |
 
 <details>
 <summary><strong>Repository layout</strong></summary>
@@ -165,6 +240,18 @@ src/
 ├── storage/      IndexedDB transactions and temporary export files
 ├── store/        Compatibility exports and asset UI state
 └── workers/      Media preparation and thumbnail generation
+
+macos/
+├── OpenSCRL.xcodeproj
+├── Design/       Icon Composer source for the app icon
+└── OpenSCRL/
+    ├── App/        App scenes, menu commands, settings, and preferences
+    ├── Document/   Project packages, media storage, and imports
+    ├── Editor/     Canvas, sidebar panels, inspector, filmstrip, and command palette
+    ├── Export/     Still and MP4 rendering and carousel packaging
+    ├── Model/      Project model, web-compatible JSON, grids, snapping, and presets
+    ├── Rendering/  Shared renderer, text layout, fonts, and image caching
+    └── Welcome/    Welcome window and recent projects
 ```
 
 </details>

@@ -13,15 +13,17 @@ extension EditorController {
                    completion: @escaping () -> Void = {}) {
         guard exportState == nil else { return }
         exportState = ExportState(title: title, detail: "Preparing…", fraction: nil)
+        weak let controller = self
+        let report: @Sendable (String, Double?) -> Void = { detail, fraction in
+            Task { @MainActor in
+                guard controller?.exportState != nil else { return }
+                controller?.exportState?.detail = detail
+                controller?.exportState?.fraction = fraction
+            }
+        }
         exportTask = Task { [weak self] in
             do {
-                try await work { detail, fraction in
-                    Task { @MainActor [weak self] in
-                        guard self?.exportState != nil else { return }
-                        self?.exportState?.detail = detail
-                        self?.exportState?.fraction = fraction
-                    }
-                }
+                try await work(report)
                 self?.exportState = nil
                 completion()
             } catch is CancellationError {
