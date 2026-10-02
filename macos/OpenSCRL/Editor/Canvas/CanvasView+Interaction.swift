@@ -61,6 +61,15 @@ extension CanvasView {
             controller.cropLayerID = nil
         }
 
+        if let button = slideButton(atView: p) {
+            // A disabled button still swallows the click instead of deselecting.
+            if isEnabled(button) {
+                drag = .slideButton(button)
+                needsDisplay = true
+            }
+            return
+        }
+
         if event.clickCount == 2, let item = hitLayer(atView: p) {
             drag = .none
             switch item.layer.content {
@@ -108,6 +117,10 @@ extension CanvasView {
         switch drag {
         case .none, .marqueeSlide:
             return
+
+        case .slideButton:
+            // Pressed while over the button; released elsewhere cancels.
+            updateSlideHover(p)
 
         case .pan(let start, let startOrigin):
             origin = CGPoint(x: startOrigin.x + p.x - start.x, y: startOrigin.y + p.y - start.y)
@@ -199,6 +212,7 @@ extension CanvasView {
         case .rotate: controller.endGesture("Rotate Layer")
         case .crop: controller.endGesture("Adjust Crop"); NSCursor.openHand.set()
         case .pan: (spaceDown ? NSCursor.openHand : NSCursor.arrow).set()
+        case .slideButton(let button): if slideButton(atView: point(event)) == button { performSlideAction(button) }
         default: break
         }
         drag = .none
@@ -293,6 +307,7 @@ extension CanvasView {
 
     override func mouseExited(with event: NSEvent) {
         if hoverLayerID != nil { hoverLayerID = nil; needsDisplay = true }
+        updateSlideHover(nil)
         lastMouseLocation = nil
     }
 
@@ -311,6 +326,7 @@ extension CanvasView {
             hoverLayerID = hovered
             needsDisplay = true
         }
+        updateSlideHover(p)
     }
 
     private func cursor(for handle: Handle, item: SceneItem) -> NSCursor {

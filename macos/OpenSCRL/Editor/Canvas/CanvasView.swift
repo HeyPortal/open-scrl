@@ -33,6 +33,7 @@ final class CanvasView: NSView {
         case crop(id: String, base: Layer, start: CGPoint)
         case pan(start: CGPoint, origin: CGPoint)
         case marqueeSlide
+        case slideButton(SlideButton)
     }
 
     var drag: Drag = .none
@@ -40,6 +41,8 @@ final class CanvasView: NSView {
     var guideSlideOffset: Double = 0
     var seams: [CGRect] = []
     var hoverLayerID: String?
+    var hoverSlideIndex: Int?
+    var hoverSlideButton: SlideButton?
     var dropTargetLayerID: String?
     var isDropTargeted = false
     var spaceDown = false
@@ -174,6 +177,8 @@ final class CanvasView: NSView {
         syncTextEditor()
         syncPlayback()
         layoutTextEditor()
+        // Zooming or revealing a slide moves the deck under a still pointer.
+        updateSlideHover(lastMouseLocation)
     }
 
     /// Scrolls just enough to show the slide; centers it when it doesn't fit.
@@ -285,7 +290,7 @@ final class CanvasView: NSView {
 
     var isInteracting: Bool {
         switch drag {
-        case .none, .pending, .marqueeSlide: false
+        case .none, .pending, .marqueeSlide, .slideButton: false
         default: true
         }
     }
@@ -342,19 +347,10 @@ final class CanvasView: NSView {
             cg.setLineWidth(2)
             cg.stroke(rect)
         }
-        // Slide numbers above each slide.
-        let font = NSFont.systemFont(ofSize: 11, weight: .semibold)
+        // Slide numbers above each slide, with buttons on the selected and hovered ones.
         guard first <= last else { return }
         for index in first...last {
-            let isSelected = index == selected
-            let label = "\(index + 1)" as NSString
-            let attrs: [NSAttributedString.Key: Any] = [
-                .font: font,
-                .foregroundColor: isSelected ? NSColor.controlAccentColor : NSColor.secondaryLabelColor,
-            ]
-            let size = label.size(withAttributes: attrs)
-            let point = CGPoint(x: origin.x + CGFloat(index) * W + 2, y: origin.y - size.height - 6)
-            label.draw(at: point, withAttributes: attrs)
+            drawSlideHeader(cg, index: index, selected: index == selected)
         }
     }
 
@@ -456,13 +452,7 @@ final class CanvasView: NSView {
                 cg.fillEllipse(in: badge)
                 let iconH: CGFloat = 9, iconW = iconH * CGFloat(lock.width) / CGFloat(lock.height)
                 let iconRect = CGRect(x: badge.midX - iconW / 2, y: badge.midY - iconH / 2, width: iconW, height: iconH)
-                cg.saveGState()
-                cg.translateBy(x: 0, y: iconRect.minY + iconRect.maxY)
-                cg.scaleBy(x: 1, y: -1)
-                cg.clip(to: iconRect, mask: lock)
-                cg.setFillColor(.white)
-                cg.fill(iconRect)
-                cg.restoreGState()
+                Self.fillSymbol(lock, in: iconRect, color: .white, cg: cg)
             }
             return
         }
