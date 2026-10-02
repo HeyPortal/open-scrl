@@ -293,12 +293,14 @@ export const useDocumentStore = create<EditorState>((set, get) => ({
   },
   deleteSlide: (slideId) => {
     const state = get(); if (state.doc.slideOrder.length <= 1) return;
-    const index = state.doc.slideOrder.indexOf(slideId);
+    const index = state.doc.slideOrder.indexOf(slideId); if (index < 0) return;
+    const wasSelected = useEditorSession.getState().selectedSlideId === slideId;
     get().execute(command('Delete slide', (d) => {
       for (const lid of d.slides[slideId]?.layerOrder ?? []) delete d.layers[lid];
       delete d.slides[slideId]; d.slideOrder.splice(index, 1);
     }));
-    get().selectSlide(get().doc.slideOrder[Math.min(index, get().doc.slideOrder.length - 1)] ?? '');
+    // Deleting another slide (from the canvas header) keeps the current selection.
+    if (wasSelected) get().selectSlide(get().doc.slideOrder[Math.min(index, get().doc.slideOrder.length - 1)] ?? '');
   },
   duplicateSlide: (slideId) => {
     const source = get().doc.slides[slideId]; if (!source) return;

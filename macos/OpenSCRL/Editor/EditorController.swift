@@ -226,8 +226,10 @@ final class EditorController {
 
     func deleteSlide(_ id: String) {
         guard project.slides.count > 1, let index = project.slideIndex(of: id) else { return }
+        let wasSelected = id == selectedSlideID
         perform("Delete Slide") { $0.slides.remove(at: index) }
-        focusSlide(at: min(index, project.slides.count - 1))
+        // Deleting another slide (from the canvas header) keeps the current selection.
+        if wasSelected { focusSlide(at: min(index, project.slides.count - 1)) }
     }
 
     func duplicateSlide(_ id: String) {

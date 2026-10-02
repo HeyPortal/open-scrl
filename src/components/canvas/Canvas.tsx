@@ -16,6 +16,7 @@ import { ImageNode } from './ImageNode';
 import { TextNode } from './TextNode';
 import { ShapeNode } from './ShapeNode';
 import { TextEditor } from './TextEditor';
+import { SlideHeaders } from './SlideHeaders';
 
 const SNAP_THRESHOLD_PX = 6;
 const PADDING = 32;
@@ -38,6 +39,7 @@ export function Canvas({ width, height }: { width: number; height: number }) {
   const assets = useAssets((s) => s.assets);
 
   const openContextMenu = useContextMenu((s) => s.open);
+  const workspaceRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<Konva.Stage>(null);
   const transformerRef = useRef<Konva.Transformer>(null);
@@ -170,7 +172,7 @@ export function Canvas({ width, height }: { width: number; height: number }) {
     return <Group key={layer.id} x={offset}>{layer.kind==='image'?<ImageNode {...props} layer={layer} asset={layer.assetId ? assetsById.get(layer.assetId) : undefined} activeSlide={selectedSlideId===slideId} selected={selectedId===layer.id} groupRef={ref} renderScale={zoom*EDITOR_PIXEL_RATIO}/>:layer.kind==='shape'?<ShapeNode {...props} layer={layer} groupRef={ref}/>:<TextNode {...props} layer={layer} onDblClick={()=>setEditingTextId(layer.id)} nodeRef={ref}/>}</Group>;
   };
 
-  return <div className="workspace relative h-full w-full overflow-hidden select-none">
+  return <div ref={workspaceRef} className="workspace relative h-full w-full overflow-hidden select-none">
     <div ref={scrollRef} data-testid="canvas-scroll" onScroll={scheduleScrollSync} className="absolute inset-0 overflow-auto scrollbar-thin"><div style={{width:spacerWidth,height:spacerHeight}} /></div>
     <div className="absolute inset-0 pointer-events-auto overflow-hidden">
       <Stage ref={stageRef} width={Math.max(1,width)} height={Math.max(1,height)} onWheel={onWheel} onContextMenu={(e)=>{e.evt.preventDefault();openContextMenu(e.evt.clientX,e.evt.clientY,layerMenu(),'Canvas actions');}} onMouseDown={(e)=>{if(e.target===e.target.getStage())selectPageAtPointer();}} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={()=>{if(touch.current)selectPageAtPointer();touch.current=null;}}>
@@ -179,6 +181,7 @@ export function Canvas({ width, height }: { width: number; height: number }) {
         <KLayer listening={false}><Group x={viewportOffset.x} y={viewportOffset.y} scaleX={zoom} scaleY={zoom}>{resizeSeams.map((seam)=><Group key={`seam-${seam.x}`}><Rect x={seam.x-6/zoom} y={seam.y} width={12/zoom} height={seam.height} fill="#ff3b8a" opacity={0.2}/><Line points={[seam.x,seam.y,seam.x,seam.y+seam.height]} stroke="#ff3b8a" strokeWidth={3/zoom} dash={[10/zoom,6/zoom]}/></Group>)}{guides.map((g,i)=>g.orientation==='v'?<Line key={i} points={[guideOffsetX+g.position,g.start,guideOffsetX+g.position,g.end]} stroke="#ff3b8a" strokeWidth={1/zoom}/>:<Line key={i} points={[guideOffsetX+g.start,g.position,guideOffsetX+g.end,g.position]} stroke="#ff3b8a" strokeWidth={1/zoom}/>)}</Group></KLayer>
       </Stage>
     </div>
+    <SlideHeaders containerRef={workspaceRef} slides={visibleSlides} count={doc.slideOrder.length} selectedSlideId={selectedSlideId} offset={viewportOffset} slideWidth={fmt.width*zoom} slideHeight={fmt.height*zoom}/>
     {editingTextId&&active?.kind==='text'&&stageRef.current&&(
       <TextEditor layer={active} stage={stageRef.current} offsetX={pageX(doc.slideOrder.find((sid)=>doc.slides[sid].layerOrder.includes(active.id))??selectedSlideId)} scale={zoom} viewportOffset={{x:originX-scrollPosition.current.left,y:centeredY-scrollPosition.current.top}} onClose={()=>setEditingTextId(null)}/>
     )}
