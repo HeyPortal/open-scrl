@@ -163,10 +163,18 @@ export interface ProjectDocumentV2 {
   updatedAt: number;
 }
 
+export interface SlideGrid {
+  templateId: string;
+  gap: number;
+  margin: number;
+  slotIds: string[];
+}
+
 export interface SlideRecord {
   id: string;
   background: Background;
   layerOrder: string[];
+  grid?: SlideGrid;
 }
 
 export type PersistedDocument = Document | ProjectDocumentV2;

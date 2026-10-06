@@ -318,3 +318,43 @@ export const GRID_TEMPLATES: GridTemplate[] = [
     cells: grid(4, 4),
   },
 ];
+
+export const MIN_CELL = 16;
+export const MAX_GRID_INSET = 120;
+
+type Size = { width: number; height: number };
+
+export function maxMargin(width: number, height: number): number {
+  return Math.min(MAX_GRID_INSET, Math.floor(Math.min(width, height) / 4));
+}
+
+const smallestSide = (cells: GridCell[]) => Math.min(...cells.flatMap((c) => [c.w, c.h]));
+
+/** Largest gap <= `gap` (>= 0) for which every cell is at least MIN_CELL on both sides. */
+function effectiveGap(template: GridTemplate, W: number, H: number, gap: number): number {
+  const want = Math.max(0, gap);
+  if (smallestSide(template.cells(W, H, want)) >= MIN_CELL) return want;
+  let lo = 0;
+  let hi = want;
+  for (let i = 0; i < 24; i++) {
+    const mid = (lo + hi) / 2;
+    if (smallestSide(template.cells(W, H, mid)) >= MIN_CELL) lo = mid;
+    else hi = mid;
+  }
+  return lo;
+}
+
+/** Cells for `template` inside a `margin`-inset slide, with the gap clamped so no cell is tiny. */
+export function layoutGrid(template: GridTemplate, format: Size, gap: number, margin: number): GridCell[] {
+  const m = Math.min(Math.max(0, margin), maxMargin(format.width, format.height));
+  const W = format.width - 2 * m;
+  const H = format.height - 2 * m;
+  const g = effectiveGap(template, W, H, gap);
+  return template.cells(W, H, g).map((c) => ({ x: c.x + m, y: c.y + m, w: c.w, h: c.h }));
+}
+
+/** Slider maximum for the gap: 120, or less when the template would drop below MIN_CELL. */
+export function maxGapFor(template: GridTemplate, format: Size, margin: number): number {
+  const m = Math.min(Math.max(0, margin), maxMargin(format.width, format.height));
+  return Math.floor(effectiveGap(template, format.width - 2 * m, format.height - 2 * m, MAX_GRID_INSET));
+}
