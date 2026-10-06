@@ -44,6 +44,25 @@ struct SlideInspector: View {
                 }
             }
 
+            if let live = project.liveGrid(slide: index) {
+                let marginMax = GridTemplate.maxMargin(width: project.format.width, height: project.format.height)
+                let margin = min(live.grid.margin, marginMax)
+                let gapMax = max(1, live.template.maxGap(format: project.format, margin: margin))
+                let gap = min(live.grid.gap, gapMax)
+                Section {
+                    GestureSlider(title: "Gap", value: Binding(get: { gap }, set: { controller.setSlideGrid(gap: $0.rounded()) }),
+                                  range: 0...gapMax, display: "\(Int(gap)) px", controller: controller, undoName: "Adjust Grid")
+                    GestureSlider(title: "Outer Margin", value: Binding(get: { margin }, set: { controller.setSlideGrid(margin: $0.rounded()) }),
+                                  range: 0...max(1, marginMax), display: "\(Int(margin)) px", controller: controller, undoName: "Adjust Grid")
+                    if live.movedSlots > 0 {
+                        Text("\(live.movedSlots) slot\(live.movedSlots == 1 ? " was" : "s were") moved by hand and won’t follow these sliders.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                } header: {
+                    HStack { Text("Photo Grid"); Spacer(); Text(live.template.name).foregroundStyle(.secondary) }
+                }
+            }
+
             Section {
                 HStack(spacing: 6) {
                     ForEach(Array(Swatches.quick.enumerated()), id: \.offset) { _, bg in

@@ -100,6 +100,7 @@ final class EditorController {
     var showsFileImporter = false
     @ObservationIgnored var fileImporterPlacement: MediaPlacement = .libraryOnly
     var gridGap: Double = 0
+    var gridMargin: Double = 0
     var exportState: ExportState?
     /// Layer whose name field the inspector should focus.
     var renameRequest: String?
@@ -278,7 +279,13 @@ final class EditorController {
 
     func duplicateSlide(_ id: String) {
         guard let index = project.slideIndex(of: id) else { return }
-        let copy = project.slides[index].duplicated()
+        var copy = project.slides[index].duplicated()
+        // slotIds stay index-aligned with the template cells; a deleted slot gets a fresh unused id rather than being dropped.
+        if var grid = copy.grid {
+            let idMap = Dictionary(uniqueKeysWithValues: zip(project.slides[index].layers.map(\.id), copy.layers.map(\.id)))
+            grid.slotIds = grid.slotIds.map { idMap[$0] ?? UID.make() }
+            copy.grid = grid
+        }
         perform("Duplicate Slide") { $0.slides.insert(copy, at: index + 1) }
         focusSlide(copy.id)
     }
@@ -415,20 +422,47 @@ final class EditorController {
         PhotoFrames.setPhoto(asset.id, in: &layer)
     }
 
-    func applyGrid(_ template: GridTemplate, gap: Double? = nil) {
+    func applyGrid(_ template: GridTemplate, gap: Double? = nil, margin: Double? = nil) {
         let index = selectedSlideIndex
-        let cells = template.cells(project.format.width, project.format.height, gap ?? gridGap)
+        let gap = gap ?? gridGap, margin = margin ?? gridMargin
+        let cells = template.layout(format: project.format, gap: gap, margin: margin)
         let layers = cells.enumerated().map { i, cell in
             Layer(id: UID.make(), name: "Photo \(i + 1)", x: cell.minX, y: cell.minY, width: cell.width, height: cell.height,
                   locked: true, content: .image(ImageProperties()))
         }
+        let grid = SlideGrid(templateId: template.id, gap: gap, margin: margin, slotIds: layers.map(\.id))
         perform("Apply \(template.name) Grid") { p in
             guard p.slides.indices.contains(index) else { return }
             p.slides[index].layers = layers
+            p.slides[index].grid = grid
         }
         selectLayer(nil)
         selectedSlideID = project.slides[index].id
         show("Applied the \(template.name) grid. Click a slot, then a photo in Media to fill it.")
+    }
+
+    /// Re-lays out the selected slide's grid. Only slots still on their old cell follow; hand-moved slots and other layers are untouched.
+    func setSlideGrid(gap: Double? = nil, margin: Double? = nil) {
+        let index = selectedSlideIndex
+        guard let live = project.liveGrid(slide: index) else { return }
+        let newGap = gap ?? live.grid.gap, newMargin = margin ?? live.grid.margin
+        guard newGap != live.grid.gap || newMargin != live.grid.margin else { return }
+        let format = project.format
+        let oldCells = live.template.layout(format: format, gap: live.grid.gap, margin: live.grid.margin)
+        let newCells = live.template.layout(format: format, gap: newGap, margin: newMargin)
+        perform("Adjust Grid", coalesce: "grid:\(selectedSlideID)") { p in
+            guard p.slides.indices.contains(index), var grid = p.slides[index].grid else { return }
+            for (i, id) in grid.slotIds.enumerated() where i < oldCells.count && i < newCells.count {
+                guard let li = p.slides[index].layers.firstIndex(where: { $0.id == id }), p.slides[index].layers[li].matches(oldCells[i]) else { continue }
+                p.slides[index].layers[li].x = newCells[i].minX
+                p.slides[index].layers[li].y = newCells[i].minY
+                p.slides[index].layers[li].width = newCells[i].width
+                p.slides[index].layers[li].height = newCells[i].height
+            }
+            grid.gap = newGap
+            grid.margin = newMargin
+            p.slides[index].grid = grid
+        }
     }
 
     // MARK: - Editing layers

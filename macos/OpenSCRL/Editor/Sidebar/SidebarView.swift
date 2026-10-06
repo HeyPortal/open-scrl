@@ -86,11 +86,23 @@ struct GridsPanel: View {
                     .font(.callout)
                     Slider(value: Binding(get: { controller.gridGap }, set: { controller.gridGap = $0.rounded() }), in: 0...120).controlSize(.small).labelsHidden()
                 }
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack {
+                        Text("Outer margin").foregroundStyle(.secondary)
+                        Spacer()
+                        Text("\(Int(controller.gridMargin)) px").monospacedDigit().foregroundStyle(.secondary)
+                    }
+                    .font(.callout)
+                    Slider(value: Binding(get: { controller.gridMargin }, set: { controller.gridMargin = $0.rounded() }),
+                           in: 0...GridTemplate.maxMargin(width: controller.project.format.width, height: controller.project.format.height))
+                        .controlSize(.small).labelsHidden()
+                        .accessibilityLabel("Outer margin")
+                }
                 LazyVGrid(columns: columns, spacing: 8) {
                     ForEach(GridTemplate.all) { template in
                         Button { controller.applyGrid(template) } label: {
                             VStack(spacing: 6) {
-                                GridPreview(template: template, ratio: controller.project.format.aspectRatio, gap: controller.gridGap)
+                                GridPreview(template: template, ratio: controller.project.format.aspectRatio, gap: controller.gridGap, margin: controller.gridMargin)
                                     .frame(height: 64)
                                 Text(template.name).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                             }
@@ -110,15 +122,17 @@ struct GridPreview: View {
     var template: GridTemplate
     var ratio: Double
     var gap: Double
+    var margin: Double
 
     var body: some View {
         Canvas { context, size in
             let h = size.height, w = min(size.width, h * ratio)
             let originX = (size.width - w) / 2
             let previewGap = max(2, gap / 120 * 6)
+            let previewMargin = margin / 120 * 6
             context.fill(Path(roundedRect: CGRect(x: originX, y: 0, width: w, height: h), cornerRadius: 3), with: .color(.secondary.opacity(0.15)))
-            for cell in template.cells(w, h, previewGap) {
-                let r = CGRect(x: originX + cell.minX, y: cell.minY, width: cell.width, height: cell.height)
+            for cell in template.cells(w - 2 * previewMargin, h - 2 * previewMargin, previewGap) {
+                let r = CGRect(x: originX + previewMargin + cell.minX, y: previewMargin + cell.minY, width: cell.width, height: cell.height)
                 context.fill(Path(roundedRect: r, cornerRadius: 2), with: .style(.tint.opacity(0.75)))
             }
         }
