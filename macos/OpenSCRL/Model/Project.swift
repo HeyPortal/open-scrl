@@ -238,10 +238,20 @@ struct Layer: Identifiable, Hashable, Sendable {
 
 // MARK: - Slides, media, project
 
+/// Records which photo-grid template laid out a slide so gap and margin can be re-adjusted.
+/// `slotIds[i]` is the layer for template cell `i`; entries for deleted slots stay in place.
+struct SlideGrid: Codable, Hashable, Sendable {
+    var templateId: String
+    var gap: Double
+    var margin: Double
+    var slotIds: [String]
+}
+
 struct Slide: Identifiable, Hashable, Sendable {
     var id: String
     var background: Background
     var layers: [Layer]
+    var grid: SlideGrid? = nil
 
     static func blank() -> Slide { Slide(id: UID.make(), background: .white, layers: []) }
 }

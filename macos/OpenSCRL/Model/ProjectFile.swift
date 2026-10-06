@@ -8,6 +8,7 @@ struct ProjectFile: Codable {
         var id: String
         var background: Background
         var layerOrder: [String]
+        var grid: SlideGrid?
     }
 
     var schemaVersion: Int
@@ -44,7 +45,7 @@ struct ProjectFile: Codable {
         var slideRecords: [String: SlideRecord] = [:]
         var layerRecords: [String: Layer] = [:]
         for slide in project.slides {
-            slideRecords[slide.id] = SlideRecord(id: slide.id, background: slide.background, layerOrder: slide.layers.map(\.id))
+            slideRecords[slide.id] = SlideRecord(id: slide.id, background: slide.background, layerOrder: slide.layers.map(\.id), grid: slide.grid)
             for layer in slide.layers { layerRecords[layer.id] = layer }
         }
         slides = slideRecords
@@ -61,7 +62,7 @@ struct ProjectFile: Codable {
         project.id = id
         project.slides = slideOrder.compactMap { slideID in
             guard let record = slides[slideID] else { return nil }
-            return Slide(id: record.id, background: record.background, layers: record.layerOrder.compactMap { layers[$0] })
+            return Slide(id: record.id, background: record.background, layers: record.layerOrder.compactMap { layers[$0] }, grid: record.grid)
         }
         if project.slides.isEmpty { project.slides = [.blank()] }
         project.assets = assets ?? []
