@@ -3,8 +3,9 @@ import { create } from 'zustand';
 import type { AssetMeta, Background, Bounds, Format, ImageLayer, Layer, ProjectDocumentV2, ShapeLayer, SlideRecord, TextLayer } from '@/types';
 import { id } from '@/lib/nano';
 import { DEFAULT_FORMAT } from '@/lib/format';
-import type { GridTemplate } from '@/lib/grids';
+import { layoutGrid, type GridTemplate } from '@/lib/grids';
 import { migrateDocument } from '@/core/document/migrations';
+import { getLiveGrid, slotMatchesCell } from '@/core/document/grid';
 import { command, type EditorCommand } from '@/core/document/commands';
 import { getSlideLayers, materializeSlide, expandToGroups, groupMemberIds, selectionUnits } from '@/core/document/selectors';
 import { scaleLayer, slideSpanFor, unionBounds, type AlignEdge, type DistributeAxis } from '@/core/document/geometry';
@@ -87,7 +88,8 @@ export interface EditorState {
   swapPhotos(sourceId: string, targetId: string): boolean;
   addTextLayer(text?: string): void;
   addShapeLayer(shape: 'rect' | 'ellipse'): void;
-  applyGrid(template: GridTemplate, gap: number): void;
+  applyGrid(template: GridTemplate, gap: number, margin?: number): void;
+  setSlideGrid(slideId: string, patch: { gap?: number; margin?: number }): void;
   updateLayer(id: string, patch: Partial<Layer>): void;
   updateLayers(patches: { id: string; patch: Partial<Layer> }[]): void;
   deleteLayer(id: string): void;
@@ -380,10 +382,11 @@ export const useDocumentStore = create<EditorState>((set, get) => ({
     const nextId = id(); const newLayerIds: string[] = [];
     get().execute(command('Duplicate slide', (d) => {
       const groups = new Map<string, string>();
+      const idMap = new Map<string, string>();
       for (const lid of source.layerOrder) {
         const nid = id(); const layer = d.layers[lid];
         if (!layer) continue;
-        newLayerIds.push(nid);
+        newLayerIds.push(nid); idMap.set(lid, nid);
         const copy = { ...layer, id: nid };
         if (layer.groupId) {
           if (!groups.has(layer.groupId)) groups.set(layer.groupId, id());
@@ -391,7 +394,9 @@ export const useDocumentStore = create<EditorState>((set, get) => ({
         }
         d.layers[nid] = copy;
       }
-      d.slides[nextId] = { ...source, id: nextId, layerOrder: newLayerIds };
+      // slotIds must stay index-aligned with the template cells, so a slot that no longer exists gets a fresh unused id rather than being dropped.
+      const grid = source.grid && { ...source.grid, slotIds: source.grid.slotIds.map((old) => idMap.get(old) ?? id()) };
+      d.slides[nextId] = { ...source, id: nextId, layerOrder: newLayerIds, ...(grid ? { grid } : {}) };
       d.slideOrder.splice(d.slideOrder.indexOf(slideId) + 1, 0, nextId);
     })); get().selectSlide(nextId);
   },
@@ -460,8 +465,15 @@ export const useDocumentStore = create<EditorState>((set, get) => ({
     const layer: ShapeLayer={id:id(),kind:'shape',name:shape==='rect'?'Rectangle':'Ellipse',x:(f.width-width)/2,y:(f.height-height)/2,width,height,rotation:0,opacity:1,visible:true,locked:false,shape,fill:'#7c5cff',stroke:'transparent',strokeWidth:0,cornerRadius:shape==='rect'?24:0};
     get().execute(command('Add shape',(d)=>{d.layers[layer.id]=layer;d.slides[sid].layerOrder.push(layer.id);}));get().selectLayer(layer.id);
   },
-  applyGrid: (template,gap) => { const s=get();const sid=useEditorSession.getState().selectedSlideId||s.doc.slideOrder[0];const cells=template.cells(s.doc.format.width,s.doc.format.height,gap);
-    get().execute(command('Apply grid',(d)=>{for(const lid of d.slides[sid].layerOrder)delete d.layers[lid];d.slides[sid].layerOrder=[];cells.forEach((c,i)=>{const lid=id();d.layers[lid]={id:lid,kind:'image',name:`Photo ${i+1}`,x:c.x,y:c.y,width:c.w,height:c.h,rotation:0,opacity:1,visible:true,locked:true,assetId:null,cornerRadius:0,cropOffsetX:0,cropOffsetY:0,cropScale:1};d.slides[sid].layerOrder.push(lid);});}));get().selectLayer(null);
+  applyGrid: (template,gap,margin=0) => { const s=get();const sid=useEditorSession.getState().selectedSlideId||s.doc.slideOrder[0];const cells=layoutGrid(template,s.doc.format,gap,margin);
+    get().execute(command('Apply grid',(d)=>{for(const lid of d.slides[sid].layerOrder)delete d.layers[lid];d.slides[sid].layerOrder=[];const slotIds:string[]=[];cells.forEach((c,i)=>{const lid=id();slotIds.push(lid);d.layers[lid]={id:lid,kind:'image',name:`Photo ${i+1}`,x:c.x,y:c.y,width:c.w,height:c.h,rotation:0,opacity:1,visible:true,locked:true,assetId:null,cornerRadius:0,cropOffsetX:0,cropOffsetY:0,cropScale:1};d.slides[sid].layerOrder.push(lid);});d.slides[sid].grid={templateId:template.id,gap,margin,slotIds};}));get().selectLayer(null);
+  },
+  setSlideGrid: (slideId,patch) => { const s=get();const live=getLiveGrid(s.doc,slideId);if(!live)return;
+    const gap=patch.gap??live.grid.gap;const margin=patch.margin??live.grid.margin;if(gap===live.grid.gap&&margin===live.grid.margin)return;
+    const oldCells=layoutGrid(live.template,s.doc.format,live.grid.gap,live.grid.margin);const newCells=layoutGrid(live.template,s.doc.format,gap,margin);
+    get().execute(command('Adjust grid',(d)=>{const slide=d.slides[slideId];const g=slide.grid;if(!g)return;
+      g.slotIds.forEach((lid,i)=>{const layer=d.layers[lid];if(!layer||!slide.layerOrder.includes(lid)||!oldCells[i]||!newCells[i])return;if(!slotMatchesCell(layer,oldCells[i]))return;const c=newCells[i];layer.x=c.x;layer.y=c.y;layer.width=c.w;layer.height=c.h;});
+      g.gap=gap;g.margin=margin;},`grid:${slideId}`));
   },
   updateLayer: (layerId, patch) => get().execute(command('Edit layer',(d)=>{if(d.layers[layerId])d.layers[layerId]=fitTextBox({...d.layers[layerId],...patch} as Layer,Object.keys(patch));},`layer:${layerId}:${Object.keys(patch).sort().join(',')}`)),
   updateLayers: (patches) => get().execute(command('Edit layers',(d)=>{for(const p of patches)if(d.layers[p.id])d.layers[p.id]=fitTextBox({...d.layers[p.id],...p.patch} as Layer,Object.keys(p.patch));})),
