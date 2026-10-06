@@ -358,3 +358,16 @@ export function maxGapFor(template: GridTemplate, format: Size, margin: number):
   const m = Math.min(Math.max(0, margin), maxMargin(format.width, format.height));
   return Math.floor(effectiveGap(template, format.width - 2 * m, format.height - 2 * m, MAX_GRID_INSET));
 }
+
+/** Slider maximum when gap and margin are linked: the largest whole value both can take at once. */
+export function linkedMax(template: GridTemplate, format: Size): number {
+  let lo = 0;
+  let hi = Math.min(MAX_GRID_INSET, maxMargin(format.width, format.height));
+  // Feasibility is monotone: if v works then so does anything smaller.
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (maxGapFor(template, format, mid) >= mid) lo = mid;
+    else hi = mid - 1;
+  }
+  return lo;
+}

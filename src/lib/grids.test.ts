@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GRID_TEMPLATES, MIN_CELL, layoutGrid, maxGapFor, maxMargin } from './grids';
+import { GRID_TEMPLATES, MAX_GRID_INSET, MIN_CELL, layoutGrid, linkedMax, maxGapFor, maxMargin } from './grids';
 
 const portrait = { width: 1080, height: 1350 };
 const landscape = { width: 1080, height: 566 };
@@ -60,5 +60,28 @@ describe('limits', () => {
       if (cells[i].y === cells[i - 1].y) expect(cells[i].x).toBeGreaterThanOrEqual(cells[i - 1].x + cells[i - 1].w - 1e-6);
     }
     expect(cells).toEqual(layoutGrid(tpl('nine-grid'), portrait, 120, 0));
+  });
+});
+
+describe('linkedMax', () => {
+  it('is the largest whole value that both the gap and the margin can take at once', () => {
+    for (const format of [portrait, landscape]) for (const t of GRID_TEMPLATES) {
+      const v = linkedMax(t, format);
+      const cap = Math.min(MAX_GRID_INSET, maxMargin(format.width, format.height));
+      expect(Number.isInteger(v)).toBe(true);
+      expect(v).toBeGreaterThanOrEqual(0);
+      expect(v).toBeLessThanOrEqual(cap);
+      expect(maxGapFor(t, format, v)).toBeGreaterThanOrEqual(v);
+      if (v < cap) expect(maxGapFor(t, format, v + 1)).toBeLessThan(v + 1);
+    }
+  });
+
+  it('reaches the full 120 when cells are roomy, and a laid-out linked pair needs no clamping', () => {
+    expect(linkedMax(tpl('four-grid'), portrait)).toBe(120);
+    for (const t of GRID_TEMPLATES) {
+      const v = linkedMax(t, landscape);
+      const side = Math.min(...layoutGrid(t, landscape, v, v).flatMap((c) => [c.w, c.h]));
+      expect(side).toBeGreaterThanOrEqual(MIN_CELL - 1e-6);
+    }
   });
 });

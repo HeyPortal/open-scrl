@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { GRID_TEMPLATES, maxMargin, type GridTemplate } from '@/lib/grids';
+import { GRID_TEMPLATES, MAX_GRID_INSET, maxMargin, type GridTemplate } from '@/lib/grids';
 import { useEditor } from '@/store/editor';
-import { PanelHeader, Slider } from '../ui';
+import { useEditorSession } from '@/editor/sessionStore';
+import { LinkToggle, PanelHeader, Slider } from '../ui';
 import { isMac } from '@/app/actions';
 
 function GridThumb({ tpl, gap, margin, ratio }: { tpl: GridTemplate; gap: number; margin: number; ratio: number }) {
@@ -35,15 +36,25 @@ export function TemplatesPanel() {
   const format = useEditor((s) => s.doc.format);
   const [gap, setGap] = useState(0);
   const [margin, setMargin] = useState(0);
+  const linked = useEditorSession((s) => s.gridLinked);
+  const setGridLinked = useEditorSession((s) => s.setGridLinked);
+  // No template is chosen yet, so the shared limit is just the slider range; each template clamps its own layout.
   const marginMax = maxMargin(format.width, format.height);
+  const sharedMax = Math.min(MAX_GRID_INSET, marginMax);
+  const setBoth = (v: number) => { setGap(v); setMargin(v); };
+  const toggleLinked = () => {
+    if (!linked) setBoth(Math.min(gap, sharedMax));
+    setGridLinked(!linked);
+  };
   const ratio = format.width / format.height;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
       <PanelHeader title="Photo grids" hint={`Replaces the current slide's layers with empty photo slots. Undo with ${isMac ? '⌘' : 'Ctrl'} Z.`} />
       <div className="space-y-2.5 px-3 pb-3">
-        <Slider label="Gap between photos" display={`${gap} px`} min={0} max={120} value={gap} onChange={setGap} valueText={`${gap} pixels`} />
-        <Slider label="Outer margin" display={`${margin} px`} min={0} max={marginMax} value={Math.min(margin, marginMax)} onChange={setMargin} valueText={`${margin} pixels`} />
+        <Slider label="Gap between photos" display={`${gap} px`} min={0} max={linked ? sharedMax : 120} value={Math.min(gap, linked ? sharedMax : 120)} onChange={linked ? setBoth : setGap} valueText={`${gap} pixels`} />
+        <LinkToggle linked={linked} onToggle={toggleLinked} />
+        <Slider label="Outer margin" display={`${margin} px`} min={0} max={marginMax} value={Math.min(margin, marginMax)} onChange={linked ? setBoth : setMargin} valueText={`${margin} pixels`} />
       </div>
       <div className="grid min-h-0 flex-1 grid-cols-3 content-start gap-2 overflow-auto border-t border-line px-3 py-3 scrollbar-thin">
         {GRID_TEMPLATES.map((t) => (

@@ -1,4 +1,5 @@
 import { useRef, type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
+import { Link2, Link2Off } from 'lucide-react';
 import { round } from '@/lib/nano';
 
 /** Title row at the top of a sidebar panel. */
@@ -24,6 +25,25 @@ export function Section({ title, action, children }: { title: string; action?: R
       </div>
       <div className="space-y-2.5">{children}</div>
     </section>
+  );
+}
+
+/** Link/unlink toggle that sits between two sliders that can move together. */
+export function LinkToggle({ linked, onToggle }: { linked: boolean; onToggle: () => void }) {
+  const Icon = linked ? Link2 : Link2Off;
+  return (
+    <div className="flex justify-center">
+      <button
+        type="button"
+        className={`icon-btn ${linked ? 'icon-btn-active' : ''}`}
+        title={linked ? 'Unlink gap and outer margin' : 'Link gap and outer margin'}
+        aria-label="Link gap and outer margin"
+        aria-pressed={linked}
+        onClick={onToggle}
+      >
+        <Icon size={14} aria-hidden />
+      </button>
+    </div>
   );
 }
 

@@ -29,7 +29,7 @@ import { useEditorSession } from '@/editor/sessionStore';
 import type { ImageLayer, Layer, ShapeLayer, TextLayer } from '@/types';
 import { GRADIENT_SWATCHES, SOLID_SWATCHES, backgroundCss, backgroundLabel, sameBackground } from '@/lib/palette';
 import { RotationDial } from './RotationDial';
-import { ColorField, NumberField, Section, Slider } from './ui';
+import { ColorField, LinkToggle, NumberField, Section, Slider } from './ui';
 import { useEditGesture, useLayerGesture } from './inspector/useLayerGesture';
 import { Switch } from './inspector/controls';
 import { PhotoSwapSection } from './inspector/PhotoSwapSection';
@@ -39,7 +39,7 @@ import { alignSelection, isMac } from '@/app/actions';
 import { ALIGN_BUTTONS, SelectionInspector } from './inspector/SelectionInspector';
 import { groupMemberIds } from '@/core/document/selectors';
 import { getLiveGrid } from '@/core/document/grid';
-import { maxGapFor, maxMargin } from '@/lib/grids';
+import { linkedMax, maxGapFor, maxMargin } from '@/lib/grids';
 
 const KIND_META = {
   image: { label: 'Photo', Icon: ImageIcon },
@@ -439,18 +439,29 @@ function ShapeInspector({ layer }: { layer: ShapeLayer }) {
 function GridSection({ slideId }: { slideId: string }) {
   const doc = useEditor((s) => s.doc);
   const setSlideGrid = useEditor((s) => s.setSlideGrid);
+  const linked = useEditorSession((s) => s.gridLinked);
+  const setGridLinked = useEditorSession((s) => s.setGridLinked);
   const gesture = useEditGesture('Adjust grid', `gesture:grid:${slideId}`);
   const live = useMemo(() => getLiveGrid(doc, slideId), [doc, slideId]);
   if (!live) return null;
   const { grid, template, movedSlots } = live;
-  const marginMax = maxMargin(doc.format.width, doc.format.height);
+  const shared = linkedMax(template, doc.format);
+  const marginMax = linked ? shared : maxMargin(doc.format.width, doc.format.height);
   const margin = Math.min(grid.margin, marginMax);
-  const gapMax = maxGapFor(template, doc.format, margin);
+  const gapMax = linked ? shared : maxGapFor(template, doc.format, margin);
   const gap = Math.min(grid.gap, gapMax);
+  // Linked: either slider sets both, so the spacing stays equal.
+  const setGap = (v: number) => setSlideGrid(slideId, linked ? { gap: v, margin: v } : { gap: v });
+  const setMargin = (v: number) => setSlideGrid(slideId, linked ? { gap: v, margin: v } : { margin: v });
+  const toggleLinked = () => {
+    if (!linked) { const v = Math.min(grid.gap, shared); setSlideGrid(slideId, { gap: v, margin: v }); }
+    setGridLinked(!linked);
+  };
   return (
     <Section title="Photo grid" action={<span className="text-[11px] text-ink-faint">{template.name}</span>}>
-      <Slider ariaLabel="Gap" label="Gap" display={`${Math.round(gap)} px`} min={0} max={gapMax} value={gap} onChange={(v) => setSlideGrid(slideId, { gap: v })} gesture={gesture} valueText={`${Math.round(gap)} pixels`} />
-      <Slider ariaLabel="Outer margin" label="Outer margin" display={`${Math.round(margin)} px`} min={0} max={marginMax} value={margin} onChange={(v) => setSlideGrid(slideId, { margin: v })} gesture={gesture} valueText={`${Math.round(margin)} pixels`} />
+      <Slider ariaLabel="Gap" label="Gap" display={`${Math.round(gap)} px`} min={0} max={gapMax} value={gap} onChange={setGap} gesture={gesture} valueText={`${Math.round(gap)} pixels`} />
+      <LinkToggle linked={linked} onToggle={toggleLinked} />
+      <Slider ariaLabel="Outer margin" label="Outer margin" display={`${Math.round(margin)} px`} min={0} max={marginMax} value={margin} onChange={setMargin} gesture={gesture} valueText={`${Math.round(margin)} pixels`} />
       {movedSlots > 0 && <p className="text-[11px] leading-relaxed text-ink-faint">{movedSlots} slot{movedSlots === 1 ? ' was' : 's were'} moved by hand and won’t follow these sliders.</p>}
     </Section>
   );
