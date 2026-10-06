@@ -74,6 +74,10 @@ struct GridsPanel: View {
     private let columns = [GridItem(.adaptive(minimum: 68, maximum: 110), spacing: 8)]
 
     var body: some View {
+        let format = controller.project.format
+        let marginMax = GridTemplate.maxMargin(width: format.width, height: format.height)
+        // No template is chosen yet, so the shared limit is just the slider range; each template clamps its own layout.
+        let sharedMax = min(GridTemplate.maxInset, marginMax)
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 PanelHeader(title: "Photo Grids", subtitle: "Replaces the current slide’s layers with empty photo slots. Undo with ⌘Z.")
@@ -84,7 +88,24 @@ struct GridsPanel: View {
                         Text("\(Int(controller.gridGap)) px").monospacedDigit().foregroundStyle(.secondary)
                     }
                     .font(.callout)
-                    Slider(value: Binding(get: { controller.gridGap }, set: { controller.gridGap = $0.rounded() }), in: 0...120).controlSize(.small).labelsHidden()
+                    Slider(value: Binding(get: { min(controller.gridGap, controller.gridLinked ? sharedMax : 120) },
+                                          set: { controller.gridGap = $0.rounded(); if controller.gridLinked { controller.gridMargin = controller.gridGap } }),
+                           in: 0...(controller.gridLinked ? sharedMax : 120))
+                        .controlSize(.small).labelsHidden()
+                }
+                HStack {
+                    Spacer()
+                    Toggle(isOn: Binding(get: { controller.gridLinked }, set: { on in
+                        if on { controller.gridGap = min(controller.gridGap, sharedMax); controller.gridMargin = controller.gridGap }
+                        controller.gridLinked = on
+                    })) {
+                        Label("Link gap and outer margin", systemImage: "link")
+                    }
+                    .toggleStyle(.button)
+                    .labelStyle(.iconOnly)
+                    .controlSize(.small)
+                    .help("Link gap and outer margin")
+                    Spacer()
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     HStack {
@@ -93,8 +114,9 @@ struct GridsPanel: View {
                         Text("\(Int(controller.gridMargin)) px").monospacedDigit().foregroundStyle(.secondary)
                     }
                     .font(.callout)
-                    Slider(value: Binding(get: { controller.gridMargin }, set: { controller.gridMargin = $0.rounded() }),
-                           in: 0...GridTemplate.maxMargin(width: controller.project.format.width, height: controller.project.format.height))
+                    Slider(value: Binding(get: { controller.gridMargin },
+                                          set: { controller.gridMargin = $0.rounded(); if controller.gridLinked { controller.gridGap = controller.gridMargin } }),
+                           in: 0...marginMax)
                         .controlSize(.small).labelsHidden()
                         .accessibilityLabel("Outer margin")
                 }

@@ -101,6 +101,8 @@ final class EditorController {
     @ObservationIgnored var fileImporterPlacement: MediaPlacement = .libraryOnly
     var gridGap: Double = 0
     var gridMargin: Double = 0
+    /// Gap and outer margin move together. UI-only; not saved in the project.
+    var gridLinked = false
     var exportState: ExportState?
     /// Layer whose name field the inspector should focus.
     var renameRequest: String?

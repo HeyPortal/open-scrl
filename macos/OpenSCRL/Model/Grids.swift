@@ -143,6 +143,17 @@ extension GridTemplate {
         return effectiveGap(width: format.width - 2 * m, height: format.height - 2 * m, gap: Self.maxInset).rounded(.down)
     }
 
+    /// Slider maximum when gap and margin are linked: the largest whole value both can take at once.
+    func linkedMax(format: CanvasFormat) -> Double {
+        var lo = 0.0, hi = min(Self.maxInset, Self.maxMargin(width: format.width, height: format.height))
+        // Feasibility is monotone: if v works then so does anything smaller.
+        while lo < hi {
+            let mid = ((lo + hi) / 2).rounded(.up)
+            if maxGap(format: format, margin: mid) >= mid { lo = mid } else { hi = mid - 1 }
+        }
+        return lo
+    }
+
     static func template(id: String) -> GridTemplate? { all.first { $0.id == id } }
 }
 
