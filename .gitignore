@@ -29,3 +29,7 @@ test-results/
 .vscode/*
 !.vscode/extensions.json
 .idea/
+
+# Agent scratch
+.superpowers/
+.claude/worktrees/
