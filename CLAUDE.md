@@ -52,7 +52,7 @@ Note: some files (e.g. `src/lib/export.ts`, `scripts/check-bundle.mjs`) are writ
 
 Under `macos/OpenSCRL/`: SwiftUI shell with AppKit for the canvas, menus, and text editing.
 
-- `Model/` — `Project` model; `ProjectFile.swift` encodes/decodes the web-compatible flat JSON and rejects unknown `schemaVersion`s. **Changing the schema requires updating both `src/core/document` (+ migrations) and `ProjectFile.swift`.**
+- `Model/` — `Project` model; `ProjectFile.swift` encodes/decodes the web-compatible flat JSON and rejects unknown `schemaVersion`s. **Changing the schema requires updating both `src/core/document` (+ migrations) and `ProjectFile.swift`.** `SlideRecord.grid` (template id, gap, margin, ordered slot layer ids) is an optional field on both sides; grid layout math lives in `src/lib/grids.ts` (`layoutGrid`) and `Model/Grids.swift` (`layout`), and the two must stay in step.
 - `Document/` — each project is an `.openscrl` file-wrapper package (`project.json` + media) via the macOS 27 SwiftUI `Document` API; `MediaStore`/`MediaImporter` handle media.
 - `Rendering/` — a single Core Graphics/Core Text renderer shared by the canvas, thumbnails, and export (`Renderer.swift`, `TextLayout.swift`).
 - `Editor/` — `EditorController` (split across `+Carousel/+Clipboard/+Export` extensions) is the central state/command object; `Canvas/CanvasView` is split into `+Interaction/+TextEditing/+DragAndDrop/+SlideHeaders` extensions.
