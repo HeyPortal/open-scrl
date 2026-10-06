@@ -49,4 +49,16 @@ describe('limits', () => {
       expect(side).toBeGreaterThanOrEqual(MIN_CELL - 1e-6);
     }
   });
+
+  it('caps an out-of-range requested gap at 120 and never flips or overlaps cells', () => {
+    const cells = layoutGrid(tpl('nine-grid'), portrait, 600, 0);
+    for (const c of cells) {
+      expect(c.w).toBeGreaterThanOrEqual(MIN_CELL - 1e-6);
+      expect(c.h).toBeGreaterThanOrEqual(MIN_CELL - 1e-6);
+    }
+    for (let i = 1; i < cells.length; i++) {
+      if (cells[i].y === cells[i - 1].y) expect(cells[i].x).toBeGreaterThanOrEqual(cells[i - 1].x + cells[i - 1].w - 1e-6);
+    }
+    expect(cells).toEqual(layoutGrid(tpl('nine-grid'), portrait, 120, 0));
+  });
 });

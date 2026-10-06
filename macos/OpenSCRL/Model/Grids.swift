@@ -114,12 +114,12 @@ extension GridTemplate {
     }
 
     private static func smallestSide(_ cells: [CGRect]) -> Double {
-        cells.map { min($0.width, $0.height) }.min() ?? 0
+        cells.map { min($0.size.width, $0.size.height) }.min() ?? 0
     }
 
     /// Largest gap <= `gap` (>= 0) for which every cell is at least `minCell` on both sides.
     private func effectiveGap(width: Double, height: Double, gap: Double) -> Double {
-        let want = max(0, gap)
+        let want = min(max(0, gap), Self.maxInset)
         if Self.smallestSide(cells(width, height, want)) >= Self.minCell { return want }
         var lo = 0.0, hi = want
         for _ in 0..<24 {

@@ -332,7 +332,7 @@ const smallestSide = (cells: GridCell[]) => Math.min(...cells.flatMap((c) => [c.
 
 /** Largest gap <= `gap` (>= 0) for which every cell is at least MIN_CELL on both sides. */
 function effectiveGap(template: GridTemplate, W: number, H: number, gap: number): number {
-  const want = Math.max(0, gap);
+  const want = Math.min(Math.max(0, gap), MAX_GRID_INSET);
   if (smallestSide(template.cells(W, H, want)) >= MIN_CELL) return want;
   let lo = 0;
   let hi = want;

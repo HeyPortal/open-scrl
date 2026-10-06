@@ -436,7 +436,6 @@ function ShapeInspector({ layer }: { layer: ShapeLayer }) {
   );
 }
 
-/** Shown when no layer is selected: settings for the current slide. */
 function GridSection({ slideId }: { slideId: string }) {
   const doc = useEditor((s) => s.doc);
   const setSlideGrid = useEditor((s) => s.setSlideGrid);
@@ -457,6 +456,7 @@ function GridSection({ slideId }: { slideId: string }) {
   );
 }
 
+/** Shown when no layer is selected: settings for the current slide. */
 function SlideInspector({ onShowLayers }: { onShowLayers: () => void }) {
   const selectedSlideId = useEditorSession((s) => s.selectedSlideId);
   const setLeftPanel = useEditorSession((s) => s.setLeftPanel);
