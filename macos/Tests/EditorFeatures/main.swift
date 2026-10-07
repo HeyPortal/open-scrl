@@ -285,6 +285,24 @@ import Darwin
     let linkedLimit = fourStack.linkedMax(format: gc.project.format)
     check(linkedLimit == 100 && gc.project.slides[0].grid!.gap == 100 && gc.project.slides[0].grid!.margin == 100, "linked spacing is clamped to what the template fits")
 
+    // Re-attach: a freed slot reset by hand stays free until re-attached, then follows again.
+    let rDoc = ProjectDocument(format: CanvasFormat(name: "P", width: 1080, height: 1350))
+    rDoc.perform("Fixture", undoManager: nil) { p in p.slides = [Slide(id: "r1", background: .solid("#ffffff"), layers: [])] }
+    let rc = EditorController(document: rDoc); rc.selectedSlideID = "r1"
+    rc.applyGrid(fourGrid, gap: 0, margin: 0)
+    let rs = rc.project.slides[0].grid!.slotIds
+    let flush = fourGrid.layout(format: rc.project.format, gap: 0, margin: 0)[1]
+    rc.updateLayer(rs[1]) { $0.width = 300 }
+    rc.setSlideGrid(gap: 20)
+    rc.setSlideGrid(gap: 0)
+    rc.updateLayer(rs[1]) { $0.x = flush.minX; $0.y = flush.minY; $0.width = flush.width; $0.height = flush.height }
+    rc.setSlideGrid(gap: 30)
+    check(rc.project.slides[0].layers.first { $0.id == rs[1] }!.matches(flush), "a reset slot stays free until re-attached")
+    rc.reattachGridSlots()
+    check(rc.project.liveGrid(slide: 0)?.movedSlots == 0 && rc.project.slides[0].grid!.detachedSlotIds == nil, "re-attach clears free slots")
+    rc.setSlideGrid(gap: 40)
+    check(rc.project.slides[0].layers.first { $0.id == rs[1] }!.matches(fourGrid.layout(format: rc.project.format, gap: 40, margin: 0)[1]), "a re-attached slot follows the grid again")
+
     print("ALL \(checks) UI CHECKS PASSED")
 }
 setbuf(stdout, nil)

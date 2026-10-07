@@ -41,6 +41,28 @@ export function getLiveGrid(doc: ProjectDocumentV2, slideId: string): LiveGrid |
   return liveSlots > 0 ? { grid, template, liveSlots, movedSlots } : null;
 }
 
+/** Snaps every slot that is free or off its cell back onto its cell and lets it follow the grid again. */
+export function reattachSlideGrid(
+  draft: Draft<ProjectDocumentV2>,
+  slideId: string,
+  live: LiveGrid,
+  format: { width: number; height: number },
+): void {
+  const slide = draft.slides[slideId];
+  const grid = slide?.grid;
+  if (!slide || !grid) return;
+  const cells = layoutGrid(live.template, format, grid.gap, grid.margin);
+  grid.slotIds.forEach((id, i) => {
+    const layer = draft.layers[id];
+    if (!layer || !slide.layerOrder.includes(id) || !cells[i]) return;
+    layer.x = cells[i].x;
+    layer.y = cells[i].y;
+    layer.width = cells[i].w;
+    layer.height = cells[i].h;
+  });
+  delete grid.detachedSlotIds;
+}
+
 /**
  * Re-lays out one slide's grid inside an Immer draft. Only slots still on their old computed cell move;
  * hand-moved slots and every other layer are left alone. `live` must come from the document the draft started from.

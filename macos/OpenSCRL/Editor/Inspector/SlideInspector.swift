@@ -66,6 +66,7 @@ struct SlideInspector: View {
                     if live.movedSlots > 0 {
                         Text("\(live.movedSlots) slot\(live.movedSlots == 1 ? " was" : "s were") moved by hand and won’t follow these sliders.")
                             .font(.caption).foregroundStyle(.secondary)
+                        Button("Re-attach Moved Slots") { controller.reattachGridSlots() }
                     }
                     let gridSlides = project.gridSlideCount
                     if gridSlides > 1 {

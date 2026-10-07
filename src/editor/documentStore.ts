@@ -5,7 +5,7 @@ import { id } from '@/lib/nano';
 import { DEFAULT_FORMAT } from '@/lib/format';
 import { layoutGrid, type GridTemplate } from '@/lib/grids';
 import { migrateDocument } from '@/core/document/migrations';
-import { getLiveGrid, relayoutSlideGrid } from '@/core/document/grid';
+import { getLiveGrid, reattachSlideGrid, relayoutSlideGrid } from '@/core/document/grid';
 import { command, type EditorCommand } from '@/core/document/commands';
 import { getSlideLayers, materializeSlide, expandToGroups, groupMemberIds, selectionUnits } from '@/core/document/selectors';
 import { scaleLayer, slideSpanFor, unionBounds, type AlignEdge, type DistributeAxis } from '@/core/document/geometry';
@@ -91,6 +91,7 @@ export interface EditorState {
   applyGrid(template: GridTemplate, gap: number, margin?: number): void;
   setSlideGrid(slideId: string, patch: { gap?: number; margin?: number }): void;
   setGridSpacingForAllSlides(fromSlideId: string): void;
+  reattachGridSlots(slideId: string): void;
   updateLayer(id: string, patch: Partial<Layer>): void;
   updateLayers(patches: { id: string; patch: Partial<Layer> }[]): void;
   deleteLayer(id: string): void;
@@ -482,6 +483,9 @@ export const useDocumentStore = create<EditorState>((set, get) => ({
     const targets=s.doc.slideOrder.filter((sid)=>sid!==fromSlideId).flatMap((sid)=>{const live=getLiveGrid(s.doc,sid);return live&&(live.grid.gap!==gap||live.grid.margin!==margin)?[{sid,live}]:[];});
     if(!targets.length)return;
     get().execute(command('Apply grid spacing to all slides',(d)=>{for(const t of targets)relayoutSlideGrid(d,t.sid,t.live,s.doc.format,gap,margin);}));
+  },
+  reattachGridSlots: (slideId) => { const s=get();const live=getLiveGrid(s.doc,slideId);if(!live||live.movedSlots===0)return;
+    get().execute(command('Re-attach grid slots',(d)=>reattachSlideGrid(d,slideId,live,s.doc.format)));
   },
   updateLayer: (layerId, patch) => get().execute(command('Edit layer',(d)=>{if(d.layers[layerId])d.layers[layerId]=fitTextBox({...d.layers[layerId],...patch} as Layer,Object.keys(patch));},`layer:${layerId}:${Object.keys(patch).sort().join(',')}`)),
   updateLayers: (patches) => get().execute(command('Edit layers',(d)=>{for(const p of patches)if(d.layers[p.id])d.layers[p.id]=fitTextBox({...d.layers[p.id],...p.patch} as Layer,Object.keys(p.patch));})),

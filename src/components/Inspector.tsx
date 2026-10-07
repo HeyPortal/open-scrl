@@ -440,6 +440,7 @@ function GridSection({ slideId }: { slideId: string }) {
   const doc = useEditor((s) => s.doc);
   const setSlideGrid = useEditor((s) => s.setSlideGrid);
   const setGridSpacingForAllSlides = useEditor((s) => s.setGridSpacingForAllSlides);
+  const reattachGridSlots = useEditor((s) => s.reattachGridSlots);
   const linked = useEditorSession((s) => s.gridLinked);
   const setGridLinked = useEditorSession((s) => s.setGridLinked);
   const gesture = useEditGesture('Adjust grid', `gesture:grid:${slideId}`);
@@ -467,7 +468,14 @@ function GridSection({ slideId }: { slideId: string }) {
         top={<Slider ariaLabel="Gap" label="Gap" display={`${Math.round(gap)} px`} min={0} max={gapMax} value={gap} onChange={setGap} gesture={gesture} valueText={`${Math.round(gap)} pixels`} />}
         bottom={<Slider ariaLabel="Outer margin" label="Outer margin" display={`${Math.round(margin)} px`} min={0} max={marginMax} value={margin} onChange={setMargin} gesture={gesture} valueText={`${Math.round(margin)} pixels`} />}
       />
-      {movedSlots > 0 && <p className="text-[11px] leading-relaxed text-ink-faint">{movedSlots} slot{movedSlots === 1 ? ' was' : 's were'} moved by hand and won’t follow these sliders.</p>}
+      {movedSlots > 0 && (
+        <>
+          <p className="text-[11px] leading-relaxed text-ink-faint">{movedSlots} slot{movedSlots === 1 ? ' was' : 's were'} moved by hand and won’t follow these sliders.</p>
+          <button className="btn btn-secondary btn-sm w-full" onClick={() => reattachGridSlots(slideId)}>
+            Re-attach moved slots
+          </button>
+        </>
+      )}
       {gridSlides > 1 && (
         <button className="btn btn-secondary btn-sm w-full" aria-label={`Apply grid spacing to all ${gridSlides} slides`} onClick={() => setGridSpacingForAllSlides(slideId)}>
           Apply to all {gridSlides} slides

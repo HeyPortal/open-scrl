@@ -456,6 +456,13 @@ final class EditorController {
         }
     }
 
+    /// Snaps the selected slide's moved or free grid slots back onto their cells so they follow the sliders again.
+    func reattachGridSlots() {
+        let index = selectedSlideIndex
+        guard let live = project.liveGrid(slide: index), live.movedSlots > 0 else { return }
+        perform("Re-attach Grid Slots") { p in p.reattachGridSlots(slide: index, live: live) }
+    }
+
     /// Copies the selected slide's gap and margin to every other slide that has a grid. Each slide keeps its
     /// own template; slots moved by hand and slides without a grid are left alone.
     func applyGridSpacingToAllSlides() {

@@ -139,6 +139,59 @@ describe('setSlideGrid', () => {
   });
 });
 
+describe('reattachGridSlots', () => {
+  it('snaps free slots back to their cells so they follow the grid again, in one undo step', () => {
+    store().applyGrid(four, 0, 0);
+    const [a, b] = slotIds();
+    store().updateLayer(b, { width: 200 });
+    store().setSlideGrid(sid(), { gap: 20 });
+    expect(store().doc.slides[sid()].grid!.detachedSlotIds).toEqual([b]);
+    const before = store().past.length;
+
+    store().reattachGridSlots(sid());
+
+    const cells = layoutGrid(four, store().doc.format, 20, 0);
+    expect(frame(b)).toEqual(cells[1]);
+    expect(store().doc.slides[sid()].grid!.detachedSlotIds).toBeUndefined();
+    expect(getLiveGrid(store().doc, sid())!.movedSlots).toBe(0);
+    expect(store().past.length).toBe(before + 1);
+
+    store().setSlideGrid(sid(), { gap: 50 });
+    const wide = layoutGrid(four, store().doc.format, 50, 0);
+    expect(frame(b)).toEqual(wide[1]);
+    expect(frame(a)).toEqual(wide[0]);
+
+    store().undo();
+    store().undo();
+    expect(frame(b)).toMatchObject({ w: 200 });
+    expect(store().doc.slides[sid()].grid!.detachedSlotIds).toEqual([b]);
+  });
+
+  it('re-attaches a slot that was reset by hand after a relayout freed it', () => {
+    store().applyGrid(four, 0, 0);
+    const b = slotIds()[1];
+    store().updateLayer(b, { width: 200 });
+    store().setSlideGrid(sid(), { gap: 20 });
+    const cell = layoutGrid(four, store().doc.format, 0, 0)[1];
+    store().setSlideGrid(sid(), { gap: 0 });
+    store().updateLayer(b, { x: cell.x, y: cell.y, width: cell.w, height: cell.h });
+    store().setSlideGrid(sid(), { gap: 30 });
+    expect(frame(b)).toEqual({ x: cell.x, y: cell.y, w: cell.w, h: cell.h });
+
+    store().reattachGridSlots(sid());
+    store().setSlideGrid(sid(), { gap: 40 });
+
+    expect(frame(b)).toEqual(layoutGrid(four, store().doc.format, 40, 0)[1]);
+  });
+
+  it('does nothing when no slot is moved', () => {
+    store().applyGrid(four, 10, 0);
+    const doc = store().doc;
+    store().reattachGridSlots(sid());
+    expect(store().doc).toBe(doc);
+  });
+});
+
 describe('duplicateSlide with a grid', () => {
   it('re-ids the copied slots so adjusting the copy does not move the original', () => {
     store().applyGrid(four, 0, 0);
