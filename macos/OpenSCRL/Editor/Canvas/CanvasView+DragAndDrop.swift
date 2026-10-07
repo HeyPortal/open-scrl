@@ -92,8 +92,9 @@ extension CanvasView {
         let p = point(event)
         if controller.editingTextLayerID != nil { finishTextEditing() }
         if let item = hitLayer(atView: p) {
-            controller.selectLayer(item.layer.id)
+            if !controller.selectedLayerIDs.contains(item.layer.id) { controller.pickLayer(item.layer.id, additive: false) }
             needsDisplay = true
+            if controller.isMultiSelection { return EditorMenus.selectionMenu(controller: controller) }
             return EditorMenus.layerMenu(controller: controller, layer: item.layer, canvas: self)
         }
         if let index = slideIndex(atView: p) {
@@ -108,9 +109,11 @@ extension CanvasView {
 
     @objc func copy(_ sender: Any?) { controller?.copySelection() }
 
-    @objc func cut(_ sender: Any?) {
-        controller?.copySelection()
-        controller?.deleteSelection()
+    @objc func cut(_ sender: Any?) { controller?.cutSelection() }
+
+    @objc override func selectAll(_ sender: Any?) {
+        controller?.selectAllLayers()
+        needsDisplay = true
     }
 
     @objc func paste(_ sender: Any?) {
@@ -120,9 +123,7 @@ extension CanvasView {
 
     @objc func delete(_ sender: Any?) { controller?.deleteSelection() }
 
-    @objc func duplicate(_ sender: Any?) {
-        if let id = controller?.selectedLayerID { controller?.duplicateLayer(id) }
-    }
+    @objc func duplicate(_ sender: Any?) { controller?.duplicateSelection() }
 }
 
 extension CanvasView: NSMenuItemValidation {
@@ -133,6 +134,8 @@ extension CanvasView: NSMenuItemValidation {
             return controller.selectedLayerID != nil
         case #selector(paste(_:)):
             return controller.canPaste
+        case #selector(selectAll(_:)):
+            return !(controller.selectedSlide?.layers.isEmpty ?? true)
         default:
             return true
         }

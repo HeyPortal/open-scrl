@@ -33,7 +33,7 @@ function HeaderButton({ title, label, danger, disabled, onClick, children }: {
  * Slide numbers above the canvas, with add, duplicate and delete buttons on the selected slide
  * and on the slide under the mouse.
  */
-export function SlideHeaders({ containerRef, slides, count, selectedSlideId, offset, slideWidth, slideHeight }: {
+export function SlideHeaders({ containerRef, slides, count, selectedSlideId, offset, slideWidth, slideHeight, numbersOnly }: {
   containerRef: RefObject<HTMLDivElement | null>;
   slides: { slideId: string; index: number }[];
   count: number;
@@ -41,6 +41,8 @@ export function SlideHeaders({ containerRef, slides, count, selectedSlideId, off
   offset: { x: number; y: number };
   slideWidth: number;
   slideHeight: number;
+  /** Wide mode: just the numbers, without per-slide buttons. */
+  numbersOnly?: boolean;
 }) {
   const addSlide = useEditor((s) => s.addSlide);
   const duplicateSlide = useEditor((s) => s.duplicateSlide);
@@ -74,7 +76,7 @@ export function SlideHeaders({ containerRef, slides, count, selectedSlideId, off
     return () => { el.removeEventListener('pointermove', onMove); el.removeEventListener('pointerleave', onLeave); };
   }, [containerRef, count, offset.x, offset.y, slideHeight, slideWidth]);
 
-  const showActions = slideWidth >= MIN_ACTIONS_WIDTH;
+  const showActions = !numbersOnly && slideWidth >= MIN_ACTIONS_WIDTH;
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden">
       {slides.map(({ slideId, index }) => {

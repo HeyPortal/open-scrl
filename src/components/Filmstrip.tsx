@@ -1,134 +1,31 @@
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { ChevronLeft, ChevronRight, Copy, Plus, Trash2 } from 'lucide-react';
 import { useEditor } from '@/store/editor';
-import { useAssets } from '@/store/assets';
 import type { Slide } from '@/types';
 import { materializeSlides } from '@/core/document/selectors';
 import { useEditorSession } from '@/editor/sessionStore';
 import { useContextMenu } from './Menu';
 import { slideMenu } from '@/app/menus';
+import { slideScene, type SlideScene } from '@/render/preview';
+import { SlidePreviewImage } from './SlidePreviewCanvas';
 
 const THUMB_H = 56;
 
-function SlidePreview({
-  slide,
-  thumbs,
-  thumbW,
-  format,
-}: {
-  slide: Slide;
-  thumbs: Record<string, string>;
-  thumbW: number;
-  format: { width: number; height: number };
-}) {
-  const bg =
-    slide.background.kind === 'solid'
-      ? slide.background.color
-      : `linear-gradient(${slide.background.angle}deg, ${slide.background.from}, ${slide.background.to})`;
-  const scaleX = thumbW / format.width;
-  const scaleY = THUMB_H / format.height;
-
-  return (
-    <div
-      className="absolute inset-0 overflow-hidden"
-      style={{
-        width: thumbW,
-        height: THUMB_H,
-        background: bg,
-      }}
-    >
-      {slide.layers.map((layer) => {
-        if (!layer.visible) return null;
-        const style = {
-          left: layer.x * scaleX,
-          top: layer.y * scaleY,
-          width: layer.width * scaleX,
-          height: layer.height * scaleY,
-          opacity: layer.opacity,
-          transform: `rotate(${layer.rotation}deg)`,
-          transformOrigin: 'center',
-        };
-
-        if (layer.kind === 'image') {
-          const src = layer.assetId ? thumbs[layer.assetId] : undefined;
-          return (
-            <div
-              key={layer.id}
-              className="absolute overflow-hidden bg-bg-inset"
-              style={{ ...style, borderRadius: layer.cornerRadius * Math.min(scaleX, scaleY) }}
-            >
-              {src && (
-                <img
-                  src={src}
-                  alt=""
-                  className="h-full w-full object-cover"
-                  draggable={false}
-                  style={{
-                    objectPosition: `${50 + layer.cropOffsetX * 100}% ${50 + layer.cropOffsetY * 100}%`,
-                  }}
-                />
-              )}
-            </div>
-          );
-        }
-
-        if (layer.kind === 'shape') {
-          return (
-            <div
-              key={layer.id}
-              className="absolute"
-              style={{
-                ...style,
-                background: layer.fill,
-                border:
-                  layer.strokeWidth > 0
-                    ? `${Math.max(1, layer.strokeWidth * Math.min(scaleX, scaleY))}px solid ${layer.stroke}`
-                    : undefined,
-                borderRadius:
-                  layer.shape === 'ellipse' ? '999px' : layer.cornerRadius * Math.min(scaleX, scaleY),
-              }}
-            />
-          );
-        }
-
-        return (
-          <div
-            key={layer.id}
-            className="absolute overflow-hidden"
-            style={{
-              ...style,
-              color: layer.fill,
-              fontFamily: layer.fontFamily,
-              fontSize: Math.max(2, layer.fontSize * scaleY),
-              fontWeight: layer.fontWeight,
-              fontStyle: layer.italic ? 'italic' : undefined,
-              lineHeight: layer.lineHeight,
-              textAlign: layer.align,
-            }}
-          >
-            {layer.text}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 interface SlideThumbProps {
   slide: Slide;
+  scene: SlideScene;
   index: number;
   active: boolean;
   thumbW: number;
-  thumbs: Record<string, string>;
   format: { width: number; height: number };
   onSelect: (slideId: string) => void;
   onMenu: (slideId: string, x: number, y: number) => void;
 }
 
-const SlideThumb = memo(function SlideThumb({ slide, index, active, thumbW, thumbs, format, onSelect, onMenu }: SlideThumbProps) {
+const SlideThumb = memo(function SlideThumb({ slide, scene, index, active, thumbW, format, onSelect, onMenu }: SlideThumbProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: slide.id });
   return (
     <div
@@ -149,7 +46,7 @@ const SlideThumb = memo(function SlideThumb({ slide, index, active, thumbW, thum
         title={`Slide ${index + 1}`}
         aria-current={active ? 'true' : undefined}
       >
-        <SlidePreview slide={slide} thumbs={thumbs} thumbW={thumbW} format={format} />
+        <SlidePreviewImage scene={scene} format={format} width={thumbW} height={THUMB_H} delay={150} className="absolute inset-0" />
       </button>
       <span className={`text-[10px] font-medium tabular-nums ${active ? 'text-ink' : 'text-ink-faint'}`}>{index + 1}</span>
     </div>
@@ -160,7 +57,7 @@ export function Filmstrip() {
   const doc = useEditor((s) => s.doc);
   const slides = materializeSlides(doc);
   const format = doc.format;
-  const thumbs = useAssets((s) => s.thumbs);
+  const scenes = useMemo(() => new Map(doc.slideOrder.map((id) => [id, slideScene(doc, id)])), [doc]);
   const selected = useEditorSession((s) => s.selectedSlideId);
   const focusSlide = useEditorSession((s) => s.focusSlide);
   const addSlide = useEditor((s) => s.addSlide);
@@ -196,10 +93,10 @@ export function Filmstrip() {
               <SlideThumb
                 key={s.id}
                 slide={s}
+                scene={scenes.get(s.id)!}
                 index={i}
                 active={s.id === selected}
                 thumbW={thumbW}
-                thumbs={thumbs}
                 format={format}
                 onSelect={focusSlide}
                 onMenu={onMenu}

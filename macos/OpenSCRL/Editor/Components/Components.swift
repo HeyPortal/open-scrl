@@ -18,7 +18,8 @@ struct SlideScene: Equatable {
             local.origin.x -= viewport.minX
             return local
         }
-        let ids = Set(items.compactMap { $0.layer.image?.assetID })
+        var ids = Set(items.compactMap { $0.layer.image?.assetID })
+        if let id = background.imageAssetID { ids.insert(id) }
         assets = project.assetsByID.filter { ids.contains($0.key) }
     }
 }
@@ -40,7 +41,7 @@ struct SlideThumbnail: View, Equatable {
                 cg.scaleBy(x: scale, y: scale)
                 let rect = CGRect(origin: .zero, size: scene.format.size)
                 cg.clip(to: rect)
-                Renderer.drawBackground(scene.background, in: rect, cg: cg)
+                Renderer.drawBackground(scene.background, in: rect, cg: cg, images: images, assets: scene.assets, checkerboard: editorPlaceholders)
                 var options = RenderOptions(editor: editorPlaceholders)
                 options.interpolation = .medium
                 for item in scene.items {
@@ -74,25 +75,42 @@ struct FormatGlyph: View {
 
 // MARK: - Backgrounds
 
+extension Gradient {
+    /// A SwiftUI fill matching the renderer: CSS-style angles, radial reaching the farthest corner.
+    var shapeStyle: AnyShapeStyle {
+        let stops = sortedStops.map { SwiftUI.Gradient.Stop(color: HexColor.color($0.color), location: $0.offset) }
+        if type == .radial {
+            return AnyShapeStyle(EllipticalGradient(stops: stops, center: .center, startRadiusFraction: 0, endRadiusFraction: 0.5.squareRoot()))
+        }
+        let r = Geometry.radians(angle)
+        let d = CGPoint(x: sin(r), y: -cos(r))
+        return AnyShapeStyle(LinearGradient(stops: stops,
+                                            startPoint: UnitPoint(x: 0.5 - d.x / 2, y: 0.5 - d.y / 2),
+                                            endPoint: UnitPoint(x: 0.5 + d.x / 2, y: 0.5 + d.y / 2)))
+    }
+}
+
 extension Background {
     /// A SwiftUI fill matching the renderer's CSS-style gradient angle.
     var shapeStyle: AnyShapeStyle {
         switch self {
         case .solid(let hex):
             return AnyShapeStyle(HexColor.color(hex))
-        case .gradient(let from, let to, let angle):
-            let r = Geometry.radians(angle)
-            let d = CGPoint(x: sin(r), y: -cos(r))
-            return AnyShapeStyle(LinearGradient(colors: [HexColor.color(from), HexColor.color(to)],
-                                                startPoint: UnitPoint(x: 0.5 - d.x / 2, y: 0.5 - d.y / 2),
-                                                endPoint: UnitPoint(x: 0.5 + d.x / 2, y: 0.5 + d.y / 2)))
+        case .gradient(let gradient):
+            return gradient.shapeStyle
+        case .image(let image):
+            return AnyShapeStyle(HexColor.color(image.color))
+        case .transparent:
+            return AnyShapeStyle(Color.white)
         }
     }
 
     var accessibilityName: String {
         switch self {
         case .solid(let hex): "Solid \(hex)"
-        case .gradient(let from, let to, _): "Gradient from \(from) to \(to)"
+        case .gradient(let gradient): "Gradient from \(gradient.firstColor) to \(gradient.lastColor)"
+        case .image: "Photo"
+        case .transparent: "Transparent"
         }
     }
 }

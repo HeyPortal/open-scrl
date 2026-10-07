@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { Group, Image as KImage, Line, Rect, Text } from 'react-konva';
+import { Group, Line, Shape, Text } from 'react-konva';
 import Konva from 'konva';
 import type { AssetMeta, ImageLayer } from '@/types';
 import { getAsset, getAssetMetadata, getAssetThumbUrl, getAssetUrl } from '@/lib/assets';
 import { imageResourceManager, type ImageLease } from '@/render/resources/ImageResourceManager';
+import { maskPath } from '@/render/paint/masks';
+import { paintImageContent, paintLayerShadow, type PaintMedia } from '@/render/paint/layers';
 import { getMediaKind, setVideoElementPlaying } from '@/lib/media';
+import { SelectionOutline } from './SelectionOutline';
 import {
   createAnimatedGifCanvas,
   setAnimatedGifCanvasPlaying,
@@ -37,22 +40,25 @@ interface Props {
   activeSlide: boolean;
   selected: boolean;
   onSelect: (e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => void;
-  onDragStart: () => void;
+  onClick: () => void;
+  onDblClick: () => void;
+  outline?: boolean;
+  onDragStart: (e: Konva.KonvaEventObject<DragEvent>) => void;
   onDragMove: (e: Konva.KonvaEventObject<DragEvent>) => void;
-  onDragEnd: (e: Konva.KonvaEventObject<DragEvent>) => void;
+  onDragEnd: () => void;
   onTransform: (e: Konva.KonvaEventObject<Event>) => void;
   onTransformEnd: (e: Konva.KonvaEventObject<Event>) => void;
   groupRef: (n: Konva.Group | null) => void;
   renderScale: number;
 }
 
-export function ImageNode({ layer, asset, activeSlide, selected, onSelect, onDragStart, onDragMove, onDragEnd, onTransform, onTransformEnd, groupRef, renderScale }: Props) {
+export function ImageNode({ layer, asset, activeSlide, selected, onSelect, onClick, onDblClick, outline, onDragStart, onDragMove, onDragEnd, onTransform, onTransformEnd, groupRef, renderScale }: Props) {
   const [baseImg, setBaseImg] = useState<DrawableImage | null>(null);
   const [detailImg, setDetailImg] = useState<ImageBitmap | null>(null);
   const [detailEdge, setDetailEdge] = useState(NAVIGATION_IMAGE_EDGE);
   const [animated, setAnimated] = useState(false);
   const [missing, setMissing] = useState(false);
-  const imageRef = useRef<Konva.Image | null>(null);
+  const imageRef = useRef<Konva.Shape | null>(null);
   const idealEdge = chooseEditorImageTier(layer, renderScale);
   const requestedEdge = !activeSlide
     ? NAVIGATION_IMAGE_EDGE
@@ -135,16 +141,31 @@ export function ImageNode({ layer, asset, activeSlide, selected, onSelect, onDra
   }, [animated, asset, detailEdge, layer.assetId]);
 
   const img = detailImg ?? baseImg;
-  const crop = img && (() => {
-    const scale = Math.max(1, layer.cropScale ?? 1); const box = layer.width / layer.height; const ratio = img.width / img.height;
-    let width = img.width; let height = img.height; if (ratio > box) width = img.height * box; else height = img.width / box; width /= scale; height /= scale;
-    const maxX = Math.max(0, img.width - width); const maxY = Math.max(0, img.height - height);
-    return { x: maxX / 2 + layer.cropOffsetX * maxX, y: maxY / 2 + layer.cropOffsetY * maxY, width, height };
-  })();
+  const media: PaintMedia | null = img ? { source: img, width: img.width, height: img.height } : null;
+  const hit = (context: Konva.Context, shape: Konva.Shape) => {
+    context.beginPath();
+    context.rect(0, 0, layer.width, layer.height);
+    context.closePath();
+    context.fillStrokeShape(shape);
+  };
 
-  return <Group ref={groupRef} id={layer.id} name="layer" x={layer.x + layer.width / 2} y={layer.y + layer.height / 2} offsetX={layer.width / 2} offsetY={layer.height / 2} rotation={layer.rotation} opacity={layer.opacity} visible={layer.visible} draggable={!layer.locked} onMouseDown={onSelect} onTouchStart={onSelect} onTap={onSelect} onDragStart={onDragStart} onDragMove={onDragMove} onDragEnd={onDragEnd} onTransform={onTransform} onTransformEnd={onTransformEnd}>
-    <Rect width={layer.width} height={layer.height} fill={img ? undefined : selected ? '#231d3d' : '#1c1c21'} stroke={img ? undefined : selected ? '#7c5cff' : '#3a3a43'} strokeWidth={img ? 0 : selected ? 4 : 1.5} cornerRadius={layer.cornerRadius} listening />
-    {img && crop && <KImage ref={imageRef} image={img} width={layer.width} height={layer.height} cornerRadius={layer.cornerRadius} listening={false} perfectDrawEnabled={false} cropX={crop.x} cropY={crop.y} cropWidth={crop.width} cropHeight={crop.height} />}
+  return <Group ref={groupRef} id={layer.id} name="layer" x={layer.x + layer.width / 2} y={layer.y + layer.height / 2} offsetX={layer.width / 2} offsetY={layer.height / 2} rotation={layer.rotation} opacity={layer.opacity} visible={layer.visible} draggable={!layer.locked} onMouseDown={onSelect} onTouchStart={onSelect} onTap={onSelect} onClick={onClick} onDblClick={onDblClick} onDblTap={onDblClick} onDragStart={onDragStart} onDragMove={onDragMove} onDragEnd={onDragEnd} onTransform={onTransform} onTransformEnd={onTransformEnd}>
+    {media ? (
+      <Shape ref={imageRef} width={layer.width} height={layer.height} perfectDrawEnabled={false} hitFunc={hit}
+        sceneFunc={(context) => { const ctx = context._context; paintLayerShadow(ctx, layer, media); paintImageContent(ctx, layer, media); }} />
+    ) : (
+      <Shape width={layer.width} height={layer.height} hitFunc={hit}
+        sceneFunc={(context) => {
+          const ctx = context._context;
+          const path = maskPath(layer.mask, layer.width, layer.height, layer.cornerRadius);
+          ctx.fillStyle = selected ? '#231d3d' : '#1c1c21';
+          ctx.fill(path);
+          ctx.strokeStyle = selected ? '#7c5cff' : '#3a3a43';
+          ctx.lineWidth = selected ? 4 : 1.5;
+          ctx.stroke(path);
+        }} />
+    )}
     {missing && !img && <Group listening={false}><Line points={[layer.width*.35,layer.height*.58,layer.width*.47,layer.height*.44,layer.width*.55,layer.height*.51,layer.width*.65,layer.height*.42]} stroke={selected?'#a996ff':'#5c5c68'} strokeWidth={4} lineCap="round" lineJoin="round"/><Text x={0} y={layer.height*.64} width={layer.width} text={selected?'Choose from Media':'Add media'} fontFamily="Inter" fontStyle={selected?'bold':'normal'} fontSize={Math.min(24,Math.max(12,layer.width/13))} fill={selected?'#c4b8ff':'#7d7d89'} align="center" listening={false}/></Group>}
+    <SelectionOutline width={layer.width} height={layer.height} show={outline} />
   </Group>;
 }

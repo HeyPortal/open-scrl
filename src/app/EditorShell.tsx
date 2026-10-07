@@ -15,6 +15,8 @@ import { useEditorSession } from '@/editor/sessionStore';
 import { ContextMenuHost, useContextMenu } from '@/components/Menu';
 import { EditorOverlays } from '@/components/Overlays';
 import { handleEditorKey } from './actions';
+import { useEditorView } from '@/editor/viewStore';
+import { PhonePreview } from '@/components/preview/PhonePreview';
 
 function PanelContent() {
   const panel=useEditorSession((s)=>s.leftPanel);
@@ -26,8 +28,9 @@ export default function EditorShell(){
   const measure=useCallback(()=>{const rect=stageRef.current?.getBoundingClientRect();if(!rect)return;const next={width:Math.max(1,Math.round(rect.width)),height:Math.max(1,Math.round(rect.height))};setSize((old)=>old.width===next.width&&old.height===next.height?old:next);},[]);
   useLayoutEffect(()=>{const element=stageRef.current;if(!element)return;const schedule=()=>{if(frame.current!==null)cancelAnimationFrame(frame.current);frame.current=requestAnimationFrame(measure);};measure();const observer=new ResizeObserver(schedule);observer.observe(element);return()=>{if(frame.current!==null)cancelAnimationFrame(frame.current);observer.disconnect();};},[measure]);
   const panelOpen=useEditorSession((s)=>s.leftPanelOpen);
-  useEffect(()=>{const onKey=(e:KeyboardEvent)=>{if(e.defaultPrevented||useEditorSession.getState().overlay||useContextMenu.getState().menu)return;handleEditorKey(e);};window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey);},[]);
+  const previewOpen=useEditorView((s)=>s.previewOpen);
+  useEffect(()=>{const onKey=(e:KeyboardEvent)=>{if(e.defaultPrevented||useEditorSession.getState().overlay||useEditorView.getState().previewOpen||useContextMenu.getState().menu)return;handleEditorKey(e);};window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey);},[]);
   return <div className="flex flex-col h-full w-full" onDragOver={(e)=>{if(e.dataTransfer.types.includes('Files'))e.preventDefault();}} onDrop={async(e)=>{const files=Array.from(e.dataTransfer.files).filter(isLikelyMediaFile);if(!files.length)return;e.preventDefault();await importFiles(files);}}>
-    <TopBar/><div className="flex flex-1 overflow-hidden min-h-0"><LeftRail/>{panelOpen&&<aside className="w-60 shrink-0 overflow-hidden border-r border-line bg-bg-panel xl:w-64"><PanelContent/></aside>}<div ref={stageRef} className="relative min-w-0 flex-1 overflow-hidden"><Canvas width={size.width} height={size.height}/></div><RightPanel/></div><Filmstrip/><ContextMenuHost/><EditorOverlays/>
+    <TopBar/><div className="flex flex-1 overflow-hidden min-h-0"><LeftRail/>{panelOpen&&<aside className="w-60 shrink-0 overflow-hidden border-r border-line bg-bg-panel xl:w-64"><PanelContent/></aside>}<div ref={stageRef} className="relative min-w-0 flex-1 overflow-hidden"><Canvas width={size.width} height={size.height}/></div><RightPanel/></div><Filmstrip/><ContextMenuHost/><EditorOverlays/>{previewOpen&&<PhonePreview/>}
   </div>;
 }

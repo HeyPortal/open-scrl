@@ -82,12 +82,16 @@ struct ShortcutsView: View {
             ("Lock / Hide", "⇧⌘L  ⇧⌘H"), ("Command palette", "⌘K"),
         ]),
         ("Arrange", [
+            ("Select all layers", "⌘A"), ("Group / Ungroup", "⌘G  ⇧⌘G"),
+            ("Add to selection", "⇧-click or ⌘-click"), ("Enter a group", "Double-click"),
             ("Bring forward / Send backward", "⌘]  ⌘["), ("Bring to front / Send to back", "⌥⌘]  ⌥⌘["),
         ]),
         ("Slides", [
             ("New slide", "⇧⌘N"), ("Duplicate slide", "⇧⌘D"), ("Previous / next slide", "⌥⌘←  ⌥⌘→"), ("Move slide", "⌃⌥⌘←  ⌃⌥⌘→"),
         ]),
         ("View & File", [
+            ("Phone preview", "P or ⌥⌘P"), ("Full-screen preview", "⇧⌥⌘P"),
+            ("Preview slides / Full screen / Close", "← →  F  esc"),
             ("Zoom in / out", "⌘+  ⌘−"), ("Actual size / Zoom to fit", "⌘0  ⌘9"), ("Show panel 1–5", "⌘1 … ⌘5"),
             ("Inspector / Layers", "⌥⌘I  ⌥⌘L"), ("Import media", "⇧⌘I"), ("Export carousel / slide", "⇧⌘E  ⌥⇧⌘E"),
         ]),

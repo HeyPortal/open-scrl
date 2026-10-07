@@ -186,6 +186,7 @@ enum VideoSlideRenderer {
                     guard let context = CGContext(data: CVPixelBufferGetBaseAddress(pixels), width: width, height: height, bitsPerComponent: 8,
                                                   bytesPerRow: CVPixelBufferGetBytesPerRow(pixels), space: HexColor.srgb,
                                                   bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue) else { return false }
+                    ExportCompositing.fillWhite(context, in: CGRect(x: 0, y: 0, width: width, height: height))
                     context.translateBy(x: 0, y: CGFloat(height))
                     context.scaleBy(x: 1, y: -1)
                     context.scaleBy(x: pixelScale, y: pixelScale)

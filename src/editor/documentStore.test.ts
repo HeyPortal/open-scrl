@@ -18,6 +18,17 @@ describe('document history',()=>{
 });
 
 describe('project asset scope migration',()=>{
+  it('includes and deduplicates background-only media references',async()=>{
+    const doc=newDocument();const sid=doc.slideOrder[0];
+    doc.layers.photo=image('photo','shared');doc.slides[sid].layerOrder=['photo'];
+    doc.slides[sid].background={kind:'image',assetId:'background-only',blur:0,dim:0,color:'#fff'};
+    doc.slideOrder.push('second','third');
+    doc.slides.second={id:'second',background:{kind:'image',assetId:'shared',blur:0,dim:0,color:'#fff'},layerOrder:[]};
+    doc.slides.third={id:'third',background:{kind:'image',assetId:null,blur:0,dim:0,color:'#fff'},layerOrder:[]};
+    const project:StoredProjectSummary={id:doc.id,name:doc.name,format:doc.format,slideCount:3,createdAt:0,updatedAt:0};
+    const result=await collectProjectAssetScopes([project],async()=>doc);
+    expect(result).toEqual({scopes:[{projectId:doc.id,assetIds:['shared','background-only']}],failures:[]});
+  });
   it('reports a partial scan so the one-time migration is not committed',async()=>{
     const doc=newDocument();doc.id='project-a';const slideId=doc.slideOrder[0];doc.layers.photo=image('photo','asset-a');doc.slides[slideId].layerOrder=['photo'];
     const project=(id:string):StoredProjectSummary=>({id,name:id,format:doc.format,slideCount:1,createdAt:0,updatedAt:0});

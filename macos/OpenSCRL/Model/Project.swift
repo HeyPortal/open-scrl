@@ -40,44 +40,85 @@ struct CanvasFormat: Codable, Hashable, Identifiable, Sendable {
     }
 }
 
+// MARK: - Fills and effects
+
+struct GradientStop: Hashable, Sendable {
+    /// Position along the gradient, 0–1.
+    var offset: Double
+    var color: String
+}
+
+struct Gradient: Hashable, Sendable {
+    enum Kind: String, Codable, CaseIterable, Sendable { case linear, radial }
+
+    var type: Kind = .linear
+    /// CSS `linear-gradient` semantics: 0° points up, 90° points right. Ignored for radial.
+    var angle: Double = 135
+    /// At least two stops, sorted by offset.
+    var stops: [GradientStop]
+
+    static func twoColor(_ from: String, _ to: String, angle: Double = 135, type: Kind = .linear) -> Gradient {
+        Gradient(type: type, angle: angle, stops: [GradientStop(offset: 0, color: from), GradientStop(offset: 1, color: to)])
+    }
+
+    var sortedStops: [GradientStop] { stops.sorted { $0.offset < $1.offset } }
+    var firstColor: String { sortedStops.first?.color ?? "#ffffff" }
+    var lastColor: String { sortedStops.last?.color ?? "#000000" }
+}
+
+/// A drop shadow. Distances are in project pixels and don't rotate with the layer.
+struct Shadow: Hashable, Sendable {
+    var color: String = "#000000"
+    /// 0–1, multiplied with the color's own alpha.
+    var opacity: Double = 0.35
+    var blur: Double = 24
+    var offsetX: Double = 0
+    var offsetY: Double = 12
+}
+
+/// A colored box behind text: one around the whole text, or one per line.
+struct TextHighlight: Hashable, Sendable {
+    enum Style: String, Codable, CaseIterable, Sendable { case box, lines }
+
+    var style: Style = .lines
+    var color: String = "#ffffff"
+    var padding: Double = 16
+    var radius: Double = 12
+}
+
+/// Shapes a photo can be clipped to. `rect` uses the layer's corner radius.
+enum ImageMask: String, Codable, CaseIterable, Sendable {
+    case rect, ellipse, arch, blob, hexagon, star, heart
+}
+
 // MARK: - Background
+
+struct BackgroundImage: Hashable, Sendable {
+    /// The photo, cover-fitted and centered on the slide. `nil` shows only `color`.
+    var assetID: String?
+    /// Gaussian blur radius in project pixels; 0 is a sharp photo.
+    var blur: Double = 0
+    /// 0–1 black overlay that keeps text legible on busy photos.
+    var dim: Double = 0
+    /// Drawn under the photo, and alone when the photo is missing.
+    var color: String = "#111111"
+}
 
 enum Background: Hashable, Sendable {
     case solid(String)
-    case gradient(from: String, to: String, angle: Double)
+    case gradient(Gradient)
+    case image(BackgroundImage)
+    case transparent
 
     static let white = Background.solid("#ffffff")
-}
 
-extension Background: Codable {
-    private enum CodingKeys: String, CodingKey { case kind, color, from, to, angle }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        let kind = try c.decodeIfPresent(String.self, forKey: .kind) ?? "solid"
-        if kind == "gradient" {
-            self = .gradient(
-                from: try c.decodeIfPresent(String.self, forKey: .from) ?? "#ffffff",
-                to: try c.decodeIfPresent(String.self, forKey: .to) ?? "#000000",
-                angle: try c.decodeIfPresent(Double.self, forKey: .angle) ?? 135
-            )
-        } else {
-            self = .solid(try c.decodeIfPresent(String.self, forKey: .color) ?? "#ffffff")
-        }
+    /// A two-color linear gradient.
+    static func gradient(from: String, to: String, angle: Double) -> Background {
+        .gradient(.twoColor(from, to, angle: angle))
     }
 
-    func encode(to encoder: Encoder) throws {
-        var c = encoder.container(keyedBy: CodingKeys.self)
-        switch self {
-        case .solid(let color):
-            try c.encode("solid", forKey: .kind)
-            try c.encode(color, forKey: .color)
-        case .gradient(let from, let to, let angle):
-            try c.encode("gradient", forKey: .kind)
-            try c.encode(from, forKey: .from)
-            try c.encode(to, forKey: .to)
-            try c.encode(angle, forKey: .angle)
-        }
+    var imageAssetID: String? {
+        if case .image(let image) = self { image.assetID } else { nil }
     }
 }
 
@@ -97,6 +138,11 @@ struct ImageProperties: Hashable, Sendable {
     var cropOffsetX: Double = 0
     var cropOffsetY: Double = 0
     var cropScale: Double = 1
+    var mask: ImageMask = .rect
+    /// Border color, drawn inside the mask outline.
+    var stroke: String = "#ffffff"
+    /// Border width; 0 means no border.
+    var strokeWidth: Double = 0
 }
 
 struct TextProperties: Hashable, Sendable {
@@ -109,6 +155,15 @@ struct TextProperties: Hashable, Sendable {
     var align: TextAlignment = .center
     var letterSpacing: Double = 0
     var lineHeight: Double = 1.15
+    /// Outline color.
+    var stroke: String = "#000000"
+    /// Outline width; 0 means no outline.
+    var strokeWidth: Double = 0
+    /// When set, replaces `fill`; spans the text box.
+    var fillGradient: Gradient?
+    var highlight: TextHighlight?
+    /// Shrink the font size until the text fits the box; `fontSize` is then the largest size.
+    var autoFit: Bool = false
 }
 
 struct ShapeProperties: Hashable, Sendable {
@@ -138,6 +193,9 @@ struct Layer: Identifiable, Hashable, Sendable {
     var opacity: Double = 1
     var visible: Bool = true
     var locked: Bool = false
+    /// Layers on the same slide sharing a group ID are selected, moved and arranged together.
+    var groupID: String?
+    var shadow: Shadow?
     var content: Content
 
     var kind: Kind {
@@ -295,12 +353,15 @@ extension Project {
 
     var usedAssetIDs: Set<String> {
         var ids = Set<String>()
-        for slide in slides { for layer in slide.layers { if let id = layer.image?.assetID { ids.insert(id) } } }
+        for slide in slides {
+            if let id = slide.background.imageAssetID { ids.insert(id) }
+            for layer in slide.layers { if let id = layer.image?.assetID { ids.insert(id) } }
+        }
         return ids
     }
 
     func references(toAsset id: String) -> Int {
-        slides.reduce(0) { n, slide in n + slide.layers.filter { $0.image?.assetID == id }.count }
+        slides.reduce(0) { n, slide in n + slide.layers.filter { $0.image?.assetID == id }.count + (slide.background.imageAssetID == id ? 1 : 0) }
     }
 }
 

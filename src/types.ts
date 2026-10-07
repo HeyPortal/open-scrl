@@ -6,6 +6,30 @@ export type Format = {
 
 export type LayerKind = 'image' | 'text' | 'shape';
 
+/** A color stop at `offset` (0–1) along a gradient. */
+export interface GradientStop {
+  offset: number;
+  color: string;
+}
+
+export interface Gradient {
+  type: 'linear' | 'radial';
+  /** CSS `linear-gradient` semantics: 0° points up, 90° points right. Ignored for radial. */
+  angle: number;
+  /** At least two stops, sorted by offset. */
+  stops: GradientStop[];
+}
+
+/** A drop shadow. Distances are in project pixels and do not rotate with the layer. */
+export interface Shadow {
+  color: string;
+  /** 0–1, multiplied with the color's own alpha. */
+  opacity: number;
+  blur: number;
+  offsetX: number;
+  offsetY: number;
+}
+
 export interface BaseLayer {
   id: string;
   kind: LayerKind;
@@ -18,7 +42,13 @@ export interface BaseLayer {
   opacity: number;
   visible: boolean;
   locked: boolean;
+  /** Layers on the same slide that share a group id are selected, moved and arranged together. */
+  groupId?: string | null;
+  shadow?: Shadow | null;
 }
+
+/** Shapes a photo can be clipped to. `rect` uses `cornerRadius`. */
+export type ImageMask = 'rect' | 'ellipse' | 'arch' | 'blob' | 'hexagon' | 'star' | 'heart';
 
 export interface ImageLayer extends BaseLayer {
   kind: 'image';
@@ -27,12 +57,27 @@ export interface ImageLayer extends BaseLayer {
   cropOffsetX: number;
   cropOffsetY: number;
   cropScale: number;
+  /** Missing means `rect`. */
+  mask?: ImageMask;
+  /** Border color, drawn inside the mask outline. */
+  stroke?: string;
+  /** Border width; missing or 0 means no border. */
+  strokeWidth?: number;
+}
+
+/** A colored box behind text: one box around the whole text, or one per line. */
+export interface TextHighlight {
+  style: 'box' | 'lines';
+  color: string;
+  padding: number;
+  radius: number;
 }
 
 export interface TextLayer extends BaseLayer {
   kind: 'text';
   text: string;
   fontFamily: string;
+  /** With `autoFit`, the largest size the text may use. */
   fontSize: number;
   fontWeight: number;
   italic: boolean;
@@ -40,6 +85,15 @@ export interface TextLayer extends BaseLayer {
   align: 'left' | 'center' | 'right';
   letterSpacing: number;
   lineHeight: number;
+  /** Outline color. */
+  stroke?: string;
+  /** Outline width; missing or 0 means no outline. */
+  strokeWidth?: number;
+  /** When set, replaces `fill`; spans the text box. */
+  fillGradient?: Gradient | null;
+  highlight?: TextHighlight | null;
+  /** Shrink the font size until the text fits the box's width and height. */
+  autoFit?: boolean;
 }
 
 export interface ShapeLayer extends BaseLayer {
@@ -55,7 +109,29 @@ export type Layer = ImageLayer | TextLayer | ShapeLayer;
 
 export type Background =
   | { kind: 'solid'; color: string }
-  | { kind: 'gradient'; from: string; to: string; angle: number };
+  | {
+      kind: 'gradient';
+      /** First and last stop colors, kept for older readers when `stops` is present. */
+      from: string;
+      to: string;
+      angle: number;
+      /** Missing means `linear`. */
+      type?: 'linear' | 'radial';
+      /** Overrides `from`/`to` when it has at least two stops. */
+      stops?: GradientStop[];
+    }
+  | {
+      kind: 'image';
+      /** The photo, cover-fitted and centered on the slide. `null` shows only `color`. */
+      assetId: string | null;
+      /** Gaussian blur radius in project pixels; 0 is a sharp photo. */
+      blur: number;
+      /** 0–1 black overlay that keeps text legible on busy photos. */
+      dim: number;
+      /** Drawn under the photo, and alone when the photo is missing. */
+      color: string;
+    }
+  | { kind: 'transparent' };
 
 export interface Slide {
   id: string;

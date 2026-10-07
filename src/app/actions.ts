@@ -1,6 +1,10 @@
 import { useEditor } from '@/store/editor';
 import { useEditorSession } from '@/editor/sessionStore';
 import { useExport } from '@/editor/exportStore';
+import { useEditorView } from '@/editor/viewStore';
+import { currentSelection, enteredGroupId, selectParent } from '@/editor/selectionActions';
+import { expandToGroups, groupMemberIds, selectionUnits } from '@/core/document/selectors';
+import type { AlignEdge, DistributeAxis } from '@/core/document/geometry';
 import { useToasts } from '@/store/toasts';
 import { GRID_TEMPLATES } from '@/lib/grids';
 import type { Layer } from '@/types';
@@ -55,15 +59,22 @@ export function matchesBinding(binding: KeyBinding, e: Pick<KeyboardEvent, 'key'
 
 const doc = () => useEditor.getState();
 const session = () => useEditorSession.getState();
-const selectedLayer = (): Layer | undefined => {
-  const id = session().selectedLayerId;
-  return id ? doc().doc.layers[id] : undefined;
+const selection = () => currentSelection(doc().doc);
+const selectedLayers = (): Layer[] => selection().map((id) => doc().doc.layers[id]);
+const hasLayer = () => selection().length > 0;
+const hasUnlockedLayer = () => selectedLayers().some((l) => !l.locked);
+const unitCount = () => selectionUnits(doc().doc, selection()).length;
+/** Grouping needs two or more layers that aren't already exactly one group. */
+const canGroup = () => {
+  const d = doc().doc;
+  const ids = expandToGroups(d, selection());
+  if (ids.length < 2) return false;
+  const group = d.layers[ids[0]].groupId;
+  return !(group && ids.every((id) => d.layers[id].groupId === group) && groupMemberIds(d, ids[0]).length === ids.length && !enteredGroupId(d));
 };
-const hasLayer = () => !!selectedLayer();
-const hasUnlockedLayer = () => !!selectedLayer() && !selectedLayer()!.locked;
+const canUngroup = () => selectedLayers().some((l) => !!l.groupId);
 const slideIndex = () => Math.max(0, doc().doc.slideOrder.indexOf(session().selectedSlideId));
 const currentSlideId = () => doc().doc.slideOrder[slideIndex()];
-const withLayer = (fn: (layer: Layer) => void) => () => { const layer = selectedLayer(); if (layer) fn(layer); };
 const focusSlideAt = (index: number) => {
   const order = doc().doc.slideOrder;
   const id = order[Math.max(0, Math.min(order.length - 1, index))];
@@ -72,25 +83,36 @@ const focusSlideAt = (index: number) => {
 const zoomTo = (zoom: number) => session().setZoom(zoom);
 
 export function nudgeSelected(dx: number, dy: number) {
-  const layer = selectedLayer();
-  if (!layer || layer.locked) return;
-  doc().updateLayer(layer.id, { x: layer.x + dx, y: layer.y + dy });
+  const ids = selectedLayers().filter((l) => !l.locked).map((l) => l.id);
+  if (!ids.length) return;
+  doc().moveLayers(ids, dx, dy, `nudge:${ids.join(',')}`);
 }
 
-function alignSelected(edge: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom') {
-  const layer = selectedLayer();
-  if (!layer || layer.locked) return;
-  const f = doc().doc.format;
-  const patch = {
-    left: { x: 0 },
-    center: { x: (f.width - layer.width) / 2 },
-    right: { x: f.width - layer.width },
-    top: { y: 0 },
-    middle: { y: (f.height - layer.height) / 2 },
-    bottom: { y: f.height - layer.height },
-  }[edge];
-  doc().updateLayer(layer.id, patch);
+/** Aligns the selection's edges to each other, or a single layer or group to the slide. */
+export function alignSelection(edge: AlignEdge, relativeTo?: 'selection' | 'slide') {
+  doc().alignLayers(selection(), edge, relativeTo);
 }
+
+export function distributeSelection(axis: DistributeAxis) {
+  doc().distributeLayers(selection(), axis);
+}
+
+/** Lock or hide the whole selection in one step; mixed selections switch everything on. */
+function toggleAll(key: 'locked' | 'visible') {
+  const layers = selectedLayers();
+  if (!layers.length) return;
+  const value = key === 'locked' ? !layers.every((l) => l.locked) : !layers.every((l) => l.visible);
+  doc().updateLayers(layers.map((l) => ({ id: l.id, patch: { [key]: value } })));
+}
+
+const ALIGN_ACTIONS: { id: string; edge: AlignEdge; label: string; keywords: string }[] = [
+  { id: 'align-left', edge: 'left', label: 'Align left', keywords: 'left edges slide' },
+  { id: 'align-center', edge: 'centerX', label: 'Align centers horizontally', keywords: 'center middle slide' },
+  { id: 'align-right', edge: 'right', label: 'Align right', keywords: 'right edges slide' },
+  { id: 'align-top', edge: 'top', label: 'Align top', keywords: 'top edges slide' },
+  { id: 'align-middle', edge: 'centerY', label: 'Align centers vertically', keywords: 'middle center slide' },
+  { id: 'align-bottom', edge: 'bottom', label: 'Align bottom', keywords: 'bottom edges slide' },
+];
 
 export function buildActions(): Action[] {
   const toast = useToasts.getState().addToast;
@@ -104,23 +126,23 @@ export function buildActions(): Action[] {
     // Edit
     { id: 'undo', label: 'Undo', group: 'Edit', keys: [{ key: 'z', mod: true, shift: false, global: true }], enabled: () => doc().past.length > 0, run: () => doc().undo() },
     { id: 'redo', label: 'Redo', group: 'Edit', keys: [{ key: 'z', mod: true, shift: true, global: true }, { key: 'y', mod: true, global: true }], enabled: () => doc().future.length > 0, run: () => doc().redo() },
-    { id: 'duplicate-layer', label: 'Duplicate layer', group: 'Edit', keys: [{ key: 'd', mod: true }], enabled: hasLayer, run: withLayer((l) => doc().duplicateLayer(l.id)) },
-    { id: 'delete-layer', label: 'Delete layer', group: 'Edit', keys: [{ key: 'Delete' }, { key: 'Backspace' }], enabled: hasLayer, run: withLayer((l) => doc().deleteLayer(l.id)) },
-    { id: 'toggle-lock', label: 'Lock / unlock layer', group: 'Edit', enabled: hasLayer, run: withLayer((l) => doc().toggleLocked(l.id)) },
-    { id: 'toggle-visible', label: 'Show / hide layer', group: 'Edit', enabled: hasLayer, run: withLayer((l) => doc().toggleVisible(l.id)) },
-    { id: 'deselect', label: 'Deselect', group: 'Edit', keys: [{ key: 'Escape' }], hidden: true, enabled: hasLayer, run: () => session().selectLayer(null) },
+    { id: 'select-all', label: 'Select all layers', group: 'Edit', keys: [{ key: 'a', mod: true, shift: false }], keywords: 'everything', run: () => doc().selectAllLayers() },
+    { id: 'duplicate-layer', label: 'Duplicate', group: 'Edit', keys: [{ key: 'd', mod: true }], keywords: 'copy layer', enabled: hasLayer, run: () => { doc().duplicateLayers(selection()); } },
+    { id: 'delete-layer', label: 'Delete', group: 'Edit', keys: [{ key: 'Delete' }, { key: 'Backspace' }], keywords: 'remove layer', enabled: hasLayer, run: () => doc().deleteLayers(selection()) },
+    { id: 'toggle-lock', label: 'Lock / unlock', group: 'Edit', keywords: 'layer', enabled: hasLayer, run: () => toggleAll('locked') },
+    { id: 'toggle-visible', label: 'Show / hide', group: 'Edit', keywords: 'layer', enabled: hasLayer, run: () => toggleAll('visible') },
+    { id: 'deselect', label: 'Deselect', group: 'Edit', keys: [{ key: 'Escape' }], hidden: true, enabled: hasLayer, run: selectParent },
 
     // Arrange
-    { id: 'bring-forward', label: 'Bring forward', group: 'Arrange', keys: [{ key: ']', shift: false }], enabled: hasLayer, run: withLayer((l) => doc().reorderLayer(l.id, 'up')) },
-    { id: 'send-backward', label: 'Send backward', group: 'Arrange', keys: [{ key: '[', shift: false }], enabled: hasLayer, run: withLayer((l) => doc().reorderLayer(l.id, 'down')) },
-    { id: 'bring-front', label: 'Bring to front', group: 'Arrange', keys: [{ key: '}', shift: true }], enabled: hasLayer, run: withLayer((l) => doc().reorderLayer(l.id, 'top')) },
-    { id: 'send-back', label: 'Send to back', group: 'Arrange', keys: [{ key: '{', shift: true }], enabled: hasLayer, run: withLayer((l) => doc().reorderLayer(l.id, 'bottom')) },
-    { id: 'align-left', label: 'Align to slide left', group: 'Arrange', enabled: hasUnlockedLayer, run: () => alignSelected('left') },
-    { id: 'align-center', label: 'Center horizontally on slide', group: 'Arrange', enabled: hasUnlockedLayer, run: () => alignSelected('center') },
-    { id: 'align-right', label: 'Align to slide right', group: 'Arrange', enabled: hasUnlockedLayer, run: () => alignSelected('right') },
-    { id: 'align-top', label: 'Align to slide top', group: 'Arrange', enabled: hasUnlockedLayer, run: () => alignSelected('top') },
-    { id: 'align-middle', label: 'Center vertically on slide', group: 'Arrange', enabled: hasUnlockedLayer, run: () => alignSelected('middle') },
-    { id: 'align-bottom', label: 'Align to slide bottom', group: 'Arrange', enabled: hasUnlockedLayer, run: () => alignSelected('bottom') },
+    { id: 'group', label: 'Group', group: 'Arrange', keys: [{ key: 'g', mod: true, shift: false }], keywords: 'combine layers', enabled: canGroup, run: () => { doc().groupLayers(selection()); } },
+    { id: 'ungroup', label: 'Ungroup', group: 'Arrange', keys: [{ key: 'g', mod: true, shift: true }], keywords: 'split layers', enabled: canUngroup, run: () => doc().ungroupLayers(selection()) },
+    { id: 'bring-forward', label: 'Bring forward', group: 'Arrange', keys: [{ key: ']', shift: false }], enabled: hasLayer, run: () => doc().reorderLayers(selection(), 'up') },
+    { id: 'send-backward', label: 'Send backward', group: 'Arrange', keys: [{ key: '[', shift: false }], enabled: hasLayer, run: () => doc().reorderLayers(selection(), 'down') },
+    { id: 'bring-front', label: 'Bring to front', group: 'Arrange', keys: [{ key: '}', shift: true }], enabled: hasLayer, run: () => doc().reorderLayers(selection(), 'top') },
+    { id: 'send-back', label: 'Send to back', group: 'Arrange', keys: [{ key: '{', shift: true }], enabled: hasLayer, run: () => doc().reorderLayers(selection(), 'bottom') },
+    ...ALIGN_ACTIONS.map(({ id, edge, label, keywords }): Action => ({ id, label, group: 'Arrange', keywords, enabled: hasUnlockedLayer, run: () => alignSelection(edge) })),
+    { id: 'distribute-horizontal', label: 'Distribute horizontally', group: 'Arrange', keywords: 'space evenly spacing', enabled: () => unitCount() >= 3, run: () => distributeSelection('horizontal') },
+    { id: 'distribute-vertical', label: 'Distribute vertically', group: 'Arrange', keywords: 'space evenly spacing', enabled: () => unitCount() >= 3, run: () => distributeSelection('vertical') },
 
     // Slide
     { id: 'add-slide', label: 'Add slide', group: 'Slide', keys: [{ key: 'n', shift: true }], run: () => doc().addSlide(currentSlideId()) },
@@ -139,8 +161,10 @@ export function buildActions(): Action[] {
     },
 
     // View
+    { id: 'preview', label: 'Preview on a phone', group: 'View', keys: [{ key: 'p', shift: false }], keywords: 'instagram feed swipe profile grid present play', run: () => useEditorView.getState().setPreviewOpen(true) },
     { id: 'palette', label: 'Command palette', group: 'View', keys: [{ key: 'k', mod: true, global: true }], hidden: true, run: () => session().setOverlay('palette') },
     { id: 'shortcuts', label: 'Keyboard shortcuts', group: 'View', keys: [{ key: '?' }], keywords: 'help keys hotkeys', run: () => session().setOverlay('shortcuts') },
+    { id: 'wide-mode', label: 'Wide view', group: 'View', keys: [{ key: 'w', shift: false }], keywords: 'strip panorama whole carousel overview seamless', run: () => useEditorView.getState().setWideMode(!useEditorView.getState().wideMode) },
     { id: 'zoom-in', label: 'Zoom in', group: 'View', keys: [{ key: '=' }, { key: '+' }], run: () => zoomTo(session().zoom * 1.25) },
     { id: 'zoom-out', label: 'Zoom out', group: 'View', keys: [{ key: '-' }], run: () => zoomTo(session().zoom / 1.25) },
     { id: 'zoom-fit', label: 'Zoom to fit', group: 'View', keys: [{ code: 'Digit1', shift: true }], run: () => zoomTo(session().fitZoom) },

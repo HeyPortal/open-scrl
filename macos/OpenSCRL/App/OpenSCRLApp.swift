@@ -102,6 +102,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        MainActor.assumeIsolated { ExportActivity.shared.configureNotifications() }
         // Like Xcode and Keynote: closing the last project brings back the welcome window.
         NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: nil, queue: .main) { note in
             guard let closing = note.object as? NSWindow, closing.isDocumentWindow else { return }

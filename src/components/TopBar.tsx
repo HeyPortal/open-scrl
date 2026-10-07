@@ -5,6 +5,7 @@ import {
   CloudOff,
   Command,
   Download,
+  GalleryHorizontal,
   House,
   ImagePlus,
   Loader2,
@@ -15,11 +16,13 @@ import {
   Square,
   Type,
   Undo2,
+  Smartphone,
 } from 'lucide-react';
 import { useEditor } from '@/store/editor';
 import { FORMATS } from '@/lib/format';
 import { useEditorSession } from '@/editor/sessionStore';
 import { useExport } from '@/editor/exportStore';
+import { useEditorView } from '@/editor/viewStore';
 import { buildActions, formatBinding, type Action } from '@/app/actions';
 import { DropdownMenu, type MenuEntry } from './Menu';
 
@@ -61,8 +64,12 @@ function ZoomControl() {
   const zoom = useEditorSession((s) => s.zoom);
   const fitZoom = useEditorSession((s) => s.fitZoom);
   const setZoom = useEditorSession((s) => s.setZoom);
+  const wideMode = useEditorView((s) => s.wideMode);
+  const setWideMode = useEditorView((s) => s.setWideMode);
   const presets: MenuEntry[] = [
-    ...actionItems(['zoom-in', 'zoom-out', '-', 'zoom-fit']),
+    ...actionItems(['zoom-in', 'zoom-out', '-', 'zoom-fit']).map((item) => 'label' in item && item.label === 'Zoom to fit' ? { ...item, label: wideMode ? 'Fit the whole strip' : 'Fit one slide' } : item),
+    { label: 'Wide view', checked: wideMode, shortcut: ['W'], onSelect: () => setWideMode(!wideMode) },
+    { separator: true },
     ...[0.5, 1, 2].map((value) => ({ label: `${value * 100}%`, checked: Math.abs(zoom - value) < 0.005, onSelect: () => setZoom(value), shortcut: value === 1 ? ['⇧', '0'] : undefined })),
   ];
   return (
@@ -83,6 +90,16 @@ function ZoomControl() {
       <button className="icon-btn" title={hint('Zoom in', 'zoom-in')} aria-label="Zoom in" onClick={() => setZoom(zoom * 1.25)}>
         <Plus size={14} />
       </button>
+      <span className="mx-0.5 h-4 w-px bg-line-strong" aria-hidden />
+      <button
+        className={`icon-btn ${wideMode ? 'icon-btn-active' : ''}`}
+        title={hint(wideMode ? 'Back to one slide' : 'Wide view: the whole carousel as one strip', 'wide-mode')}
+        aria-label="Wide view"
+        aria-pressed={wideMode}
+        onClick={() => setWideMode(!wideMode)}
+      >
+        <GalleryHorizontal size={15} />
+      </button>
     </div>
   );
 }
@@ -101,6 +118,7 @@ export function TopBar() {
   const requestImport = useEditorSession((s) => s.requestImport);
   const setOverlay = useEditorSession((s) => s.setOverlay);
   const exporting = useExport((s) => s.exporting);
+  const setPreviewOpen = useEditorView((s) => s.setPreviewOpen);
   const progress = useExport((s) => s.progress);
   const exportCurrentSlide = useExport((s) => s.exportCurrentSlide);
   const exportCarousel = useExport((s) => s.exportCarousel);
@@ -188,6 +206,9 @@ export function TopBar() {
             <SaveIndicator />
           )}
         </div>
+        <button className="btn btn-secondary" onClick={() => setPreviewOpen(true)} title={hint('Preview on a phone', 'preview')}>
+          <Smartphone size={14} aria-hidden /> <span className="hidden xl:inline">Preview</span><span className="sr-only xl:hidden">Preview</span>
+        </button>
         <button className="btn btn-secondary" disabled={exporting} onClick={() => void exportCurrentSlide()} title="Download the selected slide as a PNG">
           <Download size={14} aria-hidden /> <span className="hidden xl:inline">Slide PNG</span><span className="sr-only xl:hidden">Slide PNG</span>
         </button>

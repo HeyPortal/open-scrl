@@ -26,13 +26,20 @@ final class CanvasView: NSView {
 
     enum Drag {
         case none
-        case pending(id: String, start: CGPoint)
-        case move(id: String, slide: Int, base: Layer, start: CGPoint, others: [Layer], duplicated: Bool)
+        /// Mouse is down on a selected layer. `narrow` narrows the selection to it on a plain click.
+        case pending(id: String, start: CGPoint, narrow: Bool)
+        /// Moves every unlocked selected layer; `union` is their slide-local bounds at the start.
+        case move(ids: [String], slide: Int, bases: [Layer], union: CGRect, start: CGPoint, others: [Layer], duplicated: Bool)
         case resize(id: String, slide: Int, base: Layer, handle: Handle, others: [Layer])
         case rotate(id: String, base: Layer, center: CGPoint, startAngle: Double)
+        /// Scales a multi-layer selection from its slide-local bounds `from`.
+        case groupResize(slide: Int, bases: [Layer], from: CGRect, handle: Handle, others: [Layer])
+        /// Rotates a multi-layer selection around `center` (deck coordinates).
+        case groupRotate(slide: Int, bases: [Layer], center: CGPoint, startAngle: Double)
         case crop(id: String, base: Layer, start: CGPoint)
         case pan(start: CGPoint, origin: CGPoint)
-        case marqueeSlide
+        /// Rubber-band selection on one slide, starting at `start` (deck coordinates).
+        case marquee(start: CGPoint, slide: Int, base: [String])
         case slideButton(SlideButton)
     }
 
@@ -53,6 +60,10 @@ final class CanvasView: NSView {
     var trackingArea: NSTrackingArea?
     var lastMouseLocation: CGPoint?
     var styledZoom: CGFloat = 0
+    /// The rubber band in deck coordinates while dragging on empty canvas.
+    var marqueeRect: CGRect?
+    /// Guides the current drag last snapped to, so the trackpad taps once per new snap.
+    var lastSnapSignature: Set<String> = []
 
     static let guideColor = NSColor(srgbRed: 1, green: 0.231, blue: 0.541, alpha: 1)
 
@@ -286,11 +297,12 @@ final class CanvasView: NSView {
         }
         drawSelection(cg, project: project, controller: controller, accent: accent)
         drawGuides(cg)
+        drawMarquee(cg, accent: accent)
     }
 
     var isInteracting: Bool {
         switch drag {
-        case .none, .pending, .marqueeSlide, .slideButton: false
+        case .none, .pending, .marquee, .slideButton: false
         default: true
         }
     }
@@ -424,41 +436,29 @@ final class CanvasView: NSView {
         return path
     }
 
-    private func drawSelection(_ cg: CGContext, project: Project, controller: EditorController, accent: CGColor) {
-        if let hover = hoverLayerID, hover != controller.selectedLayerID, !isInteracting, let item = sceneItem(hover, in: project), item.layer.visible {
-            cg.saveGState()
-            cg.addPath(outlinePath(item))
-            cg.setStrokeColor(accent.copy(alpha: 0.7) ?? accent)
-            cg.setLineWidth(1)
-            cg.strokePath()
-            cg.restoreGState()
-        }
-        guard let id = controller.selectedLayerID, let item = sceneItem(id, in: project) else { return }
-        let layer = item.layer
-        let editing = controller.editingTextLayerID == id || controller.cropLayerID == id
-        cg.saveGState()
-        cg.addPath(outlinePath(item))
-        cg.setStrokeColor(accent)
-        cg.setLineWidth(1.5)
-        if layer.locked || editing || !layer.visible { cg.setLineDash(phase: 0, lengths: [5, 3]) }
-        cg.strokePath()
-        cg.restoreGState()
+    /// Deck-space bounds of a multi-layer selection (several layers or one group).
+    func selectionBox(_ controller: EditorController) -> (slide: Int, rect: CGRect, locked: Bool)? {
+        guard controller.isMultiSelection, let slide = controller.selectedLayerLocation?.slide else { return nil }
+        let layers = controller.selectedLayers
+        guard let bounds = Geometry.unionBounds(of: layers) else { return nil }
+        return (slide, bounds.offsetBy(dx: Double(slide) * controller.project.format.width, dy: 0), layers.allSatisfy(\.locked))
+    }
 
-        if layer.locked {
-            if let lock = Renderer.symbolImage("lock.fill", pointSize: 11) {
-                let corner = viewPoint(Geometry.parentPoint(CGPoint(x: layer.width, y: 0), in: item.globalFrame, degrees: layer.rotation))
-                let badge = CGRect(x: corner.x - 9, y: corner.y - 9, width: 18, height: 18)
-                cg.setFillColor(accent)
-                cg.fillEllipse(in: badge)
-                let iconH: CGFloat = 9, iconW = iconH * CGFloat(lock.width) / CGFloat(lock.height)
-                let iconRect = CGRect(x: badge.midX - iconW / 2, y: badge.midY - iconH / 2, width: iconW, height: iconH)
-                Self.fillSymbol(lock, in: iconRect, color: .white, cg: cg)
+    /// Handles around a multi-layer selection's box: axis-aligned, with rotation above the top edge.
+    func selectionHandlePositions(_ rect: CGRect) -> [(Handle, CGPoint)] {
+        let v = viewRect(rect)
+        var handles: [(Handle, CGPoint)] = []
+        for dy in [-1, 0, 1] {
+            for dx in [-1, 0, 1] where !(dx == 0 && dy == 0) {
+                if (dx == 0 && v.width < 36) || (dy == 0 && v.height < 36) { continue }
+                handles.append((.resize(dx: dx, dy: dy), CGPoint(x: v.midX + CGFloat(dx) * v.width / 2, y: v.midY + CGFloat(dy) * v.height / 2)))
             }
-            return
         }
-        guard !editing, !isInteracting || isResizingOrRotating else { return }
-        let handles = handlePositions(for: item)
-        let top = viewPoint(Geometry.parentPoint(CGPoint(x: layer.width / 2, y: 0), in: item.globalFrame, degrees: layer.rotation))
+        handles.append((.rotate, CGPoint(x: v.midX, y: v.minY - 24)))
+        return handles
+    }
+
+    private func drawHandles(_ cg: CGContext, _ handles: [(Handle, CGPoint)], rotateFrom top: CGPoint, accent: CGColor) {
         if let rotate = handles.first(where: { $0.0 == .rotate })?.1 {
             cg.setStrokeColor(accent)
             cg.setLineWidth(1)
@@ -488,9 +488,89 @@ final class CanvasView: NSView {
         }
     }
 
+    private func drawLockBadge(_ cg: CGContext, at corner: CGPoint, accent: CGColor) {
+        guard let lock = Renderer.symbolImage("lock.fill", pointSize: 11) else { return }
+        let badge = CGRect(x: corner.x - 9, y: corner.y - 9, width: 18, height: 18)
+        cg.setFillColor(accent)
+        cg.fillEllipse(in: badge)
+        let iconH: CGFloat = 9, iconW = iconH * CGFloat(lock.width) / CGFloat(lock.height)
+        let iconRect = CGRect(x: badge.midX - iconW / 2, y: badge.midY - iconH / 2, width: iconW, height: iconH)
+        Self.fillSymbol(lock, in: iconRect, color: .white, cg: cg)
+    }
+
+    /// Every selected layer gets a thin outline; the selection as a whole gets a dashed box
+    /// with handles that scale and rotate everything together.
+    private func drawMultiSelection(_ cg: CGContext, project: Project, controller: EditorController, accent: CGColor) {
+        guard let box = selectionBox(controller) else { return }
+        cg.saveGState()
+        for id in controller.selectedLayerIDs {
+            guard let item = sceneItem(id, in: project) else { continue }
+            cg.addPath(outlinePath(item))
+        }
+        cg.setStrokeColor(accent)
+        cg.setLineWidth(1)
+        cg.strokePath()
+        let rect = viewRect(box.rect).integral.insetBy(dx: 0.5, dy: 0.5)
+        cg.setLineWidth(1.25)
+        cg.setLineDash(phase: 0, lengths: [5, 3])
+        cg.stroke(rect)
+        cg.restoreGState()
+        if box.locked {
+            drawLockBadge(cg, at: CGPoint(x: rect.maxX, y: rect.minY), accent: accent)
+            return
+        }
+        guard controller.editingTextLayerID == nil, !isInteracting || isResizingOrRotating else { return }
+        drawHandles(cg, selectionHandlePositions(box.rect), rotateFrom: CGPoint(x: rect.midX, y: rect.minY), accent: accent)
+    }
+
+    private func drawMarquee(_ cg: CGContext, accent: CGColor) {
+        guard let marqueeRect else { return }
+        let r = viewRect(marqueeRect).integral.insetBy(dx: 0.5, dy: 0.5)
+        cg.saveGState()
+        cg.setFillColor(accent.copy(alpha: 0.12) ?? accent)
+        cg.fill(r)
+        cg.setStrokeColor(accent.copy(alpha: 0.85) ?? accent)
+        cg.setLineWidth(1)
+        cg.stroke(r)
+        cg.restoreGState()
+    }
+
+    private func drawSelection(_ cg: CGContext, project: Project, controller: EditorController, accent: CGColor) {
+        if let hover = hoverLayerID, !controller.selectedLayerIDs.contains(hover), !isInteracting, let item = sceneItem(hover, in: project), item.layer.visible {
+            cg.saveGState()
+            cg.addPath(outlinePath(item))
+            cg.setStrokeColor(accent.copy(alpha: 0.7) ?? accent)
+            cg.setLineWidth(1)
+            cg.strokePath()
+            cg.restoreGState()
+        }
+        if controller.isMultiSelection {
+            drawMultiSelection(cg, project: project, controller: controller, accent: accent)
+            return
+        }
+        guard let id = controller.selectedLayerID, let item = sceneItem(id, in: project) else { return }
+        let layer = item.layer
+        let editing = controller.editingTextLayerID == id || controller.cropLayerID == id
+        cg.saveGState()
+        cg.addPath(outlinePath(item))
+        cg.setStrokeColor(accent)
+        cg.setLineWidth(1.5)
+        if layer.locked || editing || !layer.visible { cg.setLineDash(phase: 0, lengths: [5, 3]) }
+        cg.strokePath()
+        cg.restoreGState()
+
+        if layer.locked {
+            drawLockBadge(cg, at: viewPoint(Geometry.parentPoint(CGPoint(x: layer.width, y: 0), in: item.globalFrame, degrees: layer.rotation)), accent: accent)
+            return
+        }
+        guard !editing, !isInteracting || isResizingOrRotating else { return }
+        let top = viewPoint(Geometry.parentPoint(CGPoint(x: layer.width / 2, y: 0), in: item.globalFrame, degrees: layer.rotation))
+        drawHandles(cg, handlePositions(for: item), rotateFrom: top, accent: accent)
+    }
+
     private var isResizingOrRotating: Bool {
         switch drag {
-        case .resize, .rotate: true
+        case .resize, .rotate, .groupResize, .groupRotate: true
         default: false
         }
     }

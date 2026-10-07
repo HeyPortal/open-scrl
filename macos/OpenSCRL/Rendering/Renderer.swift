@@ -1,5 +1,6 @@
 import AppKit
 import CoreGraphics
+import CoreImage
 
 /// Supplies decoded, orientation-corrected images for media assets.
 protocol ImageProviding: AnyObject {
@@ -22,26 +23,93 @@ struct RenderOptions {
 enum Renderer {
     // MARK: Background
 
-    static func drawBackground(_ background: Background, in rect: CGRect, cg: CGContext) {
+    /// Draws a slide background. Photo backgrounds need `images` and `assets`; transparent
+    /// backgrounds draw nothing, or a checkerboard when `checkerboard` is set (editor only).
+    static func drawBackground(_ background: Background, in rect: CGRect, cg: CGContext, images: ImageProviding? = nil,
+                               assets: [String: MediaAsset] = [:], checkerboard: Bool = false) {
         switch background {
         case .solid(let hex):
             cg.setFillColor(HexColor.cgColor(hex, fallback: .white))
             cg.fill(rect)
-        case .gradient(let from, let to, let angle):
-            // CSS `linear-gradient(<angle>deg, from, to)` semantics: 0° points up, 90° right.
-            let r = Geometry.radians(angle)
-            let d = CGPoint(x: sin(r), y: -cos(r))
-            let length = abs(rect.width * sin(r)) + abs(rect.height * cos(r))
-            let c = rect.center
-            let start = CGPoint(x: c.x - d.x * length / 2, y: c.y - d.y * length / 2)
-            let end = CGPoint(x: c.x + d.x * length / 2, y: c.y + d.y * length / 2)
-            let colors = [HexColor.cgColor(from, fallback: .white), HexColor.cgColor(to, fallback: .black)] as CFArray
-            guard let gradient = CGGradient(colorsSpace: HexColor.srgb, colors: colors, locations: [0, 1]) else { return }
+        case .gradient(let gradient):
             cg.saveGState()
             cg.clip(to: rect)
-            cg.drawLinearGradient(gradient, start: start, end: end, options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
+            drawGradient(gradient, in: rect, cg: cg)
             cg.restoreGState()
+        case .image(let image):
+            cg.setFillColor(HexColor.cgColor(image.color, fallback: .black))
+            cg.fill(rect)
+            if let id = image.assetID, let asset = assets[id] {
+                cg.saveGState()
+                cg.clip(to: rect)
+                if image.blur > 0 {
+                    if let source = images?.image(for: asset, pixelEdge: 1024),
+                       let blurred = Backdrop.blurred(source, key: "\(id)@\(source.width)", size: rect.size, blur: image.blur) {
+                        cg.interpolationQuality = .high
+                        drawImageFlipped(blurred, in: rect, cg: cg)
+                    }
+                } else {
+                    let cover = Backdrop.coverRect(asset.pixelSize, in: rect)
+                    if let source = images?.image(for: asset, pixelEdge: max(cover.width, cover.height) * deviceScale(cg)) {
+                        cg.interpolationQuality = .high
+                        drawImageFlipped(source, in: cover, cg: cg)
+                    }
+                }
+                cg.restoreGState()
+            }
+            if image.dim > 0 {
+                cg.setFillColor(CGColor(gray: 0, alpha: min(1, image.dim)))
+                cg.fill(rect)
+            }
+        case .transparent:
+            if checkerboard { drawCheckerboard(in: rect, cell: rect.width / 24, cg: cg) }
         }
+    }
+
+    /// The editor's stand-in for transparency.
+    static func drawCheckerboard(in rect: CGRect, cell: CGFloat, cg: CGContext) {
+        cg.saveGState()
+        cg.clip(to: rect)
+        cg.setFillColor(CGColor(gray: 1, alpha: 1))
+        cg.fill(rect)
+        cg.setFillColor(CGColor(srgbRed: 0.894, green: 0.894, blue: 0.906, alpha: 1))
+        let size = max(4, cell)
+        var row = 0
+        var y = rect.minY
+        while y < rect.maxY {
+            var x = rect.minX + CGFloat(row % 2) * size
+            while x < rect.maxX {
+                cg.fill(CGRect(x: x, y: y, width: size, height: size))
+                x += size * 2
+            }
+            y += size
+            row += 1
+        }
+        cg.restoreGState()
+    }
+
+    static func cgGradient(_ gradient: Gradient) -> CGGradient? {
+        let stops = gradient.sortedStops
+        return CGGradient(colorsSpace: HexColor.srgb, colors: stops.map { HexColor.cgColor($0.color) } as CFArray,
+                          locations: stops.map { CGFloat(min(1, max(0, $0.offset))) })
+    }
+
+    /// Fills the current clip with `gradient` laid out across `rect`. CSS `linear-gradient` angles
+    /// (0° points up, 90° right); radial gradients are centered circles reaching the farthest corner.
+    static func drawGradient(_ gradient: Gradient, in rect: CGRect, cg: CGContext) {
+        guard let cgGradient = cgGradient(gradient) else { return }
+        let c = rect.center
+        if gradient.type == .radial {
+            cg.drawRadialGradient(cgGradient, startCenter: c, startRadius: 0, endCenter: c,
+                                  endRadius: hypot(rect.width, rect.height) / 2, options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
+            return
+        }
+        let r = Geometry.radians(gradient.angle)
+        let d = CGPoint(x: sin(r), y: -cos(r))
+        let length = abs(rect.width * sin(r)) + abs(rect.height * cos(r))
+        let start = CGPoint(x: c.x - d.x * length / 2, y: c.y - d.y * length / 2)
+        let end = CGPoint(x: c.x + d.x * length / 2, y: c.y + d.y * length / 2)
+        cg.drawLinearGradient(cgGradient, start: start, end: end, options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
     }
 
     // MARK: Slides
@@ -56,7 +124,7 @@ enum Renderer {
         let assets = assets ?? project.assetsByID
         cg.saveGState()
         cg.clip(to: local)
-        drawBackground(project.slides[index].background, in: local, cg: cg)
+        drawBackground(project.slides[index].background, in: local, cg: cg, images: images, assets: assets, checkerboard: options.editor)
         for item in project.scene(intersecting: viewport) {
             let origin = CGPoint(x: item.origin.x - viewport.minX, y: item.origin.y)
             drawLayer(item.layer, origin: origin, cg: cg, assets: assets, images: images, options: options)
@@ -73,9 +141,12 @@ enum Renderer {
         cg.translateBy(x: origin.x + layer.width / 2, y: origin.y + layer.height / 2)
         if layer.rotation != 0 { cg.rotate(by: Geometry.radians(layer.rotation)) }
         cg.translateBy(x: -layer.width / 2, y: -layer.height / 2)
-        let grouped = layer.opacity < 0.999
+        // A shadow is cast by the composite of everything the layer draws, like the web painter.
+        let shadow = layer.shadow.flatMap { $0.opacity > 0 && !HexColor.isTransparent($0.color) ? $0 : nil }
+        let grouped = layer.opacity < 0.999 || shadow != nil
         if grouped {
             cg.setAlpha(max(0, layer.opacity))
+            if let shadow { setShadow(shadow, cg: cg) }
             cg.beginTransparencyLayer(auxiliaryInfo: nil)
         }
         let box = CGSize(width: layer.width, height: layer.height)
@@ -85,10 +156,19 @@ enum Renderer {
         case .shape(let props):
             drawShape(props, box: box, cg: cg)
         case .text(let props):
-            TextLayout.make(props, width: box.width).draw(in: cg)
+            TextLayout.make(props, width: box.width, height: box.height).draw(props, box: box, in: cg)
         }
         if grouped { cg.endTransparencyLayer() }
         cg.restoreGState()
+    }
+
+    /// Shadow distances are project pixels that don't rotate with the layer. Core Graphics takes
+    /// them in device space, where y points up.
+    static func setShadow(_ shadow: Shadow, cg: CGContext) {
+        let k = deviceScale(cg)
+        let c = HexColor.components(shadow.color) ?? (0, 0, 0, 1)
+        let color = CGColor(colorSpace: HexColor.srgb, components: [c.r, c.g, c.b, c.a * min(1, max(0, shadow.opacity))])
+        cg.setShadow(offset: CGSize(width: shadow.offsetX * k, height: -shadow.offsetY * k), blur: max(0, shadow.blur) * k, color: color)
     }
 
     static func shapePath(_ props: ShapeProperties, box: CGSize) -> CGPath {
@@ -125,7 +205,7 @@ enum Renderer {
 
     private static func drawImage(_ props: ImageProperties, layerID: String, box: CGSize, cg: CGContext,
                                   assets: [String: MediaAsset], images: ImageProviding?, options: RenderOptions) {
-        let clip = roundedRect(CGRect(origin: .zero, size: box), radius: props.cornerRadius)
+        let clip = MaskGeometry.path(props.mask, size: box, cornerRadius: props.cornerRadius)
         guard let assetID = props.assetID else {
             if options.editor { drawSlotPlaceholder(box: box, clip: clip, cg: cg, highlighted: options.highlightedSlotIDs.contains(layerID), accent: options.accent, missing: false) }
             return
@@ -145,6 +225,14 @@ enum Renderer {
         } else if options.editor {
             cg.setFillColor(CGColor(gray: 0.5, alpha: 0.16))
             cg.fill(CGRect(origin: .zero, size: box))
+        }
+        if props.strokeWidth > 0, !HexColor.isTransparent(props.stroke) {
+            // A centered stroke clipped to the mask: the border sits inside the photo's outline.
+            cg.addPath(clip)
+            cg.setStrokeColor(HexColor.cgColor(props.stroke))
+            cg.setLineWidth(props.strokeWidth * 2)
+            cg.setLineJoin(.round)
+            cg.strokePath()
         }
         cg.restoreGState()
         if options.highlightedSlotIDs.contains(layerID) {
@@ -208,5 +296,43 @@ enum Renderer {
             cg.restoreGState()
         }
         cg.restoreGState()
+    }
+}
+
+/// Cover-fitted and blurred background photos, cached because blurring is relatively expensive.
+enum Backdrop {
+    private static let cache: NSCache<NSString, CGImage> = {
+        let cache = NSCache<NSString, CGImage>()
+        cache.countLimit = 16
+        return cache
+    }()
+    private static let context = CIContext(options: [.workingColorSpace: HexColor.srgb, .outputColorSpace: HexColor.srgb])
+
+    /// The media cover-fitted and centered in `rect`.
+    static func coverRect(_ media: CGSize, in rect: CGRect) -> CGRect {
+        guard media.width > 0, media.height > 0 else { return rect }
+        let scale = max(rect.width / media.width, rect.height / media.height)
+        let size = CGSize(width: media.width * scale, height: media.height * scale)
+        return CGRect(x: rect.midX - size.width / 2, y: rect.midY - size.height / 2, width: size.width, height: size.height)
+    }
+
+    /// A blurred, cover-fitted copy for an area of `size` project pixels. `blur` is the Gaussian
+    /// standard deviation in project pixels, like CSS `blur()`. Rendered at reduced resolution
+    /// (the blur hides it), with edges extended so the photo doesn't darken toward the slide edges.
+    static func blurred(_ image: CGImage, key: String, size: CGSize, blur: Double) -> CGImage? {
+        let cacheKey = "\(key)|\(size.width)x\(size.height)|\(blur)" as NSString
+        if let hit = cache.object(forKey: cacheKey) { return hit }
+        let q = min(1, 1024 / max(size.width, size.height), max(0.04, 6 / max(blur, 0.001)))
+        let w = max(1, Int((size.width * q).rounded(.up))), h = max(1, Int((size.height * q).rounded(.up)))
+        guard let cg = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0, space: HexColor.srgb,
+                                 bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        cg.interpolationQuality = .high
+        cg.draw(image, in: coverRect(CGSize(width: image.width, height: image.height), in: CGRect(x: 0, y: 0, width: w, height: h)))
+        guard let scaled = cg.makeImage() else { return nil }
+        let input = CIImage(cgImage: scaled)
+        let output = input.clampedToExtent().applyingGaussianBlur(sigma: blur * q).cropped(to: input.extent)
+        guard let result = context.createCGImage(output, from: input.extent) else { return nil }
+        cache.setObject(result, forKey: cacheKey)
+        return result
     }
 }

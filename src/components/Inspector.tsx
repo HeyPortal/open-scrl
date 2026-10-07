@@ -1,14 +1,8 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import {
   AlignCenter,
-  AlignCenterHorizontal,
-  AlignCenterVertical,
-  AlignEndHorizontal,
-  AlignEndVertical,
   AlignLeft,
   AlignRight,
-  AlignStartHorizontal,
-  AlignStartVertical,
   ChevronsDown,
   ChevronsUp,
   ChevronDown,
@@ -33,22 +27,15 @@ import {
 import { useEditor } from '@/store/editor';
 import { useEditorSession } from '@/editor/sessionStore';
 import type { ImageLayer, Layer, ShapeLayer, TextLayer } from '@/types';
-import { GRADIENT_SWATCHES, SOLID_SWATCHES, backgroundCss, sameBackground } from '@/lib/palette';
+import { GRADIENT_SWATCHES, SOLID_SWATCHES, backgroundCss, backgroundLabel, sameBackground } from '@/lib/palette';
 import { RotationDial } from './RotationDial';
-import { ColorField, NumberField, Section, Slider, type Gesture } from './ui';
-import { isMac } from '@/app/actions';
-
-function useLayerGesture(layerId: string, label: string): Gesture {
-  const beginTransaction = useEditor((s) => s.beginTransaction);
-  const commitTransaction = useEditor((s) => s.commitTransaction);
-  const cancelTransaction = useEditor((s) => s.cancelTransaction);
-  const transaction = useRef<string | null>(null);
-  return {
-    begin: () => { if (!transaction.current) transaction.current = beginTransaction(label, `gesture:${layerId}:${label}`); },
-    end: () => { if (transaction.current) commitTransaction(transaction.current); transaction.current = null; },
-    cancel: () => { if (transaction.current) cancelTransaction(transaction.current); transaction.current = null; },
-  };
-}
+import { ColorField, NumberField, Section, Slider } from './ui';
+import { useLayerGesture } from './inspector/useLayerGesture';
+import { Switch } from './inspector/controls';
+import { ImageFrameSection, ShadowSection, TextFillSection, TextHighlightSection, TextOutlineSection } from './inspector/effects';
+import { alignSelection, isMac } from '@/app/actions';
+import { ALIGN_BUTTONS, SelectionInspector } from './inspector/SelectionInspector';
+import { groupMemberIds } from '@/core/document/selectors';
 
 const KIND_META = {
   image: { label: 'Photo', Icon: ImageIcon },
@@ -64,6 +51,7 @@ function LayerHeader({ layer }: { layer: Layer }) {
   const renameLayer = useEditor((s) => s.renameLayer);
   const [renaming, setRenaming] = useState(false);
   const { label, Icon } = KIND_META[layer.kind];
+  const selectGroup = () => useEditorSession.getState().selectLayers(groupMemberIds(useEditor.getState().doc, layer.id), layer.id);
   return (
     <div className="flex items-center gap-2 border-b border-line px-3 py-2.5">
       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-accent-soft text-accent" title={label}>
@@ -88,7 +76,10 @@ function LayerHeader({ layer }: { layer: Layer }) {
             {layer.name}
           </button>
         )}
-        <p className="truncate px-0.5 text-[11px] tabular-nums text-ink-faint">{Math.round(layer.width)} × {Math.round(layer.height)}{layer.locked ? ' · Locked' : ''}{layer.visible ? '' : ' · Hidden'}</p>
+        <p className="truncate px-0.5 text-[11px] tabular-nums text-ink-faint">
+          {Math.round(layer.width)} × {Math.round(layer.height)}{layer.locked ? ' · Locked' : ''}{layer.visible ? '' : ' · Hidden'}
+          {layer.groupId && <> · <button type="button" className="font-medium text-accent hover:text-accent-hover" title="Select the whole group (Esc)" onClick={selectGroup}>In a group</button></>}
+        </p>
       </div>
       <div className="flex shrink-0 items-center">
         <button className={`icon-btn ${layer.locked ? 'icon-btn-active' : ''}`} title={layer.locked ? 'Unlock layer' : 'Lock layer'} aria-pressed={layer.locked} onClick={() => toggleLocked(layer.id)}>
@@ -110,8 +101,6 @@ function LayerHeader({ layer }: { layer: Layer }) {
 
 function ArrangeSection({ layer }: { layer: Layer }) {
   const reorderLayer = useEditor((s) => s.reorderLayer);
-  const updateLayer = useEditor((s) => s.updateLayer);
-  const format = useEditor((s) => s.doc.format);
   const order = useEditor((s) => {
     const slideId = s.doc.slideOrder.find((id) => s.doc.slides[id].layerOrder.includes(layer.id));
     return slideId ? s.doc.slides[slideId].layerOrder : [];
@@ -126,14 +115,6 @@ function ArrangeSection({ layer }: { layer: Layer }) {
     { title: 'Bring forward', direction: 'up' as const, disabled: atFront, Icon: ChevronUp },
     { title: 'Bring to front', direction: 'top' as const, disabled: atFront, Icon: ChevronsUp },
   ];
-  const align = [
-    { title: 'Align to slide left', Icon: AlignStartVertical, patch: { x: 0 } },
-    { title: 'Center horizontally on slide', Icon: AlignCenterVertical, patch: { x: (format.width - layer.width) / 2 } },
-    { title: 'Align to slide right', Icon: AlignEndVertical, patch: { x: format.width - layer.width } },
-    { title: 'Align to slide top', Icon: AlignStartHorizontal, patch: { y: 0 } },
-    { title: 'Center vertically on slide', Icon: AlignCenterHorizontal, patch: { y: (format.height - layer.height) / 2 } },
-    { title: 'Align to slide bottom', Icon: AlignEndHorizontal, patch: { y: format.height - layer.height } },
-  ];
   return (
     <Section title="Arrange" action={<span className="text-[11px] tabular-nums text-ink-faint">{stackIndex + 1} of {stackCount}</span>}>
       <div className="segmented grid-cols-4" role="group" aria-label="Layer position">
@@ -144,8 +125,8 @@ function ArrangeSection({ layer }: { layer: Layer }) {
         ))}
       </div>
       <div className="segmented grid-cols-6" role="group" aria-label="Align to slide">
-        {align.map(({ title, Icon, patch }) => (
-          <button key={title} type="button" className="segmented-btn" title={title} aria-label={title} disabled={layer.locked} onClick={() => updateLayer(layer.id, patch)}>
+        {ALIGN_BUTTONS.map(({ edge, label, Icon }) => (
+          <button key={edge} type="button" className="segmented-btn" title={`${label} on the slide`} aria-label={`${label} on the slide`} disabled={layer.locked} onClick={() => alignSelection(edge, 'slide')}>
             <Icon size={15} aria-hidden />
           </button>
         ))}
@@ -168,7 +149,7 @@ function LayoutSection({ layer, onPatch }: { layer: Layer; onPatch: (patch: Part
         <NumberField prefix="X" ariaLabel="X position" value={layer.x} onChange={(v) => onPatch({ x: v })} disabled={locked} gesture={moveGesture} />
         <NumberField prefix="Y" ariaLabel="Y position" value={layer.y} onChange={(v) => onPatch({ y: v })} disabled={locked} gesture={moveGesture} />
         <NumberField prefix="W" ariaLabel="Width" value={layer.width} min={1} onChange={(v) => onPatch({ width: v })} disabled={locked} gesture={sizeGesture} />
-        <NumberField prefix="H" ariaLabel="Height" value={layer.height} min={1} onChange={(v) => onPatch({ height: v })} disabled={locked} gesture={sizeGesture} />
+        <NumberField prefix="H" ariaLabel="Height" value={layer.height} min={1} onChange={(v) => onPatch({ height: v })} disabled={locked || (layer.kind === 'text' && !layer.autoFit)} gesture={sizeGesture} />
       </div>
       <div className="flex items-center gap-2">
         <div className="flex-1">
@@ -223,10 +204,8 @@ function ImageInspector({ layer }: { layer: ImageLayer }) {
   const updateLayer = useEditor((s) => s.updateLayer);
   const setLeftPanel = useEditorSession((s) => s.setLeftPanel);
   const patch = (next: Partial<ImageLayer>) => updateLayer(layer.id, next);
-  const radiusMax = Math.max(1, Math.min(layer.width, layer.height) / 2);
   const cropScale = Math.min(4, Math.max(1, layer.cropScale || 1));
   const cropGesture = useLayerGesture(layer.id, 'Change crop');
-  const radiusGesture = useLayerGesture(layer.id, 'Change corner radius');
   const activeFocalPoint = FOCAL_POINTS.find(
     (p) => Math.abs(p.x - layer.cropOffsetX) < 0.01 && Math.abs(p.y - layer.cropOffsetY) < 0.01,
   );
@@ -309,30 +288,8 @@ function ImageInspector({ layer }: { layer: ImageLayer }) {
           </div>
         </div>
       </Section>
-      <Section
-        title="Corners"
-        action={
-          <button
-            type="button"
-            className="inline-flex items-center gap-1 text-xs font-medium text-ink-dim hover:text-ink"
-            onClick={() => patch({ cornerRadius: 0, cropOffsetX: 0, cropOffsetY: 0, cropScale: 1 })}
-            title="Reset crop and corners"
-          >
-            <RotateCcw size={12} aria-hidden /> Reset photo
-          </button>
-        }
-      >
-        <Slider
-          label="Corner radius"
-          display={`${Math.round(layer.cornerRadius)} px`}
-          min={0}
-          max={radiusMax}
-          value={layer.cornerRadius}
-          onChange={(v) => patch({ cornerRadius: v })}
-          gesture={radiusGesture}
-          valueText={`${Math.round(layer.cornerRadius)} pixels`}
-        />
-      </Section>
+      <ImageFrameSection layer={layer} />
+      <ShadowSection layer={layer} />
     </>
   );
 }
@@ -373,7 +330,7 @@ function TextInspector({ layer }: { layer: TextLayer }) {
           <NumberField prefix="Aa" ariaLabel="Font size" suffix="px" value={layer.fontSize} min={FONT_SIZE_MIN} max={FONT_SIZE_MAX} onChange={(v) => u({ fontSize: v })} gesture={sizeGesture} />
         </div>
         <Slider
-          label="Size"
+          label={layer.autoFit ? 'Largest size' : 'Size'}
           display={layer.fontSize}
           min={FONT_SIZE_MIN}
           max={FONT_SIZE_MAX}
@@ -396,9 +353,16 @@ function TextInspector({ layer }: { layer: TextLayer }) {
             </button>
           </div>
         </div>
+        <div className="flex items-center justify-between gap-3 rounded-md bg-bg-inset px-2.5 py-2">
+          <div className="min-w-0">
+            <p className="text-xs text-ink">Shrink to fit</p>
+            <p className="text-[11px] leading-snug text-ink-faint">Text gets smaller to stay inside its box.</p>
+          </div>
+          <Switch checked={!!layer.autoFit} onChange={(autoFit) => u({ autoFit })} label="Shrink text to fit its box" />
+        </div>
       </Section>
-      <Section title="Color & spacing">
-        <ColorField value={layer.fill} onChange={(hex) => u({ fill: hex })} label="Text color" />
+      <TextFillSection layer={layer} />
+      <Section title="Spacing">
         <Slider
           label="Line height"
           display={layer.lineHeight.toFixed(2)}
@@ -421,6 +385,9 @@ function TextInspector({ layer }: { layer: TextLayer }) {
           valueText={`${layer.letterSpacing} pixels`}
         />
       </Section>
+      <TextOutlineSection layer={layer} />
+      <TextHighlightSection layer={layer} />
+      <ShadowSection layer={layer} />
     </>
   );
 }
@@ -433,6 +400,7 @@ function ShapeInspector({ layer }: { layer: ShapeLayer }) {
   const cornerGesture = useLayerGesture(layer.id, 'Change corner radius');
 
   return (
+    <>
     <Section title={layer.shape === 'ellipse' ? 'Ellipse' : 'Rectangle'}>
       <div>
         <p className="field-label mb-1">Fill</p>
@@ -458,6 +426,8 @@ function ShapeInspector({ layer }: { layer: ShapeLayer }) {
         />
       )}
     </Section>
+    <ShadowSection layer={layer} />
+    </>
   );
 }
 
@@ -523,7 +493,7 @@ function SlideInspector({ onShowLayers }: { onShowLayers: () => void }) {
                 className={`aspect-square rounded ring-1 ring-inset ring-white/10 transition-transform hover:scale-110 ${active ? 'outline outline-2 outline-offset-2 outline-accent' : ''}`}
                 style={{ background: backgroundCss(bg) }}
                 onClick={() => setBackground(bg)}
-                aria-label={`Use background ${bg.kind === 'solid' ? bg.color : `${bg.from} to ${bg.to}`}`}
+                aria-label={`Use background ${backgroundLabel(bg)}`}
                 aria-pressed={active}
               />
             );
@@ -566,9 +536,11 @@ function SlideInspector({ onShowLayers }: { onShowLayers: () => void }) {
 
 export function Inspector({ onShowLayers }: { onShowLayers: () => void }) {
   const selectedLayerId = useEditorSession((s) => s.selectedLayerId);
+  const selectedIds = useEditorSession((s) => s.selectedLayerIds);
   const layer = useEditor((s) => selectedLayerId ? s.doc.layers[selectedLayerId] : undefined);
   const updateLayer = useEditor((s) => s.updateLayer);
 
+  if (selectedIds.length > 1) return <SelectionInspector ids={selectedIds} />;
   if (!layer) return <SlideInspector onShowLayers={onShowLayers} />;
 
   const u = (patch: Parameters<typeof updateLayer>[1]) => updateLayer(layer.id, patch);

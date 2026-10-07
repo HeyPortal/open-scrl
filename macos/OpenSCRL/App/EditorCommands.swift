@@ -22,7 +22,7 @@ struct EditorCommands: Commands {
         }
 
         CommandGroup(after: .pasteboard) {
-            Button("Duplicate") { if let id = editor?.selectedLayerID { editor?.duplicateLayer(id) } }
+            Button("Duplicate") { editor?.duplicateSelection() }
                 .keyboardShortcut("d", modifiers: .command)
                 .disabled(editor?.selectedLayerID == nil)
         }
@@ -49,43 +49,71 @@ struct EditorCommands: Commands {
         CommandMenu("Arrange") {
             let id = editor?.selectedLayerID
             let layer = editor?.selectedLayer
-            Button("Bring to Front") { if let id { editor?.arrange(id, .front) } }
+            let layers = editor?.selectedLayers ?? []
+            let allLocked = !layers.isEmpty && layers.allSatisfy(\.locked)
+            let units = editor?.selectionUnitCount ?? 0
+            Button("Group") { editor?.groupSelection() }
+                .keyboardShortcut("g", modifiers: .command)
+                .disabled(editor?.canGroupNow != true)
+            Button("Ungroup") { editor?.ungroupSelection() }
+                .keyboardShortcut("g", modifiers: [.command, .shift])
+                .disabled(editor?.canUngroupSelection != true)
+            Divider()
+            Button("Bring to Front") { editor?.arrangeSelection(.front) }
                 .keyboardShortcut("]", modifiers: [.command, .option])
-                .disabled(editor?.canArrange(.front) != true)
-            Button("Bring Forward") { if let id { editor?.arrange(id, .forward) } }
+                .disabled(editor?.canArrangeSelection(.front) != true)
+            Button("Bring Forward") { editor?.arrangeSelection(.forward) }
                 .keyboardShortcut("]", modifiers: .command)
-                .disabled(editor?.canArrange(.forward) != true)
-            Button("Send Backward") { if let id { editor?.arrange(id, .backward) } }
+                .disabled(editor?.canArrangeSelection(.forward) != true)
+            Button("Send Backward") { editor?.arrangeSelection(.backward) }
                 .keyboardShortcut("[", modifiers: .command)
-                .disabled(editor?.canArrange(.backward) != true)
-            Button("Send to Back") { if let id { editor?.arrange(id, .back) } }
+                .disabled(editor?.canArrangeSelection(.backward) != true)
+            Button("Send to Back") { editor?.arrangeSelection(.back) }
                 .keyboardShortcut("[", modifiers: [.command, .option])
-                .disabled(editor?.canArrange(.back) != true)
+                .disabled(editor?.canArrangeSelection(.back) != true)
             Divider()
-            Menu("Align to Slide") {
-                Button("Left") { if let id { editor?.align(id, .left) } }
-                Button("Center") { if let id { editor?.align(id, .centerX) } }
-                Button("Right") { if let id { editor?.align(id, .right) } }
+            Menu("Align") {
+                Button("Left Edges") { editor?.alignSelection(.left) }
+                Button("Centers") { editor?.alignSelection(.centerX) }
+                Button("Right Edges") { editor?.alignSelection(.right) }
                 Divider()
-                Button("Top") { if let id { editor?.align(id, .top) } }
-                Button("Middle") { if let id { editor?.align(id, .centerY) } }
-                Button("Bottom") { if let id { editor?.align(id, .bottom) } }
+                Button("Top Edges") { editor?.alignSelection(.top) }
+                Button("Middles") { editor?.alignSelection(.centerY) }
+                Button("Bottom Edges") { editor?.alignSelection(.bottom) }
             }
-            .disabled(layer == nil || layer?.locked == true)
+            .disabled(units < 2 || allLocked)
+            Menu("Align to Slide") {
+                Button("Left") { editor?.alignSelection(.left, relativeToSlide: true) }
+                Button("Center") { editor?.alignSelection(.centerX, relativeToSlide: true) }
+                Button("Right") { editor?.alignSelection(.right, relativeToSlide: true) }
+                Divider()
+                Button("Top") { editor?.alignSelection(.top, relativeToSlide: true) }
+                Button("Middle") { editor?.alignSelection(.centerY, relativeToSlide: true) }
+                Button("Bottom") { editor?.alignSelection(.bottom, relativeToSlide: true) }
+            }
+            .disabled(layers.isEmpty || allLocked)
+            Menu("Distribute") {
+                Button("Horizontally") { editor?.distributeSelection(.horizontal) }
+                Button("Vertically") { editor?.distributeSelection(.vertical) }
+            }
+            .disabled(editor?.canDistributeSelection != true || allLocked)
             Divider()
-            Button(layer?.locked == true ? "Unlock" : "Lock") { if let id { editor?.toggleLocked(id) } }
+            Button(allLocked ? "Unlock" : "Lock") { editor?.toggleSelection(\.locked, name: allLocked ? "Unlock" : "Lock") }
                 .keyboardShortcut("l", modifiers: [.command, .shift])
-                .disabled(id == nil)
-            Button(layer?.visible == false ? "Show" : "Hide") { if let id { editor?.toggleVisible(id) } }
+                .disabled(layers.isEmpty)
+            Button(!layers.isEmpty && layers.allSatisfy(\.visible) ? "Hide" : "Show") {
+                let visible = layers.allSatisfy(\.visible)
+                editor?.toggleSelection(\.visible, name: visible ? "Hide" : "Show")
+            }
                 .keyboardShortcut("h", modifiers: [.command, .shift])
-                .disabled(id == nil)
+                .disabled(layers.isEmpty)
             Divider()
             Button("Edit Text") { if let id { editor?.beginTextEditing(id) } }
-                .disabled(layer?.text == nil)
+                .disabled(layer?.text == nil || layers.count > 1)
             Button("Adjust Crop") { if let id { editor?.beginCropEditing(id) } }
-                .disabled(layer?.image?.assetID == nil)
+                .disabled(layer?.image?.assetID == nil || layers.count > 1)
             Button("Rename Layer") { if let id { editor?.requestRename(id) } }
-                .disabled(id == nil)
+                .disabled(id == nil || layers.count > 1)
         }
 
         CommandMenu("Slide") {
@@ -134,6 +162,13 @@ struct EditorCommands: Commands {
                 .disabled(editor == nil)
             Button("Zoom to Fit") { editor?.zoomToFit() }
                 .keyboardShortcut("9", modifiers: .command)
+                .disabled(editor == nil)
+            Divider()
+            Button("Phone Preview") { if let editor { PhonePreviewWindow.show(for: editor) } }
+                .keyboardShortcut("p", modifiers: [.command, .option])
+                .disabled(editor == nil)
+            Button("Full-Screen Preview") { if let editor { PhonePreviewWindow.show(for: editor, fullScreen: true) } }
+                .keyboardShortcut("p", modifiers: [.command, .option, .shift])
                 .disabled(editor == nil)
             Divider()
             ForEach(Array(SidebarPanel.allCases.enumerated()), id: \.element) { n, panel in

@@ -9,30 +9,41 @@ extension EditorController {
 
     /// Runs an export with a progress sheet. `work` reports (detail, fraction) and may throw.
     func runExport(_ title: String,
+                   notification: ExportCompletionNotification? = nil,
                    work: @escaping (_ report: @escaping @Sendable (String, Double?) -> Void) async throws -> Void,
                    completion: @escaping () -> Void = {}) {
-        guard exportState == nil else { return }
+        guard exportState == nil, exportTask == nil else { return }
         exportState = ExportState(title: title, detail: "Preparing…", fraction: nil)
-        weak let controller = self
-        let report: @Sendable (String, Double?) -> Void = { detail, fraction in
+        let activity = ExportActivity.shared
+        let id = activity.begin(window: hostWindow, notification: notification)
+        let report: @Sendable (String, Double?) -> Void = { [weak self] detail, fraction in
             Task { @MainActor in
-                guard controller?.exportState != nil else { return }
-                controller?.exportState?.detail = detail
-                controller?.exportState?.fraction = fraction
+                // A queued report from a finished export must not touch the next job.
+                guard activity.contains(id) else { return }
+                activity.update(id, fraction: fraction)
+                self?.exportState?.detail = detail
+                self?.exportState?.fraction = fraction
             }
         }
         exportTask = Task { [weak self] in
+            let succeeded: Bool
             do {
                 try await work(report)
-                self?.exportState = nil
-                completion()
+                // Some encoders finish without throwing after cancellation was requested.
+                try Task.checkCancellation()
+                succeeded = true
             } catch is CancellationError {
-                self?.exportState = nil
+                succeeded = false
+            } catch ExportError.cancelled {
+                succeeded = false
             } catch {
-                self?.exportState = nil
-                self?.show(error.localizedDescription, style: .error)
+                succeeded = false
+                if !Task.isCancelled { self?.show(error.localizedDescription, style: .error) }
             }
+            activity.finish(id, succeeded: succeeded)
+            self?.exportState = nil
             self?.exportTask = nil
+            if succeeded { completion() }
         }
     }
 
@@ -66,7 +77,8 @@ extension EditorController {
             let type = panel.currentContentType ?? .png
             if type.conforms(to: .jpeg) { options.stillFormat = .jpeg } else if type.conforms(to: .heic) { options.stillFormat = .heic } else { options.stillFormat = .png }
             let video = type.conforms(to: .mpeg4Movie)
-            self.runExport("Exporting Slide \(index + 1)") { report in
+            let notification = video && animated ? ExportCompletionNotification(title: "Slide Exported", body: "\(self.document.displayName) · Slide \(index + 1) is ready.") : nil
+            self.runExport("Exporting Slide \(index + 1)", notification: notification) { report in
                 try await CarouselExporter.exportSlide(project, slide: index, media: media, options: options, to: url, allowVideo: video) { fraction in
                     report(video ? "Rendering video · \(Int(fraction * 100))%" : "Rendering", fraction)
                 }
@@ -101,7 +113,9 @@ extension EditorController {
             let options = ExportOptions.current
             let zip = Preferences.packaging == .zip
             let count = project.slides.count
-            self.runExport("Exporting Carousel") { report in
+            let animated = project.slides.indices.contains { VideoSlideRenderer.isAnimated(project, slide: $0) }
+            let notification = animated ? ExportCompletionNotification(title: "Carousel Exported", body: "\(self.document.displayName) · \(count) slide\(count == 1 ? " is" : "s are") ready.") : nil
+            self.runExport("Exporting Carousel", notification: notification) { report in
                 let folder: URL
                 if zip {
                     folder = FileManager.default.temporaryDirectory.appending(path: "OpenSCRL-Export-\(UUID().uuidString)").appending(path: "\(base) Carousel")
@@ -135,7 +149,9 @@ extension EditorController {
         let count = project.slides.count
         let options = ExportOptions.current
         var files: [URL] = []
-        runExport("Preparing to Share") { report in
+        let animated = project.slides.indices.contains { VideoSlideRenderer.isAnimated(project, slide: $0) }
+        let notification = animated ? ExportCompletionNotification(title: "Ready to Share", body: "\(document.displayName) · Your carousel is ready to share.") : nil
+        runExport("Preparing to Share", notification: notification) { report in
             let folder = FileManager.default.temporaryDirectory.appending(path: "OpenSCRL-Share-\(UUID().uuidString)").appending(path: "\(base) Carousel")
             files = try await CarouselExporter.exportAll(project, media: media, options: options, into: folder) { slide, fraction, video in
                 report(video ? "Slide \(slide + 1) of \(count) · video \(Int(fraction * 100))%" : "Slide \(slide + 1) of \(count)", (Double(slide) + fraction) / Double(count))
