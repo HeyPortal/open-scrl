@@ -24,6 +24,13 @@ extension EditorController {
     /// selection so it can be dragged; `additive` (⇧ or ⌘) toggles the layer's group.
     func pickLayer(_ id: String, additive: Bool) {
         guard let loc = project.locate(layer: id) else { return }
+        if !additive, project.layer(id)?.groupID == nil {
+            groupExistingBlend(containing: id)
+            if !blendGroupMembers(containing: id).isEmpty {
+                selectLayers(project.groupMemberIDs(of: id), primary: id)
+                return
+            }
+        }
         let unit = clickUnit(id)
         let sameSlide = selectedLayerLocation?.slide == loc.slide
         if additive && sameSlide && !selectedLayerIDs.isEmpty {
@@ -111,6 +118,7 @@ extension EditorController {
         guard let loc = project.locate(layer: id) else { return }
         perform("Ungroup Layer") { p in
             p.slides[loc.slide].layers[loc.index].groupID = nil
+            p.slides[loc.slide].layers[loc.index].groupKind = nil
             p.slides[loc.slide].normalizeSingletonGroups()
         }
     }
@@ -125,6 +133,9 @@ extension EditorController {
             p.slides[slide].layers = order.compactMap { byID[$0] }
             if let regroup, let i = p.slides[slide].layers.firstIndex(where: { $0.id == regroup.id }) {
                 p.slides[slide].layers[i].groupID = regroup.groupID
+                p.slides[slide].layers[i].groupKind = regroup.groupID.flatMap { group in
+                    p.slides[slide].layers.first { $0.groupID == group && $0.id != regroup.id }?.groupKind
+                }
             }
             p.slides[slide].normalizeSingletonGroups()
         }

@@ -161,6 +161,82 @@ struct GPUSceneChecks {
         expect(seam.sample(8, 32).x > 250 && seam.sample(8, 32).z < 3, "Foreground never leaks beyond its layer bounds")
         expect(seam.sample(72, 32).x > 80 && seam.sample(72, 32).z > 80, "GPU seam mixes both photos")
         try compare("seam", project: project, images: images, output: output)
+        for direction in SeamEdge.allCases {
+            var styled = project
+            let back = layer("red", x: direction == .right ? 48 : 0, y: direction == .bottom ? 32 : 0)
+            var fore = layer("blue", x: direction == .left ? 48 : 0, y: direction == .top ? 32 : 0)
+            for mode in [SeamStyle.seamless, .soft] {
+                for edgeStyle in SeamEdgeStyle.allCases {
+                    fore.image?.seamBlend = SeamBlend(targetLayerID: back.id, edge: direction, width: 24,
+                                                     followsDetail: false, style: mode, edgeStyle: edgeStyle)
+                    styled.slides[0].layers = [back, fore]
+                    for scale in [1.0, 2.0] {
+                        try compare("refined-\(direction)-\(mode)-\(edgeStyle)", project: styled, images: images,
+                                    scale: scale, output: output)
+                    }
+                }
+            }
+        }
+        var stacked = project
+        let intervening = Layer(id: "between", name: "Between", x: 48, y: 0, width: 48, height: 64,
+                                content: .shape(ShapeProperties(shape: .rect, fill: "#00ff00")))
+        stacked.slides[0].layers.insert(intervening, at: 1)
+        stacked.slides[0].layers[2].image?.seamBlend?.edgeStyle = .organic
+        expect(cpu(stacked, images).sample(52, 32).y > 240 && gpu(stacked, images).sample(52, 32).y > 240,
+               "Refined seams preserve a visible layer between the two photos")
+        try compare("intervening-seam", project: stacked, images: images, output: output)
+        stacked.slides[0].layers[1].visible = false
+        expect(gpu(stacked, images).sample(52, 32).y < 3, "Hidden intervening layers do not prevent the refined edge")
+        for edgeStyle in SeamEdgeStyle.allCases {
+            var decorated = project
+            decorated.slides[0].layers[0].rotation = 7
+            decorated.slides[0].layers[0].opacity = 0.7
+            decorated.slides[0].layers[0].image?.mask = .ellipse
+            decorated.slides[0].layers[0].image?.stroke = "#ffeedd"
+            decorated.slides[0].layers[0].image?.strokeWidth = 3
+            decorated.slides[0].layers[1].image?.seamBlend?.edgeStyle = edgeStyle
+            try compare("decorated-seam-\(edgeStyle)", project: decorated, images: images, scale: 2, output: output)
+        }
+        var chain = project
+        chain.slides[0].layers = [layer("red", x: 0, y: 0), layer("blue", x: 0, y: 0), layer("pattern", x: 0, y: 0)]
+        for i in 1..<3 {
+            let targetID = chain.slides[0].layers[i - 1].id
+            chain.slides[0].layers[i].image?.seamBlend = SeamBlend(targetLayerID: targetID,
+                                                                width: 40, colorMatch: 0, followsDetail: false, style: .soft)
+        }
+        expect(cpu(chain, images).sample(8, 32).x > 240 && gpu(chain, images).sample(8, 32).x > 240,
+               "A third photo inherits the first join's blended pixels instead of the raw middle photo")
+        for edgeStyle in SeamEdgeStyle.allCases {
+            for i in 1..<3 { chain.slides[0].layers[i].image?.seamBlend?.edgeStyle = edgeStyle }
+            var coincidentPair = chain
+            coincidentPair.slides[0].layers.removeLast()
+            try compare("full-overlap-pair-\(edgeStyle)", project: coincidentPair, images: images, scale: 2, output: output)
+            for scale in [1.0, 2.0] {
+                try compare("three-photo-\(edgeStyle)", project: chain, images: images, scale: scale, output: output)
+            }
+        }
+        chain.slides[0].layers[1].rotation = 7
+        chain.slides[0].layers[1].opacity = 0.75
+        chain.slides[0].layers[1].image?.mask = .ellipse
+        chain.slides[0].layers[1].image?.stroke = "#ffeedd"
+        chain.slides[0].layers[1].image?.strokeWidth = 3
+        for scale in [1.0, 2.0] {
+            try compare("decorated-chain", project: chain, images: images, scale: scale, output: output)
+        }
+        var fourth = layer("fourth", x: 8, y: 8)
+        fourth.image?.assetID = "red"
+        fourth.image?.seamBlend = SeamBlend(targetLayerID: "pattern", width: 40, followsDetail: false, style: .soft)
+        chain.slides[0].layers.append(fourth)
+        try compare("four-photo-chain", project: chain, images: images, scale: 2, output: output)
+        var offscreenChain = project
+        offscreenChain.slides[0].layers = [layer("red", x: -120, y: 0), layer("blue", x: -48, y: 0), layer("pattern", x: 0, y: 0)]
+        for i in 1..<3 {
+            let targetID = offscreenChain.slides[0].layers[i - 1].id
+            offscreenChain.slides[0].layers[i].image?.seamBlend = SeamBlend(targetLayerID: targetID, width: 20, followsDetail: false)
+        }
+        let culledScene = offscreenChain.scene(intersecting: CGRect(x: 0, y: 0, width: 144, height: 104))
+        expect(culledScene.map { $0.layer.id } == ["red", "blue", "pattern"], "Scene culling retains the full offscreen dependency chain")
+        try compare("offscreen-chain", project: offscreenChain, images: images, output: output)
         images.photos["strip"] = picture { x, _ in x >= 80 ? SIMD4(1, 0, 0, 1) : .zero }
         project.assets.append(asset("strip")); base.image?.assetID = "strip"
         project.slides[0].layers[0] = base

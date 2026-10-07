@@ -89,21 +89,39 @@ The web app and the Mac app store projects separately; projects don't move betwe
 
 ### Seam blending on Mac
 
-Select two photo or video layers and choose **Arrange ▸ Blend Seam**, or choose a partner
-in a photo's **Seam Blend** inspector. Touching layers get a small overlap without changing
-their aspect ratios. The effect aligns shared detail, matches local colors, and smooths the
-join while preserving the original media and pixels away from the seam.
+Select two or more photo or video layers and choose **Arrange ▸ Blend Photos**, or choose a partner
+in a photo's **Seam Blend** inspector. The photos become a **Blend Group** with a join
+between each neighboring pair. Touching layers get a small overlap without changing
+their aspect ratios. **Automatic** chooses **Seamless** for shared scenes or **Soft** for
+different scenes; either style can be selected manually. Seamless aligns and color-matches
+regions along the join, while Soft blends several levels of detail and preserves each
+photo's colors. Both preserve the original media.
 
-Adjust the width, position, color strength, or alignment in the inspector. Choose **Update
-Match** after moving, resizing, cropping, or changing a mask. Automatic alignment needs
+Click a blend to select and move or resize the whole group. Its inspector includes a photo
+strip, **Add Photo**, group style controls, and a **Photo Pair** chooser for tuning one join
+while keeping the group selected. Select a photo in the strip to crop or replace it; press
+Escape to return to the group. **Separate Photos** removes the effects and ungroups the
+photos in one undoable step. Existing adjacent linked photos become a blend group when selected.
+
+Choose **Clean**, **Organic**, or **Glow** edges in the inspector. Adjust the
+width, position, color strength, or alignment; Seamless can match colors **Near Seam** or
+across the **Whole Photo**. Existing saved blends keep their original appearance until the
+blend settings or either photo's geometry are edited, or **Update Match** is used. The
+upgrade and edit undo together. Keep the foreground directly above its partner in Layers
+for the new effects; an intervening visible layer uses the original feather to preserve it.
+
+Moving the whole group preserves its matches; uniform group resizing also scales them.
+Choose **Update Match** after changing an individual photo's placement, crop, or mask.
+**Update All Matches** analyzes every join together. Automatic alignment needs
 shared scene detail; **Align X/Y** provides manual adjustment. Video matching uses the
 opening frames and holds the correction steady during synchronized preview and MP4 export.
 It does not track moving objects. The settings are saved with the project and are undoable.
 
 Run the native seam regression checks with `zsh macos/Scripts/test-seam-blend.sh`.
-Seam feathering, local alignment, and color correction run through a Metal-backed Core
-Image kernel. Cached source pixels and partner coverage are reused during slider changes.
-The CPU renderer remains a fallback. Compare both paths with
+Seam feathering, regional alignment, color correction, and edge effects run through
+Metal-backed Core Image kernels. Cached source pixels and partner coverage are reused
+during slider changes. The original CPU renderer remains a fallback. Compare the original
+paths and benchmark the new styles with
 `zsh macos/Scripts/benchmark-seam-blend.sh`.
 
 ### GPU rendering on Mac

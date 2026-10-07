@@ -184,10 +184,11 @@ enum SeamRenderer {
     /// Returns a locally corrected foreground with a feathered alpha mask. The actual partner
     /// already exists underneath, so transparent pixels never fade both images to the background.
     static func image(_ image: CGImage, asset: MediaAsset, foreground: SceneItem, target: SceneItem,
-                      blend: SeamBlend, pixelScale: Double, assets: [String: MediaAsset], targetImage: CGImage) -> CGImage? {
+                      blend: SeamBlend, pixelScale: Double, assets: [String: MediaAsset], targetImage: CGImage,
+                      preparedTargetImage: CGImage? = nil) -> CGImage? {
         if let gpu = SeamGPU.shared,
            let result = gpu.image(image, asset: asset, foreground: foreground, target: target,
-                                  blend: blend, pixelScale: pixelScale, assets: assets, targetImage: targetImage) {
+                                  blend: blend, pixelScale: pixelScale, assets: assets, targetImage: targetImage, preparedTargetImage: preparedTargetImage) {
             return result
         }
         return imageCPU(image, asset: asset, foreground: foreground, target: target,
@@ -274,7 +275,15 @@ enum SeamRenderer {
             result.gain[c] = gain
             result.bias[c] = clamp(meanB[c] - meanA[c] * gain, -0.25, 0.25)
         }
-        result.path = seamPath(a, b, overlap: overlap, edge: edge, shift: CGPoint(x: shift.x, y: shift.y), gain: result.gain, bias: result.bias)
+        if let regions = SeamRegions.make(a, b, overlap: overlap, edge: edge, globalShift: SIMD2(shift.x, shift.y),
+                                          globalGain: result.gain, globalBias: result.bias, linear: linear, encoded: encoded) {
+            result.regionGain = regions.gain.flatMap { [$0.x, $0.y, $0.z] }
+            result.regionBias = regions.bias.flatMap { [$0.x, $0.y, $0.z] }
+            result.regionShift = regions.shift.flatMap { [$0.x / scale, $0.y / scale] }
+            result.path = regions.path
+            result.softPath = regions.softPath
+            result.sameScene = regions.sameScene
+        }
         return result
     }
 
@@ -319,51 +328,5 @@ enum SeamRenderer {
         for y in -2...2 { for x in -2...2 { consider(center.x + Double(x), center.y + Double(y)) } }
         guard best.score > 0.65, best.score > baseline + 0.04 else { return (0, 0, baseline > 0.9) }
         return (best.x, best.y, true)
-    }
-
-    /// A dynamic-programming cut favors matching, low-detail pixels and stays near the center.
-    private static func seamPath(_ a: Pixels, _ b: Pixels, overlap: CGRect, edge: SeamEdge,
-                                 shift: CGPoint, gain: [Double], bias: [Double]) -> [Double] {
-        let horizontal = edge.isHorizontal
-        let columns = Int(horizontal ? overlap.width : overlap.height)
-        let rows = Int(horizontal ? overlap.height : overlap.width)
-        guard columns >= 3, rows >= 3 else { return [] }
-        let low = max(1, columns / 5), high = min(columns - 2, columns * 4 / 5)
-        var previous = [Double](repeating: .infinity, count: columns)
-        var parents = [Int16](repeating: 0, count: columns * rows)
-        for row in 0..<rows {
-            var next = [Double](repeating: .infinity, count: columns)
-            for column in low...high {
-                let x = overlap.minX + Double(horizontal ? column : row)
-                let y = overlap.minY + Double(horizontal ? row : column)
-                let av = a.sample(x - shift.x, y - shift.y), bv = b.sample(x, y)
-                var cost = 1000.0
-                if av.w > 250, bv.w > 250 {
-                    cost = 0
-                    for c in 0..<3 {
-                        let v = clamp(linear[clamp(Int(av[c]), 0, 255)] * gain[c] + bias[c], 0, 1)
-                        cost += abs(v - linear[clamp(Int(bv[c]), 0, 255)])
-                    }
-                    let neighbor = b.sample(x + (horizontal ? 1 : 0), y + (horizontal ? 0 : 1))
-                    cost += abs(bv.x - neighbor.x) / 255 * 0.3
-                    cost += abs(Double(column) / Double(columns) - 0.5) * 0.15
-                }
-                var bestColumn = column
-                if row > 0 {
-                    for parent in max(low, column - 1)...min(high, column + 1) where previous[parent] < previous[bestColumn] { bestColumn = parent }
-                    cost += previous[bestColumn]
-                }
-                next[column] = cost
-                parents[row * columns + column] = Int16(bestColumn)
-            }
-            previous = next
-        }
-        var column = (low...high).min { previous[$0] < previous[$1] } ?? columns / 2
-        var path = [Double](repeating: 0.5, count: rows)
-        for row in (0..<rows).reversed() {
-            path[row] = (Double(column) + 0.5) / Double(columns)
-            column = Int(parents[row * columns + column])
-        }
-        return path
     }
 }
