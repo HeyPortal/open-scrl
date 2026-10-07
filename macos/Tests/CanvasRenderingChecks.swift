@@ -1,6 +1,7 @@
 import AppKit
 import CoreImage
 import SwiftUI
+import Observation
 @testable import OpenSCRL
 
 @main @MainActor struct CanvasRenderingChecks {
@@ -100,6 +101,56 @@ import SwiftUI
         return view.subviews.lazy.compactMap(findCanvas).first
     }
 
+    final class ObservationCount: @unchecked Sendable {
+        private let lock = NSLock()
+        private var count = 0
+        func increment() { lock.withLock { count += 1 } }
+        var value: Int { lock.withLock { count } }
+    }
+
+    static func canvasTransactions() throws {
+        let document = ProjectDocument(format: .default)
+        document.perform("Fixture", undoManager: nil) { $0.slides[0].layers = [photo("moving", x: 40)] }
+        let controller = EditorController(document: document)
+        controller.selectLayer("moving")
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        controller.undoManager = undo
+        let before = document.project
+        let published = ObservationCount(), canvas = ObservationCount()
+        withObservationTracking { _ = document.project } onChange: { published.increment() }
+        withObservationTracking { _ = document.canvasRevision } onChange: { canvas.increment() }
+        undo.beginUndoGrouping()
+        controller.beginCanvasGesture()
+        for x in 41...100 { controller.updateLayer("moving", "Move") { $0.x = Double(x) } }
+        expect(document.project.layer("moving")!.x == 100, "Live document reads see the latest canvas geometry")
+        expect(controller.project.layer("moving")!.x == 100, "Controller reads see the live gesture")
+        expect(published.value == 0, "Mouse events do not invalidate the entire SwiftUI document UI")
+        expect(canvas.value == 1, "Live changes invalidate canvas observation")
+        let serialized = try ProjectFile.decode(ProjectFile(project: document.project).encoded()).makeProject()
+        expect(serialized.layer("moving")!.x == 100, "Serializing during a gesture preserves the latest geometry")
+        controller.endGesture("Move Layer")
+        undo.endUndoGrouping()
+        expect(published.value == 1 && document.project.layer("moving")!.x == 100, "Release publishes the final document once")
+        let final = document.project
+        undo.undo()
+        expect(document.project == before && !undo.canUndo, "One Undo restores the complete gesture")
+        undo.redo()
+        expect(document.project == final, "Redo restores the final geometry")
+        controller.beginCanvasGesture()
+        controller.updateLayer("moving", "Resize") { $0.width = 500 }
+        controller.cancelGesture()
+        expect(document.project == final && !document.isInGesture, "Cancelling restores geometry and clears preview state")
+        let ordinary = ObservationCount()
+        withObservationTracking { _ = document.project } onChange: { ordinary.increment() }
+        controller.beginGesture()
+        controller.updateLayer("moving", "Slider") { $0.opacity = 0.5 }
+        expect(ordinary.value == 1, "Sliders and text gestures retain live SwiftUI publication")
+        controller.cancelGesture()
+        expect(document.project == final, "Ordinary gesture cancellation still restores the project")
+        print("PASS live canvas transaction publication, serialization, undo/redo and cancellation")
+    }
+
     static func textLifecycle() {
         let document = ProjectDocument(format: .default)
         let controller = EditorController(document: document)
@@ -149,10 +200,11 @@ import SwiftUI
         print("PASS full SwiftUI-hosted native text lifecycle and idempotent layout")
     }
 
-    static func main() {
+    static func main() throws {
         NSApplication.shared.setActivationPolicy(.prohibited)
         precondition(GPUSceneRenderer.shared != nil, "Tests require the app's real GPU renderer")
         visibility()
+        try canvasTransactions()
         textLifecycle()
         print("PASS \(checks) canvas rendering assertions")
     }

@@ -124,6 +124,7 @@ final class EditorController {
     }
 
     func beginGesture() { document.beginGesture() }
+    func beginCanvasGesture() { document.beginGesture(canvasPreview: true) }
     func endGesture(_ name: String) { document.endGesture(name, undoManager: undoManager) }
     func cancelGesture() { document.cancelGesture() }
 

@@ -26,7 +26,15 @@ struct ProjectSnapshot: @unchecked Sendable {
 final class ProjectDocument: Document {
     nonisolated static let readableContentTypes: [UTType] = [.openSCRLProject]
 
-    private(set) var project: Project
+    private var committedProject: Project
+    /// Readers, exports and snapshots see the latest canvas edit. During a canvas gesture,
+    /// only the canvas revision changes; publishing the document on every mouse event would
+    /// also rebuild the inspector, filmstrip and the rest of the SwiftUI editor.
+    private(set) var project: Project {
+        get { let committed = committedProject; return gesturePreview ?? committed }
+        set { committedProject = newValue }
+    }
+    private(set) var canvasRevision = 0
     /// True for a brand-new untitled project until the user picks a canvas format.
     var needsFormatChoice: Bool
 
@@ -37,6 +45,7 @@ final class ProjectDocument: Document {
     @ObservationIgnored var pendingMedia: [URL] = []
 
     @ObservationIgnored private var gestureBase: Project?
+    @ObservationIgnored private var gesturePreview: Project?
     @ObservationIgnored private var coalesceKey: String?
     @ObservationIgnored private var coalesceTime: TimeInterval = 0
 
@@ -49,7 +58,7 @@ final class ProjectDocument: Document {
         let media = MediaStore()
         self.media = media
         images = ImageCache(media: media)
-        project = Project(format: format ?? Preferences.defaultFormat)
+        committedProject = Project(format: format ?? Preferences.defaultFormat)
         needsFormatChoice = format == nil && configuration?.fileURL == nil
         urlConfiguration = configuration
     }
@@ -78,6 +87,8 @@ final class ProjectDocument: Document {
     }
 
     func apply(snapshot: sending ProjectSnapshot, previous: sending ProjectSnapshot?) async throws {
+        gesturePreview = nil
+        gestureBase = nil
         for asset in snapshot.project.assets {
             if let wrapper = snapshot.media[asset.fileName] { media.register(asset.id, wrapper: wrapper) }
         }
@@ -143,6 +154,11 @@ final class ProjectDocument: Document {
         guard !next.hasSameContent(as: project) else { return }
         let previous = project
         next.updatedAt = Date()
+        if gesturePreview != nil {
+            gesturePreview = next
+            canvasRevision &+= 1
+            return
+        }
         project = next
         guard gestureBase == nil else { return }
         let now = ProcessInfo.processInfo.systemUptime
@@ -156,25 +172,33 @@ final class ProjectDocument: Document {
     }
 
     /// Starts a continuous gesture (drag, slider); edits apply live and become one undo step.
-    func beginGesture() {
-        if gestureBase == nil { gestureBase = project }
+    func beginGesture(canvasPreview: Bool = false) {
+        guard gestureBase == nil else { return }
+        gestureBase = project
+        if canvasPreview { gesturePreview = project }
     }
 
     var isInGesture: Bool { gestureBase != nil }
 
     func endGesture(_ actionName: String, undoManager: UndoManager?) {
         guard let base = gestureBase else { return }
+        let final = project
+        gesturePreview = nil
         gestureBase = nil
         coalesceKey = nil
-        if !base.hasSameContent(as: project) {
+        if !base.hasSameContent(as: final) {
+            project = final
             registerUndo(restoring: base, actionName: actionName, undoManager: undoManager)
         }
+        canvasRevision &+= 1
     }
 
     func cancelGesture() {
         guard let base = gestureBase else { return }
+        gesturePreview = nil
         gestureBase = nil
         project = base
+        canvasRevision &+= 1
     }
 
     /// Replaces the project without undo (initial format choice for new documents).
@@ -188,6 +212,8 @@ final class ProjectDocument: Document {
         undoManager.registerUndo(withTarget: self) { document in
             MainActor.assumeIsolated {
                 let current = document.project
+                document.gesturePreview = nil
+                document.gestureBase = nil
                 document.project = old
                 document.coalesceKey = nil
                 document.registerUndo(restoring: current, actionName: actionName, undoManager: undoManager)

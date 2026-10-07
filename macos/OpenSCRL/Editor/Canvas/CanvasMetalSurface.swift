@@ -11,6 +11,7 @@ final class CanvasMetalSurface: MTKView, MTKViewDelegate {
     private var inFlightFrames = 0
     private var pendingFrame = false
     private(set) var hasPresented = false
+    private(set) var completedFrameCount = 0
     var onUnavailable: (() -> Void)?
 
     init(renderer: GPUSceneRenderer) {
@@ -103,10 +104,12 @@ final class CanvasMetalSurface: MTKView, MTKViewDelegate {
                     self.clear()
                     self.onUnavailable?()
                 } else if self.pendingFrame {
+                    self.completedFrameCount += 1
                     self.hasPresented = self.composition != nil
                     self.pendingFrame = false
                     self.needsDisplay = true
                 } else {
+                    self.completedFrameCount += 1
                     self.hasPresented = self.composition != nil
                 }
             }

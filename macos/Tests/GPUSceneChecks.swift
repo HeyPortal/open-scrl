@@ -111,6 +111,25 @@ struct GPUSceneChecks {
             }
         }
         project.slides[0].layers = [layer("pattern")]
+        for (name, mask, size, radius, border) in [
+            ("gpu-rounded-border", ImageMask.rect, CGSize(width: 96, height: 64), 30.0, 12.0),
+            ("gpu-clamped-radius", .rect, CGSize(width: 92.5, height: 47.25), 100.0, 50.0),
+            ("gpu-flat-ellipse", .ellipse, CGSize(width: 122.25, height: 14.5), 0.0, 0.0),
+            ("ellipse-thick-border", .ellipse, CGSize(width: 96, height: 64), 0.0, 25.0),
+            ("gpu-small-rounded", .rect, CGSize(width: 8, height: 8), 4.0, 2.0)
+        ] {
+            var photo = layer("pattern")
+            photo.frame.size = size
+            photo.image?.mask = mask
+            photo.image?.cornerRadius = radius
+            photo.image?.stroke = "#ffcc1180"
+            photo.image?.strokeWidth = border
+            project.slides[0].layers = [photo]
+            for scale in [1.0, 2.0] {
+                try compare(name, project: project, images: images, scale: scale, limit: 1, output: output)
+            }
+        }
+        project.slides[0].layers = [layer("pattern")]
         for (name, background) in [("linear", Background.gradient(from: "#ffcc33", to: "#2255cc", angle: 37)),
                                     ("alpha-gradient", .gradient(from: "#ff000000", to: "#0000ffff", angle: 90)),
                                     ("radial", .gradient(.twoColor("#ffcc33", "#2255cc", type: .radial))),

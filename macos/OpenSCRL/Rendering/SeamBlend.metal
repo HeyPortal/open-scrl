@@ -41,6 +41,31 @@ float3 seamEncoded(float3 s) {
     return gray ? float4(0.894f, 0.894f, 0.906f, 1.0f) : float4(1.0f);
 }
 
+[[stitchable]] float4 sceneOutline(float4 geometry, float4 settings, float4 color,
+                                  coreimage::destination destination) {
+    float2 coord = destination.coord();
+    float2 size = geometry.xy;
+    if (any(coord < float2(0.0f)) || any(coord >= size)) return float4(0.0f);
+    float2 halfSize = size * 0.5f;
+    float2 p = coord - halfSize;
+    float distance;
+    if (geometry.w > 0.5f) {
+        // Implicit ellipse distance near its boundary, in output pixels.
+        float2 radii = max(halfSize, float2(0.001f));
+        float2 normalized = p / radii;
+        float gradient = max(length(2.0f * p / (radii * radii)), 0.000001f);
+        distance = (dot(normalized, normalized) - 1.0f) / gradient;
+    } else {
+        float radius = clamp(geometry.z, 0.0f, min(halfSize.x, halfSize.y));
+        float2 q = abs(p) - halfSize + radius;
+        distance = length(max(q, float2(0.0f))) + min(max(q.x, q.y), 0.0f) - radius;
+    }
+    float coverage = clamp(0.5f - distance, 0.0f, 1.0f);
+    if (settings.y > 0.5f) coverage -= clamp(0.5f - distance - settings.x, 0.0f, 1.0f);
+    float alpha = max(0.0f, coverage) * color.a;
+    return float4(color.rgb * alpha, alpha);
+}
+
 [[stitchable]] float4 sceneGradient(coreimage::sampler colors, coreimage::sampler positions,
                                    float4 geometry, float4 settings, coreimage::destination destination) {
     float2 coord = destination.coord() - geometry.xy;

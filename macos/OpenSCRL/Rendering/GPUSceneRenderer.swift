@@ -16,6 +16,7 @@ final class GPUSceneRenderer {
     private let opacityKernel: CIColorKernel
     private let tintKernel: CIColorKernel
     private let maskKernel: CIKernel
+    private let outlineKernel: CIColorKernel
     private let checkerKernel: CIKernel
     private let gradientKernel: CIKernel
 
@@ -52,6 +53,7 @@ final class GPUSceneRenderer {
               let opacity = try? CIColorKernel(functionName: "sceneOpacity", fromMetalLibraryData: data),
               let tint = try? CIColorKernel(functionName: "sceneTint", fromMetalLibraryData: data),
               let mask = try? CIKernel(functionName: "sceneMask", fromMetalLibraryData: data),
+              let outline = try? CIColorKernel(functionName: "sceneOutline", fromMetalLibraryData: data),
               let checker = try? CIKernel(functionName: "sceneChecker", fromMetalLibraryData: data),
               let gradient = try? CIKernel(functionName: "sceneGradient", fromMetalLibraryData: data) else { return nil }
         self.device = device; self.queue = queue
@@ -60,7 +62,8 @@ final class GPUSceneRenderer {
         context = CIContext(mtlCommandQueue: queue, options: [.workingColorSpace: HexColor.srgb,
                            .outputColorSpace: HexColor.srgb, .workingFormat: CIFormat.RGBAf,
                            .cacheIntermediates: false])
-        opacityKernel = opacity; tintKernel = tint; maskKernel = mask; checkerKernel = checker; gradientKernel = gradient
+        opacityKernel = opacity; tintKernel = tint; maskKernel = mask; outlineKernel = outline
+        checkerKernel = checker; gradientKernel = gradient
         masks.totalCostLimit = 128 * 1024 * 1024
         borders.totalCostLimit = 64 * 1024 * 1024
         content.totalCostLimit = 192 * 1024 * 1024
@@ -272,6 +275,7 @@ final class GPUSceneRenderer {
         MaskKey(mask: layer.image?.mask ?? .rect, radius: layer.image?.cornerRadius ?? 0, size: layer.frame.size, scale: scale, preview: preview)
     }
     private func mask(_ layer: Layer, scale: Double, preview: Bool) -> CIImage? {
+        if let image = analyticOutline(layer, scale: scale) { return image }
         let value = maskKey(layer, scale: scale, preview: preview), key = Key(value)
         if let cached = masks.object(forKey: key) { return cached.image }
         guard let image = raster(size: value.size, scale: scale, preview: preview, draw: { cg in
@@ -282,6 +286,7 @@ final class GPUSceneRenderer {
         return image
     }
     private func border(_ layer: Layer, scale: Double, preview: Bool) -> CIImage? {
+        if let image = analyticOutline(layer, scale: scale, border: true) { return image }
         let props = layer.image!, value = BorderKey(mask: maskKey(layer, scale: scale, preview: preview), width: props.strokeWidth, color: props.stroke)
         let key = Key(value)
         if let cached = borders.object(forKey: key) { return cached.image }
@@ -292,6 +297,23 @@ final class GPUSceneRenderer {
         }) else { return nil }
         borders.setObject(Raster(image), forKey: key, cost: rasterCost(image, preview: preview))
         return image
+    }
+    /// Rectangle and ellipse coverage is evaluated per pixel on the GPU. Changing a frame's
+    /// dimensions or corner radius no longer allocates and rasterizes a new CPU mask/border.
+    private func analyticOutline(_ layer: Layer, scale: Double, border: Bool = false) -> CIImage? {
+        guard let props = layer.image, props.mask == .rect || props.mask == .ellipse else { return nil }
+        // Thick ellipse strokes need the exact path's interior offset, rather than the
+        // local boundary-distance approximation used for antialiasing the ellipse mask.
+        if border && props.mask == .ellipse { return nil }
+        let size = CGSize(width: layer.width * scale, height: layer.height * scale)
+        let extent = CGRect(origin: .zero, size: size)
+        let color = border ? HexColor.components(props.stroke) : (r: 1.0, g: 1.0, b: 1.0, a: 1.0)
+        guard let color else { return nil }
+        return outlineKernel.apply(extent: extent, arguments: [
+            CIVector(x: size.width, y: size.height, z: max(0, props.cornerRadius * scale), w: props.mask == .ellipse ? 1 : 0),
+            CIVector(x: border ? props.strokeWidth * scale : 0, y: border ? 1 : 0, z: 0, w: 0),
+            CIVector(x: color.r, y: color.g, z: color.b, w: color.a)
+        ])
     }
     private func staticContent(_ layer: Layer, options: RenderOptions, scale: Double) -> CIImage? {
         var neutral = layer

@@ -73,6 +73,7 @@ final class CanvasView: NSView {
         guard let surface = metalSurface else { return false }
         return !surface.isHidden && surface.canPresent && surface.hasPresented
     }
+    var completedMetalFrameCount: Int { metalSurface?.completedFrameCount ?? 0 }
 
     static let guideColor = NSColor(srgbRed: 1, green: 0.231, blue: 0.541, alpha: 1)
 
@@ -94,6 +95,7 @@ final class CanvasView: NSView {
             chromeOverlay.drawChrome = { [weak self] cg in
                 guard let self, let controller = self.controller else { return }
                 withObservationTracking {
+                    _ = controller.document.canvasRevision
                     self.drawAffordances(cg, controller: controller)
                 } onChange: { [weak self] in
                     DispatchQueue.main.async { self?.needsDisplay = true }
@@ -280,6 +282,7 @@ final class CanvasView: NSView {
             return
         }
         withObservationTracking {
+            _ = controller.document.canvasRevision
             render(cg, controller: controller)
         } onChange: { [weak self] in
             DispatchQueue.main.async { self?.needsDisplay = true }

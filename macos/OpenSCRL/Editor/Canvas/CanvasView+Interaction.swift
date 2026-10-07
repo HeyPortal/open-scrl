@@ -69,7 +69,7 @@ extension CanvasView {
 
         if let cropID = controller.cropLayerID {
             if let item = hitLayer(atView: p), item.layer.id == cropID {
-                controller.beginGesture()
+                controller.beginCanvasGesture()
                 drag = .crop(id: cropID, base: item.layer, start: modelPoint(p))
                 NSCursor.closedHand.set()
                 return
@@ -110,7 +110,7 @@ extension CanvasView {
             let offset = Double(box.slide) * controller.project.format.width
             let selected = Set(controller.selectedLayerIDs)
             let bases = controller.selectedLayers.filter { !$0.locked }
-            controller.beginGesture()
+            controller.beginCanvasGesture()
             switch handle {
             case .rotate:
                 let c = box.rect.center
@@ -125,7 +125,7 @@ extension CanvasView {
 
         if let (handle, item) = hitHandle(atView: p) {
             let others = controller.project.slides[item.slideIndex].layers.filter { $0.id != item.layer.id }
-            controller.beginGesture()
+            controller.beginCanvasGesture()
             switch handle {
             case .rotate:
                 let c = item.globalFrame.center
@@ -195,7 +195,7 @@ extension CanvasView {
         case .pending(let id, let start, _):
             guard hypot(p.x - start.x, p.y - start.y) > 3, let loc = controller.project.locate(layer: id),
                   controller.project.layer(id)?.locked == false else { return }
-            controller.beginGesture()
+            controller.beginCanvasGesture()
             var duplicated = false
             if event.modifierFlags.contains(.option) {
                 // ⌥-drag leaves the originals behind and moves fresh copies.

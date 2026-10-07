@@ -114,7 +114,11 @@ Video preview and MP4 export keep decoded frames in pixel buffers; export render
 into the encoder's IOSurface-backed buffers. Still exports use the same composition.
 Embedded image color profiles, video orientation, and white compositing for MP4 are preserved.
 
-Static text, shape, mask, and border geometry is cached. The canvas renders on changes,
+Rectangle and ellipse masks and rectangle borders are generated per pixel on the GPU;
+static text, shape, and other outline geometry is cached. Canvas drag, resize, rotation,
+and crop gestures keep a live preview for rendering and project snapshots, while the
+inspector and filmstrip refresh on release. Each gesture remains one undo step.
+The canvas renders on changes,
 limits queued work, and caps viewport textures; exports retain full-resolution geometry.
 Core Graphics remains available when Metal is unavailable or rendering fails.
 
@@ -125,6 +129,11 @@ in 5.9 ms versus 56.2 ms at 1080 × 1350, and 16.8 ms versus 325.6 ms at 2160 ×
 This measures completed composition,
 including graph construction; media decoding, video encoding, disk writes, and editor
 controls are excluded. Results depend on the scene and hardware.
+
+Run `zsh macos/Scripts/benchmark-canvas-interaction.sh` after a Debug build to measure
+native drag and resize work in the full SwiftUI editor. It checks that geometry changes
+and GPU frames keep completing during each gesture; its loop timings include a fixed
+8 ms event-processing wait and are not display FPS measurements.
 
 ### Download
 
