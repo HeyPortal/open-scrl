@@ -18,7 +18,9 @@ struct InspectorView: View {
 
             switch controller.inspectorTab {
             case .design:
-                if let layer = controller.selectedLayer {
+                if controller.isMultiSelection {
+                    SelectionInspector(controller: controller)
+                } else if let layer = controller.selectedLayer {
                     LayerInspector(controller: controller, layer: layer)
                         .id(layer.id)
                 } else {
@@ -42,10 +44,15 @@ struct LayerInspector: View {
         Form {
             Section { header }
             switch layer.content {
-            case .image: ImageSections(controller: controller, layer: layer)
-            case .text: TextSections(controller: controller, layer: layer)
-            case .shape: ShapeSection(controller: controller, layer: layer)
+            case .image:
+                ImageSections(controller: controller, layer: layer)
+                PhotoFrameSections(controller: controller, layer: layer)
+            case .text:
+                TextSections(controller: controller, layer: layer)
+            case .shape:
+                ShapeSection(controller: controller, layer: layer)
             }
+            ShadowSection(controller: controller, layer: layer)
             PositionSection(controller: controller, layer: layer)
             ArrangeSection(controller: controller, layer: layer)
         }
@@ -84,10 +91,18 @@ struct LayerInspector: View {
                     .font(.headline)
                     .focused($nameFocused)
                     .onSubmit { nameFocused = false }
-                Text("\(Int(layer.width.rounded())) × \(Int(layer.height.rounded()))\(layer.locked ? " · Locked" : "")\(layer.visible ? "" : " · Hidden")")
-                    .font(.caption)
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 4) {
+                    Text("\(Int(layer.width.rounded())) × \(Int(layer.height.rounded()))\(layer.locked ? " · Locked" : "")\(layer.visible ? "" : " · Hidden")")
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                    if layer.groupID != nil {
+                        Text("·").foregroundStyle(.secondary)
+                        Button("In a Group") { controller.selectParent() }
+                            .buttonStyle(.link)
+                            .help("Select the whole group (Esc)")
+                    }
+                }
+                .font(.caption)
             }
             Spacer(minLength: 4)
             Button { controller.toggleLocked(layer.id) } label: {
@@ -174,19 +189,6 @@ struct ImageSections: View {
                 }
             }
         }
-        Section {
-            GestureSlider(title: "Corner Radius", value: controller.layerBinding(id, name: "Change Corner Radius", fallback: 0, get: { $0.image?.cornerRadius }, set: { $0.image?.cornerRadius = $1 }),
-                          range: 0...max(1, min(layer.width, layer.height) / 2), display: "\(Int(props.cornerRadius.rounded())) px", controller: controller, undoName: "Change Corner Radius")
-        } header: {
-            HStack {
-                Text("Corners")
-                Spacer()
-                Button("Reset Photo", systemImage: "arrow.counterclockwise") { controller.resetPhoto(id) }
-                    .buttonStyle(.borderless)
-                    .controlSize(.small)
-                    .labelStyle(.titleAndIcon)
-            }
-        }
     }
 
     private func assetDetail(_ asset: MediaAsset) -> String {
@@ -264,7 +266,7 @@ struct TextSections: View {
             Picker("Weight", selection: controller.layerBinding(id, name: "Change Font Weight", fallback: 400, get: { $0.text?.fontWeight }, set: { $0.text?.fontWeight = $1 })) {
                 ForEach(FontCatalog.weights, id: \.value) { weight in Text(weight.name).tag(weight.value) }
             }
-            LabeledContent("Size") {
+            LabeledContent(props.autoFit ? "Largest Size" : "Size") {
                 HStack(spacing: 6) {
                     ScrubField(label: "Size", systemImage: "textformat.size", value: controller.layerBinding(id, name: "Change Font Size", fallback: 96, get: { $0.text?.fontSize }, set: { $0.text?.fontSize = $1 }),
                                range: 8...400, suffix: "px", onScrubBegan: controller.beginGesture, onScrubEnded: { controller.endGesture("Change Font Size") })
@@ -287,14 +289,23 @@ struct TextSections: View {
                 .toggleStyle(.button)
                 .help("Italic")
             }
+            Toggle(isOn: controller.layerBinding(id, name: "Shrink to Fit", fallback: false, get: { $0.text?.autoFit }, set: { l, on in
+                l.text?.autoFit = on
+                if !on { EditorController.fitTextHeight(&l) }
+            })) {
+                Text("Shrink to Fit")
+                Text("Text gets smaller to stay inside its box.")
+            }
         }
-        Section("Color & Spacing") {
-            ColorPicker("Color", selection: controller.layerBinding(id, name: "Change Text Color", coalesce: true, fallback: "#111111", get: { $0.text?.fill }, set: { $0.text?.fill = $1 }).hexColor())
+        TextFillSection(controller: controller, layer: layer)
+        Section("Spacing") {
             GestureSlider(title: "Line Height", value: controller.layerBinding(id, name: "Change Line Height", fallback: 1.15, get: { $0.text?.lineHeight }, set: { $0.text?.lineHeight = ($1 * 100).rounded() / 100 }),
                           range: 0.8...2.5, display: String(format: "%.2f", props.lineHeight), controller: controller, undoName: "Change Line Height")
             GestureSlider(title: "Letter Spacing", value: controller.layerBinding(id, name: "Change Letter Spacing", fallback: 0, get: { $0.text?.letterSpacing }, set: { $0.text?.letterSpacing = $1.rounded() }),
                           range: -10...50, display: "\(Int(props.letterSpacing))", controller: controller, undoName: "Change Letter Spacing")
         }
+        TextOutlineSection(controller: controller, layer: layer)
+        TextHighlightSection(controller: controller, layer: layer)
     }
 
     private func setFamily(_ family: String) {
@@ -344,7 +355,8 @@ struct PositionSection: View {
     var body: some View {
         let id = layer.id
         let locked = layer.locked
-        let isText = layer.text != nil
+        // Text boxes fit their height to the text, unless the text shrinks to fit the box.
+        let isText = layer.text.map { !$0.autoFit } ?? false
         Section {
             Grid(horizontalSpacing: 8, verticalSpacing: 8) {
                 GridRow {

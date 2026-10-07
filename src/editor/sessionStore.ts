@@ -7,6 +7,7 @@ export type Overlay = 'palette' | 'shortcuts' | null;
 interface SessionState {
   selectedSlideId: string;
   selectedLayerId: string | null;
+  selectedLayerIds: string[];
   slideFocusRequest: number;
   zoom: number;
   /** Zoom that fits one slide in the canvas viewport; published by the canvas. */
@@ -21,6 +22,7 @@ interface SessionState {
   selectSlide: (id: string) => void;
   focusSlide: (id: string) => void;
   selectLayer: (id: string | null) => void;
+  selectLayers: (ids: string[], primaryId?: string | null) => void;
   resetSelection: (slideId?: string) => void;
   setZoom: (zoom: number) => void;
   setFitZoom: (zoom: number) => void;
@@ -39,6 +41,7 @@ const clampZoom = (zoom: number) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom))
 export const useEditorSession = create<SessionState>((set) => ({
   selectedSlideId: '',
   selectedLayerId: null,
+  selectedLayerIds: [],
   slideFocusRequest: 0,
   zoom: 0.5,
   fitZoom: 0.5,
@@ -48,14 +51,20 @@ export const useEditorSession = create<SessionState>((set) => ({
   saveStatus: 'saved',
   overlay: null,
   importRequest: 0,
-  selectSlide: (selectedSlideId) => set({ selectedSlideId, selectedLayerId: null }),
+  selectSlide: (selectedSlideId) => set({ selectedSlideId, selectedLayerId: null, selectedLayerIds: [] }),
   focusSlide: (selectedSlideId) => set((state) => ({
     selectedSlideId,
     selectedLayerId: null,
+    selectedLayerIds: [],
     slideFocusRequest: state.slideFocusRequest + 1,
   })),
-  selectLayer: (selectedLayerId) => set({ selectedLayerId }),
-  resetSelection: (selectedSlideId = '') => set({ selectedSlideId, selectedLayerId: null }),
+  selectLayer: (selectedLayerId) => set({ selectedLayerId, selectedLayerIds: selectedLayerId === null ? [] : [selectedLayerId] }),
+  selectLayers: (ids, primaryId) => {
+    const selectedLayerIds = [...new Set(ids)];
+    const selectedLayerId = primaryId === null ? null : primaryId !== undefined && selectedLayerIds.includes(primaryId) ? primaryId : ids.at(-1) ?? null;
+    set({ selectedLayerIds, selectedLayerId });
+  },
+  resetSelection: (selectedSlideId = '') => set({ selectedSlideId, selectedLayerId: null, selectedLayerIds: [] }),
   setZoom: (zoom) => set({ zoom: clampZoom(zoom) }),
   setFitZoom: (fitZoom) => set({ fitZoom: clampZoom(fitZoom) }),
   setScroll: (scroll) => set({ scroll }),

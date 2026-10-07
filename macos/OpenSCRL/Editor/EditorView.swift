@@ -18,6 +18,7 @@ struct ProjectWindow: View {
         EditorView(controller: controller)
             .onAppear { controller.undoManager = undoManager }
             .onChange(of: undoManager) { _, manager in controller.undoManager = manager }
+            .onDisappear { PhonePreviewWindow.close(for: controller) }
             .onReceive(NotificationCenter.default.publisher(for: .NSUndoManagerDidUndoChange)) { _ in controller.validateSelection() }
             .onReceive(NotificationCenter.default.publisher(for: .NSUndoManagerDidRedoChange)) { _ in controller.validateSelection() }
             .onAppear {
@@ -248,6 +249,11 @@ struct EditorToolbar: ToolbarContent {
         }
 
         ToolbarItemGroup(placement: .primaryAction) {
+            Button { PhonePreviewWindow.show(for: controller) } label: {
+                Label("Preview", systemImage: "iphone")
+            }
+            .help("Preview the carousel on a phone (P)")
+
             Button { controller.shareCarousel() } label: {
                 Label("Share", systemImage: "square.and.arrow.up")
                     .background { ShareAnchor { controller.shareAnchor = $0 } }

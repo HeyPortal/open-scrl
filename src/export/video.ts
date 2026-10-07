@@ -1,4 +1,5 @@
 import Konva from 'konva';
+import { paintBackground, paintLayer } from '@/render/paint/layers';
 import { ArrayBufferTarget, FileSystemWritableFileStreamTarget, Muxer } from 'mp4-muxer';
 import { compileScene } from '@/core/scene/compileScene';
 import { getSlideViewport } from '@/core/document/coordinates';
@@ -86,93 +87,19 @@ function release(value: Drawable) {
   }
 }
 
-function crop(layer: Extract<Layer, { kind: 'image' }>, source: Drawable) {
-  const scale = Math.max(1, layer.cropScale ?? 1);
-  const box = layer.width / layer.height;
-  const ratio = source.width / source.height;
-  let width = source.width;
-  let height = source.height;
-  if (ratio > box) width = source.height * box;
-  else height = source.width / box;
-  width /= scale;
-  height /= scale;
-  const maxX = Math.max(0, source.width - width);
-  const maxY = Math.max(0, source.height - height);
-  return {
-    x: maxX / 2 + layer.cropOffsetX * maxX,
-    y: maxY / 2 + layer.cropOffsetY * maxY,
-    width,
-    height,
-  };
-}
-
+/** A Konva shape that paints one layer through the shared painter, re-reading video and GIF frames on every draw. */
 function addLayer(target: Konva.Layer, item: Layer, offsetX: number, source?: Drawable) {
-  if (item.kind === 'image') {
-    if (!item.assetId || !source) return;
-    const area = crop(item, source);
-    target.add(new Konva.Image({
-      x: offsetX + item.x + item.width / 2,
-      y: item.y + item.height / 2,
-      offsetX: item.width / 2,
-      offsetY: item.height / 2,
-      width: item.width,
-      height: item.height,
-      rotation: item.rotation,
-      opacity: item.opacity,
-      cornerRadius: item.cornerRadius,
-      image: source,
-      crop: area,
-    }));
-    return;
-  }
-  if (item.kind === 'shape') {
-    if (item.shape === 'rect') {
-      target.add(new Konva.Rect({
-        x: offsetX + item.x + item.width / 2,
-        y: item.y + item.height / 2,
-        offsetX: item.width / 2,
-        offsetY: item.height / 2,
-        width: item.width,
-        height: item.height,
-        rotation: item.rotation,
-        opacity: item.opacity,
-        fill: item.fill,
-        stroke: item.strokeWidth > 0 ? item.stroke : undefined,
-        strokeWidth: item.strokeWidth,
-        cornerRadius: item.cornerRadius,
-      }));
-    } else {
-      target.add(new Konva.Ellipse({
-        x: offsetX + item.x + item.width / 2,
-        y: item.y + item.height / 2,
-        radiusX: item.width / 2,
-        radiusY: item.height / 2,
-        rotation: item.rotation,
-        opacity: item.opacity,
-        fill: item.fill,
-        stroke: item.strokeWidth > 0 ? item.stroke : undefined,
-        strokeWidth: item.strokeWidth,
-      }));
-    }
-    return;
-  }
-  target.add(new Konva.Text({
-    x: offsetX + item.x + item.width / 2,
-    y: item.y + item.height / 2,
-    offsetX: item.width / 2,
-    offsetY: item.height / 2,
-    width: item.width,
-    height: item.height,
-    rotation: item.rotation,
-    opacity: item.opacity,
-    text: item.text,
-    fontFamily: item.fontFamily,
-    fontSize: item.fontSize,
-    fontStyle: `${item.italic ? 'italic ' : ''}${item.fontWeight}`,
-    fill: item.fill,
-    align: item.align,
-    lineHeight: item.lineHeight,
-    letterSpacing: item.letterSpacing,
+  if (item.kind === 'image' && (!item.assetId || !source)) return;
+  const media = source && item.kind === 'image' ? source : undefined;
+  target.add(new Konva.Shape({
+    listening: false,
+    sceneFunc: (context) => {
+      const ctx = context._context;
+      ctx.save();
+      // MP4 frames are opaque; the shape's own transform is identity, so paint in slide space.
+      paintLayer(ctx, item, offsetX, media ? { source: media, width: media.width, height: media.height } : null);
+      ctx.restore();
+    },
   }));
 }
 
@@ -194,28 +121,24 @@ async function prepareStage(project: ProjectDocumentV2, slideId: string) {
   const media: Drawable[] = [];
   stage.add(layer);
 
-  if (slide.background.kind === 'solid') {
-    layer.add(new Konva.Rect({
-      x: 0,
-      y: 0,
-      width: project.format.width,
-      height: project.format.height,
-      fill: slide.background.color,
-    }));
-  } else {
-    layer.add(new Konva.Rect({
-      x: 0,
-      y: 0,
-      width: project.format.width,
-      height: project.format.height,
-      fillLinearGradientStartPoint: { x: 0, y: 0 },
-      fillLinearGradientEndPoint: {
-        x: project.format.width * Math.cos(slide.background.angle * Math.PI / 180),
-        y: project.format.height * Math.sin(slide.background.angle * Math.PI / 180),
-      },
-      fillLinearGradientColorStops: [0, slide.background.from, 1, slide.background.to],
-    }));
-  }
+  // H.264 has no alpha, so transparent slides are flattened onto white.
+  const background = slide.background;
+  const backgroundAsset = background.kind === 'image' && background.assetId ? await getAsset(background.assetId) : undefined;
+  const backgroundImage = backgroundAsset ? await image(backgroundAsset.blob).catch(() => undefined) : undefined;
+  layer.add(new Konva.Shape({
+    listening: false,
+    sceneFunc: (context) => {
+      const ctx = context._context;
+      const { width, height } = project.format;
+      ctx.save();
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, width, height);
+      paintBackground(ctx, background, width, height, backgroundImage && background.kind === 'image'
+        ? { source: backgroundImage, width: backgroundImage.naturalWidth, height: backgroundImage.naturalHeight, key: background.assetId ?? '' }
+        : null);
+      ctx.restore();
+    },
+  }));
 
   for (const sceneItem of compileScene(project, viewport)) {
     const sourceIndex = project.slideOrder.indexOf(sceneItem.slideId);

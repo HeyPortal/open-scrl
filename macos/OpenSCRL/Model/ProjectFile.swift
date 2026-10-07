@@ -81,13 +81,147 @@ struct ProjectFile: Codable {
     }
 }
 
+// MARK: - Fill and effect coding
+
+/// Decoding is lenient so projects from either app, or from older versions, always open.
+private extension KeyedDecodingContainer {
+    func number(_ key: Key, _ fallback: Double) -> Double {
+        (try? decodeIfPresent(Double.self, forKey: key)) ?? fallback
+    }
+
+    func string(_ key: Key, _ fallback: String) -> String {
+        (try? decodeIfPresent(String.self, forKey: key)) ?? fallback
+    }
+}
+
+extension GradientStop: Codable {
+    private enum CodingKeys: String, CodingKey { case offset, color }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(offset: min(1, max(0, c.number(.offset, 0))), color: c.string(.color, "#000000"))
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(offset, forKey: .offset)
+        try c.encode(color, forKey: .color)
+    }
+}
+
+extension Gradient: Codable {
+    private enum CodingKeys: String, CodingKey { case type, angle, stops }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let stops = ((try? c.decodeIfPresent([GradientStop].self, forKey: .stops)) ?? []).sorted { $0.offset < $1.offset }
+        self.init(type: Kind(rawValue: c.string(.type, "linear")) ?? .linear,
+                  angle: c.number(.angle, 135),
+                  stops: stops.count >= 2 ? stops : [GradientStop(offset: 0, color: "#ffffff"), GradientStop(offset: 1, color: "#000000")])
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(type.rawValue, forKey: .type)
+        try c.encode(angle, forKey: .angle)
+        try c.encode(sortedStops, forKey: .stops)
+    }
+}
+
+extension Shadow: Codable {
+    private enum CodingKeys: String, CodingKey { case color, opacity, blur, offsetX, offsetY }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(color: c.string(.color, "#000000"), opacity: min(1, max(0, c.number(.opacity, 0.35))),
+                  blur: max(0, c.number(.blur, 24)), offsetX: c.number(.offsetX, 0), offsetY: c.number(.offsetY, 12))
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(color, forKey: .color)
+        try c.encode(opacity, forKey: .opacity)
+        try c.encode(blur, forKey: .blur)
+        try c.encode(offsetX, forKey: .offsetX)
+        try c.encode(offsetY, forKey: .offsetY)
+    }
+}
+
+extension TextHighlight: Codable {
+    private enum CodingKeys: String, CodingKey { case style, color, padding, radius }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(style: Style(rawValue: c.string(.style, "lines")) ?? .lines, color: c.string(.color, "#ffffff"),
+                  padding: max(0, c.number(.padding, 16)), radius: max(0, c.number(.radius, 12)))
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(style.rawValue, forKey: .style)
+        try c.encode(color, forKey: .color)
+        try c.encode(padding, forKey: .padding)
+        try c.encode(radius, forKey: .radius)
+    }
+}
+
+extension Background: Codable {
+    private enum CodingKeys: String, CodingKey { case kind, color, from, to, angle, type, stops, assetId, blur, dim }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        switch c.string(.kind, "solid") {
+        case "gradient":
+            let from = c.string(.from, "#ffffff"), to = c.string(.to, "#000000")
+            let stops = ((try? c.decodeIfPresent([GradientStop].self, forKey: .stops)) ?? []).sorted { $0.offset < $1.offset }
+            self = .gradient(Gradient(type: Gradient.Kind(rawValue: c.string(.type, "linear")) ?? .linear,
+                                      angle: c.number(.angle, 135),
+                                      stops: stops.count >= 2 ? stops : [GradientStop(offset: 0, color: from), GradientStop(offset: 1, color: to)]))
+        case "image":
+            self = .image(BackgroundImage(assetID: try? c.decodeIfPresent(String.self, forKey: .assetId),
+                                          blur: max(0, c.number(.blur, 0)), dim: min(1, max(0, c.number(.dim, 0))),
+                                          color: c.string(.color, "#111111")))
+        case "transparent":
+            self = .transparent
+        default:
+            self = .solid(c.string(.color, "#ffffff"))
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .solid(let color):
+            try c.encode("solid", forKey: .kind)
+            try c.encode(color, forKey: .color)
+        case .gradient(let gradient):
+            // `from` and `to` keep two-color gradients readable by older versions.
+            try c.encode("gradient", forKey: .kind)
+            try c.encode(gradient.firstColor, forKey: .from)
+            try c.encode(gradient.lastColor, forKey: .to)
+            try c.encode(gradient.angle, forKey: .angle)
+            try c.encode(gradient.type.rawValue, forKey: .type)
+            try c.encode(gradient.sortedStops, forKey: .stops)
+        case .image(let image):
+            try c.encode("image", forKey: .kind)
+            try c.encode(image.assetID, forKey: .assetId)
+            try c.encode(image.blur, forKey: .blur)
+            try c.encode(image.dim, forKey: .dim)
+            try c.encode(image.color, forKey: .color)
+        case .transparent:
+            try c.encode("transparent", forKey: .kind)
+        }
+    }
+}
+
 // MARK: - Layer coding (flat, like the web schema)
 
 extension Layer: Codable {
     private enum CodingKeys: String, CodingKey {
-        case id, kind, name, x, y, width, height, rotation, opacity, visible, locked
-        case assetId, cornerRadius, cropOffsetX, cropOffsetY, cropScale
+        case id, kind, name, x, y, width, height, rotation, opacity, visible, locked, groupId, shadow
+        case assetId, cornerRadius, cropOffsetX, cropOffsetY, cropScale, mask
         case text, fontFamily, fontSize, fontWeight, italic, fill, align, letterSpacing, lineHeight
+        case fillGradient, highlight, autoFit
         case shape, stroke, strokeWidth
     }
 
@@ -107,6 +241,8 @@ extension Layer: Codable {
         opacity = min(1, max(0, try num(.opacity, 1)))
         visible = try c.decodeIfPresent(Bool.self, forKey: .visible) ?? true
         locked = try c.decodeIfPresent(Bool.self, forKey: .locked) ?? false
+        groupID = (try? c.decodeIfPresent(String.self, forKey: .groupId)) ?? nil
+        shadow = (try? c.decodeIfPresent(Shadow.self, forKey: .shadow)) ?? nil
         switch kind {
         case "image":
             content = .image(ImageProperties(
@@ -114,7 +250,10 @@ extension Layer: Codable {
                 cornerRadius: try num(.cornerRadius, 0),
                 cropOffsetX: try num(.cropOffsetX, 0),
                 cropOffsetY: try num(.cropOffsetY, 0),
-                cropScale: max(1, try num(.cropScale, 1))
+                cropScale: max(1, try num(.cropScale, 1)),
+                mask: ImageMask(rawValue: (try? c.decodeIfPresent(String.self, forKey: .mask)) ?? "rect") ?? .rect,
+                stroke: (try? c.decodeIfPresent(String.self, forKey: .stroke)) ?? "#ffffff",
+                strokeWidth: max(0, try num(.strokeWidth, 0))
             ))
         case "text":
             let numericWeight = try num(.fontWeight, 400)
@@ -128,7 +267,12 @@ extension Layer: Codable {
                 fill: try c.decodeIfPresent(String.self, forKey: .fill) ?? "#111111",
                 align: TextAlignment(rawValue: try c.decodeIfPresent(String.self, forKey: .align) ?? "left") ?? .left,
                 letterSpacing: try num(.letterSpacing, 0),
-                lineHeight: try num(.lineHeight, 1.15)
+                lineHeight: try num(.lineHeight, 1.15),
+                stroke: (try? c.decodeIfPresent(String.self, forKey: .stroke)) ?? "#000000",
+                strokeWidth: max(0, try num(.strokeWidth, 0)),
+                fillGradient: (try? c.decodeIfPresent(Gradient.self, forKey: .fillGradient)) ?? nil,
+                highlight: (try? c.decodeIfPresent(TextHighlight.self, forKey: .highlight)) ?? nil,
+                autoFit: (try? c.decodeIfPresent(Bool.self, forKey: .autoFit)) ?? false
             ))
         default:
             content = .shape(ShapeProperties(
@@ -154,6 +298,8 @@ extension Layer: Codable {
         try c.encode(opacity, forKey: .opacity)
         try c.encode(visible, forKey: .visible)
         try c.encode(locked, forKey: .locked)
+        try c.encodeIfPresent(groupID, forKey: .groupId)
+        try c.encodeIfPresent(shadow, forKey: .shadow)
         switch content {
         case .image(let p):
             try c.encode(p.assetID, forKey: .assetId)
@@ -161,6 +307,9 @@ extension Layer: Codable {
             try c.encode(p.cropOffsetX, forKey: .cropOffsetX)
             try c.encode(p.cropOffsetY, forKey: .cropOffsetY)
             try c.encode(p.cropScale, forKey: .cropScale)
+            try c.encode(p.mask.rawValue, forKey: .mask)
+            try c.encode(p.stroke, forKey: .stroke)
+            try c.encode(p.strokeWidth, forKey: .strokeWidth)
         case .text(let p):
             try c.encode(p.text, forKey: .text)
             try c.encode(p.fontFamily, forKey: .fontFamily)
@@ -171,6 +320,11 @@ extension Layer: Codable {
             try c.encode(p.align.rawValue, forKey: .align)
             try c.encode(p.letterSpacing, forKey: .letterSpacing)
             try c.encode(p.lineHeight, forKey: .lineHeight)
+            try c.encode(p.stroke, forKey: .stroke)
+            try c.encode(p.strokeWidth, forKey: .strokeWidth)
+            try c.encodeIfPresent(p.fillGradient, forKey: .fillGradient)
+            try c.encodeIfPresent(p.highlight, forKey: .highlight)
+            if p.autoFit { try c.encode(true, forKey: .autoFit) }
         case .shape(let p):
             try c.encode(p.shape.rawValue, forKey: .shape)
             try c.encode(p.fill, forKey: .fill)

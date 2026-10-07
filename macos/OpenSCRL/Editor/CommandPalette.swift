@@ -19,7 +19,12 @@ extension EditorController {
     func paletteCommands() -> [PaletteCommand] {
         let layer = selectedLayer
         let id = layer?.id
-        let unlocked = layer.map { !$0.locked } ?? false
+        let layers = selectedLayers
+        let unlocked = layers.contains { !$0.locked }
+        let single = layers.count == 1
+        let allLocked = !layers.isEmpty && layers.allSatisfy(\.locked)
+        let allVisible = !layers.isEmpty && layers.allSatisfy(\.visible)
+        let target = layers.count > 1 ? "Selection" : "Layer"
         let slideCount = project.slides.count
         let index = selectedSlideIndex
         var commands: [PaletteCommand] = [
@@ -28,18 +33,18 @@ extension EditorController {
             .init(id: "add-ellipse", title: "Add Ellipse", group: .insert, symbol: "oval", shortcut: "O", keywords: "shape circle oval", run: { self.addShape(.ellipse) }),
             .init(id: "import", title: "Import Media…", group: .insert, symbol: "photo.badge.plus", shortcut: "⇧⌘I", keywords: "photo image video gif upload", run: { self.requestImport(.add(slide: index, center: nil)) }),
 
-            .init(id: "duplicate", title: "Duplicate Layer", group: .edit, symbol: "plus.square.on.square", shortcut: "⌘D", isEnabled: id != nil, run: { if let id { self.duplicateLayer(id) } }),
-            .init(id: "delete", title: "Delete Layer", group: .edit, symbol: "trash", shortcut: "⌫", isEnabled: id != nil, run: { self.deleteSelection() }),
-            .init(id: "lock", title: layer?.locked == true ? "Unlock Layer" : "Lock Layer", group: .edit, symbol: "lock", shortcut: "⇧⌘L", isEnabled: id != nil, run: { if let id { self.toggleLocked(id) } }),
-            .init(id: "hide", title: layer?.visible == false ? "Show Layer" : "Hide Layer", group: .edit, symbol: "eye.slash", shortcut: "⇧⌘H", isEnabled: id != nil, run: { if let id { self.toggleVisible(id) } }),
-            .init(id: "edit-text", title: "Edit Text", group: .edit, symbol: "character.cursor.ibeam", shortcut: "↩", isEnabled: layer?.text != nil, run: { if let id { self.beginTextEditing(id) } }),
-            .init(id: "crop", title: "Adjust Crop", group: .edit, symbol: "crop", shortcut: "↩", isEnabled: layer?.image?.assetID != nil, run: { if let id { self.beginCropEditing(id) } }),
-            .init(id: "rename", title: "Rename Layer", group: .edit, symbol: "pencil", isEnabled: id != nil, run: { if let id { self.requestRename(id) } }),
+            .init(id: "duplicate", title: "Duplicate \(target)", group: .edit, symbol: "plus.square.on.square", shortcut: "⌘D", isEnabled: id != nil, run: { self.duplicateSelection() }),
+            .init(id: "delete", title: "Delete \(target)", group: .edit, symbol: "trash", shortcut: "⌫", isEnabled: id != nil, run: { self.deleteSelection() }),
+            .init(id: "lock", title: allLocked ? "Unlock \(target)" : "Lock \(target)", group: .edit, symbol: "lock", shortcut: "⇧⌘L", isEnabled: id != nil, run: { self.toggleSelection(\.locked, name: allLocked ? "Unlock" : "Lock") }),
+            .init(id: "hide", title: allVisible ? "Hide \(target)" : "Show \(target)", group: .edit, symbol: "eye.slash", shortcut: "⇧⌘H", isEnabled: id != nil, run: { self.toggleSelection(\.visible, name: allVisible ? "Hide" : "Show") }),
+            .init(id: "edit-text", title: "Edit Text", group: .edit, symbol: "character.cursor.ibeam", shortcut: "↩", isEnabled: single && layer?.text != nil, run: { if let id { self.beginTextEditing(id) } }),
+            .init(id: "crop", title: "Adjust Crop", group: .edit, symbol: "crop", shortcut: "↩", isEnabled: single && layer?.image?.assetID != nil, run: { if let id { self.beginCropEditing(id) } }),
+            .init(id: "rename", title: "Rename Layer", group: .edit, symbol: "pencil", isEnabled: single, run: { if let id { self.requestRename(id) } }),
 
-            .init(id: "front", title: "Bring to Front", group: .arrange, symbol: "square.3.layers.3d.top.filled", shortcut: "⌥⌘]", isEnabled: canArrange(.front), run: { if let id { self.arrange(id, .front) } }),
-            .init(id: "forward", title: "Bring Forward", group: .arrange, symbol: "square.2.layers.3d.top.filled", shortcut: "⌘]", isEnabled: canArrange(.forward), run: { if let id { self.arrange(id, .forward) } }),
-            .init(id: "backward", title: "Send Backward", group: .arrange, symbol: "square.2.layers.3d.bottom.filled", shortcut: "⌘[", isEnabled: canArrange(.backward), run: { if let id { self.arrange(id, .backward) } }),
-            .init(id: "back", title: "Send to Back", group: .arrange, symbol: "square.3.layers.3d.bottom.filled", shortcut: "⌥⌘[", isEnabled: canArrange(.back), run: { if let id { self.arrange(id, .back) } }),
+            .init(id: "front", title: "Bring to Front", group: .arrange, symbol: "square.3.layers.3d.top.filled", shortcut: "⌥⌘]", isEnabled: canArrangeSelection(.front), run: { self.arrangeSelection(.front) }),
+            .init(id: "forward", title: "Bring Forward", group: .arrange, symbol: "square.2.layers.3d.top.filled", shortcut: "⌘]", isEnabled: canArrangeSelection(.forward), run: { self.arrangeSelection(.forward) }),
+            .init(id: "backward", title: "Send Backward", group: .arrange, symbol: "square.2.layers.3d.bottom.filled", shortcut: "⌘[", isEnabled: canArrangeSelection(.backward), run: { self.arrangeSelection(.backward) }),
+            .init(id: "back", title: "Send to Back", group: .arrange, symbol: "square.3.layers.3d.bottom.filled", shortcut: "⌥⌘[", isEnabled: canArrangeSelection(.back), run: { self.arrangeSelection(.back) }),
         ]
         let aligns: [(AlignEdge, String, String)] = [
             (.left, "Align to Slide Left", "align.horizontal.left"), (.centerX, "Center Horizontally on Slide", "align.horizontal.center"),
@@ -47,9 +52,16 @@ extension EditorController {
             (.centerY, "Center Vertically on Slide", "align.vertical.center"), (.bottom, "Align to Slide Bottom", "align.vertical.bottom"),
         ]
         commands += aligns.map { edge, title, symbol in
-            PaletteCommand(id: "align-\(title)", title: title, group: .arrange, symbol: symbol, isEnabled: unlocked, run: { if let id { self.align(id, edge) } })
+            PaletteCommand(id: "align-\(title)", title: title, group: .arrange, symbol: symbol, isEnabled: unlocked, run: { self.alignSelection(edge, relativeToSlide: true) })
+        }
+        commands += aligns.map { edge, title, symbol in
+            PaletteCommand(id: "selection-align-\(edge)", title: title.replacingOccurrences(of: " to Slide", with: "").replacingOccurrences(of: " on Slide", with: ""), group: .arrange, symbol: symbol, isEnabled: selectionUnitCount >= 2 && unlocked, run: { self.alignSelection(edge, relativeToSlide: false) })
         }
         commands += [
+            .init(id: "group", title: "Group Layers", group: .arrange, symbol: "square.3.layers.3d", shortcut: "⌘G", isEnabled: canGroupNow, run: { self.groupSelection() }),
+            .init(id: "ungroup", title: "Ungroup Layers", group: .arrange, symbol: "square.3.layers.3d.slash", shortcut: "⇧⌘G", isEnabled: canUngroupSelection, run: { self.ungroupSelection() }),
+            .init(id: "distribute-horizontal", title: "Distribute Horizontally", group: .arrange, symbol: "distribute.horizontal", isEnabled: canDistributeSelection && unlocked, run: { self.distributeSelection(.horizontal) }),
+            .init(id: "distribute-vertical", title: "Distribute Vertically", group: .arrange, symbol: "distribute.vertical", isEnabled: canDistributeSelection && unlocked, run: { self.distributeSelection(.vertical) }),
             .init(id: "new-slide", title: "New Slide", group: .slide, symbol: "plus.rectangle", shortcut: "⇧⌘N", run: { self.addSlide(after: self.selectedSlideID) }),
             .init(id: "dup-slide", title: "Duplicate Slide", group: .slide, symbol: "plus.rectangle.on.rectangle", shortcut: "⇧⌘D", run: { self.duplicateSlide(self.selectedSlideID) }),
             .init(id: "del-slide", title: "Delete Slide", group: .slide, symbol: "trash", isEnabled: slideCount > 1, run: { self.deleteSlide(self.selectedSlideID) }),
@@ -63,6 +75,8 @@ extension EditorController {
             .init(id: "zoom-out", title: "Zoom Out", group: .view, symbol: "minus.magnifyingglass", shortcut: "⌘−", run: { self.zoomOut() }),
             .init(id: "zoom-fit", title: "Zoom to Fit", group: .view, symbol: "arrow.up.left.and.down.right.magnifyingglass", shortcut: "⌘9", run: { self.zoomToFit() }),
             .init(id: "zoom-100", title: "Actual Size", group: .view, symbol: "1.magnifyingglass", shortcut: "⌘0", run: { self.zoomToActualSize() }),
+            .init(id: "phone-preview", title: "Phone Preview", group: .view, symbol: "iphone", shortcut: "P", keywords: "feed story profile grid crop", run: { PhonePreviewWindow.show(for: self) }),
+            .init(id: "fullscreen-preview", title: "Full-Screen Preview", group: .view, symbol: "arrow.up.left.and.arrow.down.right", shortcut: "⇧⌥⌘P", run: { PhonePreviewWindow.show(for: self, fullScreen: true) }),
             .init(id: "inspector", title: showsInspector ? "Hide Inspector" : "Show Inspector", group: .view, symbol: "sidebar.trailing", shortcut: "⌥⌘I", run: { self.showsInspector.toggle() }),
             .init(id: "layers", title: "Show Layers", group: .view, symbol: "square.3.layers.3d", run: { self.showsInspector = true; self.inspectorTab = .layers }),
 

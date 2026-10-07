@@ -22,3 +22,6 @@ export function materializeSlides(doc: ProjectDocumentV2): Slide[] {
 export function findLayerSlideId(doc: ProjectDocumentV2, layerId: string): string | undefined {
   return doc.slideOrder.find((slideId) => doc.slides[slideId]?.layerOrder.includes(layerId));
 }
+
+export { selectionSlideId, expandToGroups, groupMemberIds, selectionUnits } from './selection';
+export type { SelectionUnit } from './selection';

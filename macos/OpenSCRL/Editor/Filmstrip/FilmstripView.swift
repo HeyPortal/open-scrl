@@ -37,7 +37,7 @@ struct FilmstripView: View {
                         .buttonStyle(.plain)
                         .help("New Slide (⇧⌘N)")
                     }
-                    .reorderContainer(for: Slide.self) { difference in
+                    .reorderContainer(for: SlideDragItem.self) { difference in
                         var order = project.slides.map(\.id)
                         let moving = order.filter { difference.sources.contains($0) }
                         order.removeAll { difference.sources.contains($0) }
@@ -48,6 +48,13 @@ struct FilmstripView: View {
                             order.append(contentsOf: moving)
                         }
                         controller.reorderSlides(order)
+                    }
+                    .dragContainer(for: SlideDragItem.self) { (ids: [String]) in
+                        let snapshot = controller.project
+                        return ids.filter { snapshot.slideIndex(of: $0) != nil }.map {
+                            SlideDragItem(id: $0, project: snapshot, media: controller.document.media,
+                                          name: controller.document.displayName)
+                        }
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
@@ -123,6 +130,7 @@ private struct SlideCell: View {
                 .foregroundStyle(selected ? .primary : .secondary)
         }
         .contentShape(Rectangle())
+        .help("Drag to reorder, or into Finder, Messages or Mail as a PNG")
         .onTapGesture { controller.focusSlide(slide.id) }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Slide \(index + 1)")

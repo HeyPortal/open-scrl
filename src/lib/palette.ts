@@ -1,4 +1,5 @@
 import type { Background } from '@/types';
+import { backgroundGradient, gradientCss } from '@/render/paint/gradient';
 
 export const SOLID_SWATCHES = [
   '#ffffff',
@@ -23,14 +24,35 @@ export const GRADIENT_SWATCHES: { from: string; to: string; angle: number }[] = 
   { from: '#f5f4f0', to: '#cbd5e1', angle: 180 },
 ];
 
-export const backgroundCss = (bg: Background) =>
-  bg.kind === 'solid' ? bg.color : `linear-gradient(${bg.angle}deg, ${bg.from}, ${bg.to})`;
+const CHECKERBOARD = 'repeating-conic-gradient(#d4d4d8 0% 25%, #ffffff 0% 50%) 50% / 16px 16px';
+
+/** A CSS `background` value approximating a slide background (photos show their base color). */
+export const backgroundCss = (bg: Background) => {
+  switch (bg.kind) {
+    case 'solid': return bg.color;
+    case 'gradient': return gradientCss(backgroundGradient(bg));
+    case 'image': return bg.color;
+    case 'transparent': return CHECKERBOARD;
+  }
+};
+
+export const backgroundLabel = (bg: Background) => {
+  switch (bg.kind) {
+    case 'solid': return bg.color;
+    case 'gradient': return `${bg.from} to ${bg.to}`;
+    case 'image': return 'photo';
+    case 'transparent': return 'transparent';
+  }
+};
 
 export const sameBackground = (a: Background | undefined, b: Background) => {
   if (!a || a.kind !== b.kind) return false;
   if (a.kind === 'solid' && b.kind === 'solid') return a.color.toLowerCase() === b.color.toLowerCase();
   if (a.kind === 'gradient' && b.kind === 'gradient') {
-    return a.from.toLowerCase() === b.from.toLowerCase() && a.to.toLowerCase() === b.to.toLowerCase() && a.angle === b.angle;
+    const x = backgroundGradient(a), y = backgroundGradient(b);
+    return x.type === y.type && x.angle === y.angle && x.stops.length === y.stops.length
+      && x.stops.every((s, i) => s.offset === y.stops[i].offset && s.color.toLowerCase() === y.stops[i].color.toLowerCase());
   }
-  return false;
+  if (a.kind === 'image' && b.kind === 'image') return a.assetId === b.assetId && a.blur === b.blur && a.dim === b.dim;
+  return a.kind === 'transparent';
 };

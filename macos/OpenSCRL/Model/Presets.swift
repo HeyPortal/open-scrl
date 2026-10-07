@@ -24,8 +24,11 @@ enum Swatches {
     static func same(_ a: Background?, _ b: Background) -> Bool {
         switch (a, b) {
         case (.solid(let x)?, .solid(let y)): x.lowercased() == y.lowercased()
-        case (.gradient(let f1, let t1, let a1)?, .gradient(let f2, let t2, let a2)):
-            f1.lowercased() == f2.lowercased() && t1.lowercased() == t2.lowercased() && a1 == a2
+        case (.gradient(let x)?, .gradient(let y)):
+            x.type == y.type && x.angle == y.angle && x.stops.count == y.stops.count
+                && zip(x.sortedStops, y.sortedStops).allSatisfy { $0.offset == $1.offset && $0.color.lowercased() == $1.color.lowercased() }
+        case (.image(let x)?, .image(let y)): x == y
+        case (.transparent?, .transparent): true
         default: false
         }
     }

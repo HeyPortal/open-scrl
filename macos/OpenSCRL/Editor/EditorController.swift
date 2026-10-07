@@ -61,9 +61,6 @@ enum MediaPlacement: Equatable {
     case fill(layerID: String)
 }
 
-enum ArrangeDirection { case forward, backward, front, back }
-enum AlignEdge: CaseIterable { case left, centerX, right, top, centerY, bottom }
-
 /// Per-window editor state and every editing action. Edits go through the document so they
 /// are undoable and mark the project as changed (which drives autosave).
 @MainActor
@@ -73,7 +70,19 @@ final class EditorController {
     @ObservationIgnored weak var undoManager: UndoManager?
 
     var selectedSlideID: String
-    var selectedLayerID: String?
+    var selectedLayerID: String? {
+        didSet {
+            if let id = selectedLayerID, !selectedLayerIDs.contains(id) { selectedLayerIDs.append(id) }
+        }
+    }
+    var selectedLayerIDs: [String] = [] {
+        didSet {
+            var seen = Set<String>()
+            let unique = selectedLayerIDs.filter { seen.insert($0).inserted }
+            if unique != selectedLayerIDs { selectedLayerIDs = unique }
+            if let id = selectedLayerID, !selectedLayerIDs.contains(id) { selectedLayerID = selectedLayerIDs.last }
+        }
+    }
     var zoom: CGFloat = 0.5
     var fitZoom: CGFloat = 0.5
     var zoomFollowsFit = true
@@ -132,9 +141,10 @@ final class EditorController {
     var selectedLayerLocation: LayerLocation? { project.locate(layer: selectedLayerID) }
 
     func selectSlide(_ id: String) {
-        guard selectedSlideID != id || selectedLayerID != nil else { return }
+        guard selectedSlideID != id || !selectedLayerIDs.isEmpty else { return }
         selectedSlideID = id
         selectedLayerID = nil
+        selectedLayerIDs = []
         endModes()
     }
 
@@ -152,6 +162,7 @@ final class EditorController {
     func selectLayer(_ id: String?) {
         if id != editingTextLayerID { editingTextLayerID = nil }
         if id != cropLayerID { cropLayerID = nil }
+        selectedLayerIDs = id.map { [$0] } ?? []
         selectedLayerID = id
         if let id, let loc = project.locate(layer: id) {
             selectedSlideID = project.slides[loc.slide].id
@@ -175,7 +186,9 @@ final class EditorController {
     /// Repairs selection after undo/redo removed the selected layer or slide.
     func validateSelection() {
         if project.slideIndex(of: selectedSlideID) == nil { selectedSlideID = project.slides.first?.id ?? "" }
-        if let id = selectedLayerID, project.locate(layer: id) == nil { selectedLayerID = nil }
+        selectedLayerIDs = selectedLayerIDs.filter { project.locate(layer: $0) != nil }
+        if selectedLayerID == nil { selectedLayerID = selectedLayerIDs.last }
+        if let loc = selectedLayerLocation { selectedSlideID = project.slides[loc.slide].id }
         if let id = editingTextLayerID, project.locate(layer: id) == nil { editingTextLayerID = nil }
         if let id = cropLayerID, project.locate(layer: id) == nil { cropLayerID = nil }
     }
@@ -234,9 +247,7 @@ final class EditorController {
 
     func duplicateSlide(_ id: String) {
         guard let index = project.slideIndex(of: id) else { return }
-        var copy = project.slides[index]
-        copy.id = UID.make()
-        copy.layers = copy.layers.map { var l = $0; l.id = UID.make(); return l }
+        let copy = project.slides[index].duplicated()
         perform("Duplicate Slide") { $0.slides.insert(copy, at: index + 1) }
         focusSlide(copy.id)
     }
@@ -398,21 +409,17 @@ final class EditorController {
         }
     }
 
+    /// Text boxes grow and shrink with their text, except shrink-to-fit boxes, whose height
+    /// is the space the text fits into.
     static func fitTextHeight(_ layer: inout Layer) {
-        guard let text = layer.text else { return }
+        guard let text = layer.text, !text.autoFit else { return }
         layer.height = max(1, TextLayout.measuredHeight(text, width: layer.width))
     }
 
-    func deleteLayer(_ id: String) {
-        guard let loc = project.locate(layer: id) else { return }
-        perform("Delete Layer") { $0.slides[loc.slide].layers.remove(at: loc.index) }
-        if selectedLayerID == id { selectedLayerID = nil }
-        endModes()
-    }
+    func deleteLayer(_ id: String) { deleteLayers([id]) }
 
-    func deleteSelection() {
-        if let id = selectedLayerID { deleteLayer(id) }
-    }
+    /// The selection already holds whole groups unless the user stepped into one.
+    func deleteSelection() { deleteLayers(selectedLayerIDs) }
 
     func duplicateLayer(_ id: String, offset: Double = 24) {
         guard let loc = project.locate(layer: id) else { return }
@@ -426,29 +433,12 @@ final class EditorController {
     }
 
     func arrange(_ id: String, _ direction: ArrangeDirection) {
-        guard let loc = project.locate(layer: id) else { return }
-        let count = project.slides[loc.slide].layers.count
-        let target: Int = switch direction {
-        case .forward: min(loc.index + 1, count - 1)
-        case .backward: max(loc.index - 1, 0)
-        case .front: count - 1
-        case .back: 0
-        }
-        guard target != loc.index else { return }
-        let names: [ArrangeDirection: String] = [.forward: "Bring Forward", .backward: "Send Backward", .front: "Bring to Front", .back: "Send to Back"]
-        perform(names[direction]!) { p in
-            let layer = p.slides[loc.slide].layers.remove(at: loc.index)
-            p.slides[loc.slide].layers.insert(layer, at: target)
-        }
+        arrangeLayers([id], direction)
     }
 
     func canArrange(_ direction: ArrangeDirection) -> Bool {
-        guard let loc = selectedLayerLocation else { return false }
-        let count = project.slides[loc.slide].layers.count
-        switch direction {
-        case .forward, .front: return loc.index < count - 1
-        case .backward, .back: return loc.index > 0
-        }
+        guard let id = selectedLayerID else { return false }
+        return canArrangeLayers([id], direction)
     }
 
     /// Moves a layer within its slide's stack; `toIndex` counts from the back (paint order).
@@ -489,28 +479,14 @@ final class EditorController {
     }
 
     func align(_ id: String, _ edge: AlignEdge) {
-        guard let layer = project.layer(id), !layer.locked else { return }
-        let f = project.format
-        let bounds = Geometry.rotatedBounds(of: layer.frame, degrees: layer.rotation)
-        let dx = layer.x - bounds.minX, dy = layer.y - bounds.minY
-        updateLayer(id, "Align Layer") { l in
-            switch edge {
-            case .left: l.x = dx
-            case .centerX: l.x = (f.width - l.width) / 2
-            case .right: l.x = f.width - bounds.width + dx
-            case .top: l.y = dy
-            case .centerY: l.y = (f.height - l.height) / 2
-            case .bottom: l.y = f.height - bounds.height + dy
-            }
-        }
+        alignLayers([id], edge, relativeToSlide: true)
     }
 
     func nudge(dx: Double, dy: Double) {
-        guard let layer = selectedLayer, !layer.locked else { return }
-        updateLayer(layer.id, "Move Layer", coalesce: "nudge:\(layer.id)") { l in
-            l.x += dx
-            l.y += dy
-        }
+        guard let id = selectedLayerID else { return }
+        let ids = selectedLayerIDs
+        let key = ids.count == 1 ? "nudge:\(id)" : "nudge:\(ids.joined(separator: ","))"
+        moveLayers(ids, dx: dx, dy: dy, coalesce: key)
     }
 
     func resetPhoto(_ id: String) {
@@ -675,20 +651,13 @@ final class EditorController {
         if references > 0 {
             let alert = NSAlert()
             alert.messageText = "Remove “\(asset.name)” from this project?"
-            alert.informativeText = "It’s used by \(references) layer\(references == 1 ? "" : "s"). Those layers will become empty photo slots."
+            alert.informativeText = "It has \(references) use\(references == 1 ? "" : "s") across photo layers and slide backgrounds. Photo layers will become empty slots; backgrounds will keep their fallback color."
             alert.addButton(withTitle: "Remove")
             alert.addButton(withTitle: "Cancel")
             alert.buttons.first?.hasDestructiveAction = true
             guard alert.runModal() == .alertFirstButtonReturn else { return }
         }
-        perform("Remove Media") { p in
-            p.assets.removeAll { $0.id == id }
-            for s in p.slides.indices {
-                for l in p.slides[s].layers.indices where p.slides[s].layers[l].image?.assetID == id {
-                    p.slides[s].layers[l].image?.assetID = nil
-                }
-            }
-        }
+        perform("Remove Media") { $0.removeAsset(id) }
     }
 
     /// Fills the selected empty slot when the selection is a photo layer, else adds the photo.

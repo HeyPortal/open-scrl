@@ -8,6 +8,7 @@ import {
   listAssets,
 } from '@/lib/assets';
 import type { AssetMeta } from '@/types';
+import { command } from '@/core/document/commands';
 import { useToasts } from './toasts';
 import { useEditor } from './editor';
 
@@ -169,10 +170,17 @@ export const useAssets = create<AssetsState>((set, get) => ({
     const projectId = useEditor.getState().activeProjectId;
     if (!projectId) return;
     const doc = useEditor.getState().doc;
-    const references = Object.values(doc.layers).filter((layer) => layer.kind === 'image' && layer.assetId === id).length;
-    if (references > 0 && !window.confirm(`This media file is used by ${references} layer${references === 1 ? '' : 's'}. Delete it anyway? Those layers will show a missing-media placeholder.`)) return;
+    const layerReferences = Object.values(doc.layers).filter((layer) => layer.kind === 'image' && layer.assetId === id).length;
+    const backgroundReferences = Object.values(doc.slides).filter((slide) => slide.background.kind === 'image' && slide.background.assetId === id).length;
+    const references = layerReferences + backgroundReferences;
+    if (references > 0 && !window.confirm(`This media file is used by ${references} layer or background reference${references === 1 ? '' : 's'}. Delete it anyway? Layers will show a missing-media placeholder and backgrounds will use their fallback color.`)) return;
     await idbDelete(id, projectId);
     if (get().projectId !== projectId || useEditor.getState().activeProjectId !== projectId) return;
+    useEditor.getState().execute(command('Remove background media references', (draft) => {
+      for (const slide of Object.values(draft.slides)) {
+        if (slide.background.kind === 'image' && slide.background.assetId === id) slide.background.assetId = null;
+      }
+    }));
     const next = get().assets.filter((a) => a.id !== id);
     const thumbs = { ...get().thumbs };
     delete thumbs[id];

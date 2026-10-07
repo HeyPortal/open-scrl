@@ -25,10 +25,13 @@ enum CarouselExporter {
     }
 
     static func encode(_ image: CGImage, options: ExportOptions) -> Data? {
+        if options.stillFormat == .png { return ImageDecoding.pngData(image) }
+        // JPEG and HEIC stills are opaque: composite alpha over white before encoding.
+        guard let opaque = ExportCompositing.overWhite(image) else { return nil }
         switch options.stillFormat {
-        case .png: ImageDecoding.pngData(image)
-        case .jpeg: ImageDecoding.encode(image, type: "public.jpeg", quality: options.jpegQuality)
-        case .heic: ImageDecoding.encode(image, type: "public.heic", quality: options.jpegQuality)
+        case .png: return ImageDecoding.pngData(image)
+        case .jpeg: return ImageDecoding.encode(opaque, type: "public.jpeg", quality: options.jpegQuality)
+        case .heic: return ImageDecoding.encode(opaque, type: "public.heic", quality: options.jpegQuality)
         }
     }
 

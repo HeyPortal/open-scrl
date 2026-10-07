@@ -43,7 +43,14 @@ Web App and a [native Mac app](#mac-app). Your projects and original media stay 
 - **Fast photo grids** — choose from layouts such as 1×1, 2×2, 3×3, L-shape, 1+4, and more;
   adjust the gap, select a photo slot, and choose imported media to fill it.
 - **Precise editing** — use smart alignment guides, layer locking, visibility controls,
-  duplication, renaming, drag-to-reorder, and transactional undo/redo.
+  multi-selection, groups, align/distribute, duplication, renaming, drag-to-reorder,
+  and transactional undo/redo.
+- **Text and photo styling** — add text outlines, shadows, highlights, gradient fills,
+  and shrink-to-fit text; frame photos with masks, borders, and shadows.
+- **Rich backgrounds** — use radial or multi-stop gradients, photos with blur and dim,
+  or transparency for PNG exports.
+- **Panoramas and previews** — spread a wide photo across slides on the web and inspect
+  the continuous strip in wide view. Preview posts in a phone feed, story, or 3:4 profile grid.
 - **Reusable media** — imports are deduplicated by content and organized by project.
   Click the media item used by the selected image layer again to duplicate that layer.
 - **Local-first persistence** — projects autosave in your browser, with IndexedDB fallback
@@ -138,6 +145,7 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 | `npm run build` | Type-check and create a production build |
 | `npm run preview` | Preview the production build locally |
 | `npm run verify` | Run type-checking, linting, unit tests, build, and bundle checks |
+| `bash macos/Scripts/check-features.sh` | On Mac with Xcode: check native selection, PNG drag delivery, Dock lifecycle, and offscreen preview renders |
 | `npm test` | Run the Vitest unit and regression tests |
 | `npm run test:watch` | Run Vitest in watch mode |
 | `npm run test:e2e` | Run the Playwright browser tests in Chromium |
@@ -204,6 +212,20 @@ are capped at 60 seconds per slide.
 | Edit text in place | Double-click a text layer | Double-click a text layer |
 
 The Mac app shows its shortcuts in the menu bar and in **Help ▸ Keyboard Shortcuts** (`⌘ /`).
+
+Select multiple layers with Shift-click or a marquee, then group with `⌘ G` (`Ctrl G`
+on Windows/Linux) or ungroup with Shift added. Double-click a group to edit a member;
+Escape returns to the group before clearing the selection.
+
+Press `P` on the canvas to open the phone preview. On Mac, `⌥ ⌘ P` also opens it,
+and `⇧ ⌥ ⌘ P` opens it full screen. In the preview, swipe or use the arrow keys to
+page through slides, press `F` for full screen, and Escape to exit or close.
+
+On Mac, dragging a filmstrip slide into Finder, Messages, or Mail creates a
+full-resolution PNG; animated slides use their first frame. Snapping gives a trackpad
+haptic tap. Exports show progress on the Dock icon, and long video exports can notify
+you when finished in the background. Notification permission is requested when you
+first confirm a video export or share.
 
 ## Under the hood
 

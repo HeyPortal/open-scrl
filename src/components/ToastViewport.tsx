@@ -25,7 +25,17 @@ export function ToastViewport() {
             className="pointer-events-auto flex items-start gap-2.5 rounded-lg border border-line-strong bg-bg-overlay px-3 py-2.5 text-xs text-ink shadow-lift"
           >
             <Icon size={17} className={`mt-px shrink-0 ${className}`} aria-hidden />
-            <div className="flex-1 leading-snug">{toast.message}</div>
+            <div className="flex-1 leading-snug">
+              {toast.message}
+              {toast.action && (
+                <button
+                  className="mt-1.5 block font-semibold text-accent hover:text-accent-hover"
+                  onClick={() => { removeToast(toast.id); toast.action!.run(); }}
+                >
+                  {toast.action.label}
+                </button>
+              )}
+            </div>
             <button className="text-ink-faint hover:text-ink" onClick={() => removeToast(toast.id)} title="Dismiss">
               <X size={14} />
             </button>

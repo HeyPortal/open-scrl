@@ -52,12 +52,17 @@ enum EditorMenus {
         }
         if menu.numberOfItems > 0 { menu.addItem(.separator()) }
 
-        menu.addItem(ActionMenuItem("Cut", symbol: "scissors") { c.copySelection(); c.deleteLayer(id) })
+        menu.addItem(ActionMenuItem("Cut", symbol: "scissors") { c.cutSelection() })
         menu.addItem(ActionMenuItem("Copy", symbol: "document.on.document") { c.copySelection() })
         menu.addItem(ActionMenuItem("Paste", symbol: "document.on.clipboard", enabled: c.canPaste) { c.paste(at: nil) })
-        menu.addItem(ActionMenuItem("Duplicate", symbol: "plus.square.on.square") { c.duplicateLayer(id) })
-        menu.addItem(ActionMenuItem("Delete", symbol: "trash") { c.deleteLayer(id) })
+        menu.addItem(ActionMenuItem("Duplicate", symbol: "plus.square.on.square") { c.duplicateSelection() })
+        menu.addItem(ActionMenuItem("Delete", symbol: "trash") { c.deleteSelection() })
         menu.addItem(.separator())
+        if layer.groupID != nil {
+            menu.addItem(ActionMenuItem("Select Group", symbol: "square.on.square.dashed") { c.selectParent() })
+            menu.addItem(ActionMenuItem("Ungroup", symbol: "square.on.square.squareshape.controlhandles", key: "g", modifiers: [.command, .shift]) { c.ungroupSelection() })
+            menu.addItem(.separator())
+        }
 
         menu.addItem(submenu("Arrange", symbol: "square.3.layers.3d", [
             ActionMenuItem("Bring to Front", enabled: c.canArrange(.front)) { c.arrange(id, .front) },
@@ -78,6 +83,72 @@ enum EditorMenus {
         menu.addItem(ActionMenuItem(layer.locked ? "Unlock" : "Lock", symbol: layer.locked ? "lock.open" : "lock") { c.toggleLocked(id) })
         menu.addItem(ActionMenuItem(layer.visible ? "Hide" : "Show", symbol: layer.visible ? "eye.slash" : "eye") { c.toggleVisible(id) })
         menu.addItem(ActionMenuItem("Rename…", symbol: "pencil") { c.requestRename(id) })
+        return menu
+    }
+
+    /// Align, distribute and stacking items for the current selection, shared by menus.
+    static func alignItems(_ c: EditorController) -> [NSMenuItem] {
+        let locked = c.selectedLayers.allSatisfy(\.locked)
+        let toSlide = c.selectionUnitCount < 2
+        func item(_ title: String, _ symbol: String, _ edge: AlignEdge) -> NSMenuItem {
+            ActionMenuItem(title, symbol: symbol, enabled: !locked) { c.alignSelection(edge) }
+        }
+        func slideItem(_ title: String, _ symbol: String, _ edge: AlignEdge) -> NSMenuItem {
+            ActionMenuItem(title, symbol: symbol, enabled: !locked) { c.alignSelection(edge, relativeToSlide: true) }
+        }
+        var items: [NSMenuItem] = []
+        if !toSlide {
+            items.append(submenu("Align", symbol: "align.horizontal.left", [
+                item("Left Edges", "align.horizontal.left", .left), item("Centers", "align.horizontal.center", .centerX), item("Right Edges", "align.horizontal.right", .right),
+                .separator(),
+                item("Top Edges", "align.vertical.top", .top), item("Middles", "align.vertical.center", .centerY), item("Bottom Edges", "align.vertical.bottom", .bottom),
+            ]))
+        }
+        items.append(submenu("Align to Slide", symbol: "align.horizontal.center", [
+            slideItem("Left", "align.horizontal.left", .left), slideItem("Center", "align.horizontal.center", .centerX), slideItem("Right", "align.horizontal.right", .right),
+            .separator(),
+            slideItem("Top", "align.vertical.top", .top), slideItem("Middle", "align.vertical.center", .centerY), slideItem("Bottom", "align.vertical.bottom", .bottom),
+        ]))
+        if !toSlide {
+            let can = c.canDistributeSelection && !locked
+            items.append(submenu("Distribute", symbol: "distribute.horizontal.center", [
+                ActionMenuItem("Horizontally", symbol: "distribute.horizontal.center", enabled: can) { c.distributeSelection(.horizontal) },
+                ActionMenuItem("Vertically", symbol: "distribute.vertical.center", enabled: can) { c.distributeSelection(.vertical) },
+            ]))
+        }
+        return items
+    }
+
+    /// Menu for several selected layers, or a whole group.
+    static func selectionMenu(controller c: EditorController) -> NSMenu {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        let layers = c.selectedLayers
+        let allLocked = layers.allSatisfy(\.locked)
+        let allVisible = layers.allSatisfy(\.visible)
+        menu.addItem(ActionMenuItem("Cut", symbol: "scissors") { c.cutSelection() })
+        menu.addItem(ActionMenuItem("Copy", symbol: "document.on.document") { c.copySelection() })
+        menu.addItem(ActionMenuItem("Paste", symbol: "document.on.clipboard", enabled: c.canPaste) { c.paste(at: nil) })
+        menu.addItem(ActionMenuItem("Duplicate", symbol: "plus.square.on.square") { c.duplicateSelection() })
+        menu.addItem(ActionMenuItem("Delete", symbol: "trash") { c.deleteSelection() })
+        menu.addItem(.separator())
+        if c.canGroupNow {
+            menu.addItem(ActionMenuItem("Group", symbol: "square.on.square.dashed", key: "g") { c.groupSelection() })
+        }
+        if c.canUngroupSelection {
+            menu.addItem(ActionMenuItem("Ungroup", symbol: "square.on.square.squareshape.controlhandles", key: "g", modifiers: [.command, .shift]) { c.ungroupSelection() })
+        }
+        menu.addItem(.separator())
+        menu.addItem(submenu("Arrange", symbol: "square.3.layers.3d", [
+            ActionMenuItem("Bring to Front", enabled: c.canArrangeSelection(.front)) { c.arrangeSelection(.front) },
+            ActionMenuItem("Bring Forward", enabled: c.canArrangeSelection(.forward)) { c.arrangeSelection(.forward) },
+            ActionMenuItem("Send Backward", enabled: c.canArrangeSelection(.backward)) { c.arrangeSelection(.backward) },
+            ActionMenuItem("Send to Back", enabled: c.canArrangeSelection(.back)) { c.arrangeSelection(.back) },
+        ]))
+        alignItems(c).forEach(menu.addItem)
+        menu.addItem(.separator())
+        menu.addItem(ActionMenuItem(allLocked ? "Unlock All" : "Lock All", symbol: allLocked ? "lock.open" : "lock") { c.toggleSelection(\.locked, name: allLocked ? "Unlock" : "Lock") })
+        menu.addItem(ActionMenuItem(allVisible ? "Hide All" : "Show All", symbol: allVisible ? "eye.slash" : "eye") { c.toggleSelection(\.visible, name: allVisible ? "Hide" : "Show") })
         return menu
     }
 
