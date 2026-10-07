@@ -67,6 +67,11 @@ struct SlideInspector: View {
                         Text("\(live.movedSlots) slot\(live.movedSlots == 1 ? " was" : "s were") moved by hand and won’t follow these sliders.")
                             .font(.caption).foregroundStyle(.secondary)
                     }
+                    let gridSlides = project.gridSlideCount
+                    if gridSlides > 1 {
+                        Button("Apply to All \(gridSlides) Slides") { controller.applyGridSpacingToAllSlides() }
+                            .accessibilityLabel("Apply grid spacing to all \(gridSlides) slides")
+                    }
                 } header: {
                     HStack { Text("Photo Grid"); Spacer(); Text(live.template.name).foregroundStyle(.secondary) }
                 }

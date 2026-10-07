@@ -449,22 +449,26 @@ final class EditorController {
         guard let live = project.liveGrid(slide: index) else { return }
         let newGap = gap ?? live.grid.gap, newMargin = margin ?? live.grid.margin
         guard newGap != live.grid.gap || newMargin != live.grid.margin else { return }
-        let format = project.format
-        let oldCells = live.template.layout(format: format, gap: live.grid.gap, margin: live.grid.margin)
-        let newCells = live.template.layout(format: format, gap: newGap, margin: newMargin)
         perform("Adjust Grid", coalesce: "grid:\(selectedSlideID)") { p in
-            guard p.slides.indices.contains(index), var grid = p.slides[index].grid else { return }
-            for (i, id) in grid.slotIds.enumerated() where i < oldCells.count && i < newCells.count {
-                guard let li = p.slides[index].layers.firstIndex(where: { $0.id == id }), p.slides[index].layers[li].matches(oldCells[i]) else { continue }
-                p.slides[index].layers[li].x = newCells[i].minX
-                p.slides[index].layers[li].y = newCells[i].minY
-                p.slides[index].layers[li].width = newCells[i].width
-                p.slides[index].layers[li].height = newCells[i].height
-            }
-            grid.gap = newGap
-            grid.margin = newMargin
-            p.slides[index].grid = grid
+            p.relayoutGrid(slide: index, live: live, gap: newGap, margin: newMargin)
         }
+    }
+
+    /// Copies the selected slide's gap and margin to every other slide that has a grid. Each slide keeps its
+    /// own template; slots moved by hand and slides without a grid are left alone.
+    func applyGridSpacingToAllSlides() {
+        let sourceIndex = selectedSlideIndex
+        guard let source = project.liveGrid(slide: sourceIndex) else { return }
+        let gap = source.grid.gap, margin = source.grid.margin
+        let targets: [(index: Int, live: LiveGrid)] = project.slides.indices.compactMap { i in
+            guard i != sourceIndex, let live = project.liveGrid(slide: i), live.grid.gap != gap || live.grid.margin != margin else { return nil }
+            return (i, live)
+        }
+        guard !targets.isEmpty else { return }
+        perform("Apply Grid Spacing to All Slides") { p in
+            for target in targets { p.relayoutGrid(slide: target.index, live: target.live, gap: gap, margin: margin) }
+        }
+        show("Grid spacing applied to all \(project.gridSlideCount) grid slides.", style: .success)
     }
 
     // MARK: - Editing layers

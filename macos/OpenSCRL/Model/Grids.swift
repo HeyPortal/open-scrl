@@ -183,4 +183,25 @@ extension Project {
         }
         return live > 0 ? LiveGrid(grid: grid, template: template, movedSlots: moved) : nil
     }
+
+    /// Number of slides that currently have a live grid (the N in "Apply to all N slides").
+    var gridSlideCount: Int { slides.indices.filter { liveGrid(slide: $0) != nil }.count }
+
+    /// Re-lays out one slide's grid. Only slots still on their old computed cell move; hand-moved slots and
+    /// every other layer are left alone. `live` must come from this project before the change.
+    mutating func relayoutGrid(slide index: Int, live: LiveGrid, gap: Double, margin: Double) {
+        guard slides.indices.contains(index), var grid = slides[index].grid else { return }
+        let oldCells = live.template.layout(format: format, gap: live.grid.gap, margin: live.grid.margin)
+        let newCells = live.template.layout(format: format, gap: gap, margin: margin)
+        for (i, id) in grid.slotIds.enumerated() where i < oldCells.count && i < newCells.count {
+            guard let li = slides[index].layers.firstIndex(where: { $0.id == id }), slides[index].layers[li].matches(oldCells[i]) else { continue }
+            slides[index].layers[li].x = newCells[i].minX
+            slides[index].layers[li].y = newCells[i].minY
+            slides[index].layers[li].width = newCells[i].width
+            slides[index].layers[li].height = newCells[i].height
+        }
+        grid.gap = gap
+        grid.margin = margin
+        slides[index].grid = grid
+    }
 }
