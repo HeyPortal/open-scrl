@@ -42,6 +42,7 @@ enum EditorMenus {
         case .image(let props):
             if props.assetID != nil {
                 menu.addItem(ActionMenuItem("Adjust Crop", symbol: "crop") { c.beginCropEditing(id) })
+                menu.addItem(ActionMenuItem("Blend Seam", symbol: "square.on.square", enabled: c.canBlendSelectedSeam) { c.blendSelectedSeam() })
                 menu.addItem(ActionMenuItem("Replace Photo…", symbol: "photo.badge.arrow.down") { c.replacePhoto(id) })
                 menu.addItem(ActionMenuItem("Reset Photo", symbol: "arrow.counterclockwise") { c.resetPhoto(id) })
             } else {
@@ -132,6 +133,7 @@ enum EditorMenus {
         menu.addItem(ActionMenuItem("Duplicate", symbol: "plus.square.on.square") { c.duplicateSelection() })
         menu.addItem(ActionMenuItem("Delete", symbol: "trash") { c.deleteSelection() })
         menu.addItem(.separator())
+        menu.addItem(ActionMenuItem("Blend Seam", symbol: "square.on.square", enabled: c.canBlendSelectedSeam) { c.blendSelectedSeam() })
         if c.canGroupNow {
             menu.addItem(ActionMenuItem("Group", symbol: "square.on.square.dashed", key: "g") { c.groupSelection() })
         }

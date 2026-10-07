@@ -47,6 +47,7 @@ struct LayerInspector: View {
             case .image:
                 ImageSections(controller: controller, layer: layer)
                 PhotoFrameSections(controller: controller, layer: layer)
+                SeamBlendSection(controller: controller, layer: layer)
             case .text:
                 TextSections(controller: controller, layer: layer)
             case .shape:

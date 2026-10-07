@@ -87,6 +87,45 @@ grids, and carousel export, and works the way a Mac app should:
 
 The web app and the Mac app store projects separately; projects don't move between them yet.
 
+### Seam blending on Mac
+
+Select two photo or video layers and choose **Arrange ▸ Blend Seam**, or choose a partner
+in a photo's **Seam Blend** inspector. Touching layers get a small overlap without changing
+their aspect ratios. The effect aligns shared detail, matches local colors, and smooths the
+join while preserving the original media and pixels away from the seam.
+
+Adjust the width, position, color strength, or alignment in the inspector. Choose **Update
+Match** after moving, resizing, cropping, or changing a mask. Automatic alignment needs
+shared scene detail; **Align X/Y** provides manual adjustment. Video matching uses the
+opening frames and holds the correction steady during synchronized preview and MP4 export.
+It does not track moving objects. The settings are saved with the project and are undoable.
+
+Run the native seam regression checks with `zsh macos/Scripts/test-seam-blend.sh`.
+Seam feathering, local alignment, and color correction run through a Metal-backed Core
+Image kernel. Cached source pixels and partner coverage are reused during slider changes.
+The CPU renderer remains a fallback. Compare both paths with
+`zsh macos/Scripts/benchmark-seam-blend.sh`.
+
+### GPU rendering on Mac
+
+The canvas now presents through Metal. A shared Core Image graph handles photo fitting,
+cropping, masks, rotation, opacity, seam correction, shadows, and blurred photo backgrounds.
+Video preview and MP4 export keep decoded frames in pixel buffers; export renders directly
+into the encoder's IOSurface-backed buffers. Still exports use the same composition.
+Embedded image color profiles, video orientation, and white compositing for MP4 are preserved.
+
+Static text, shape, mask, and border geometry is cached. The canvas renders on changes,
+limits queued work, and caps viewport textures; exports retain full-resolution geometry.
+Core Graphics remains available when Metal is unavailable or rendering fails.
+
+Run `zsh macos/Scripts/test-gpu-rendering.sh` for rendering and MP4 parity checks, and
+`zsh macos/Scripts/benchmark-gpu-rendering.sh` for an optimized composition benchmark.
+On an M5 Pro, a six-photo scene with masks, crop, rotation, borders, and shadows rendered
+in 5.9 ms versus 56.2 ms at 1080 × 1350, and 16.8 ms versus 325.6 ms at 2160 × 2700.
+This measures completed composition,
+including graph construction; media decoding, video encoding, disk writes, and editor
+controls are excluded. Results depend on the scene and hardware.
+
 ### Download
 
 Download `Open-SCRL-<version>.dmg` from
@@ -103,7 +142,8 @@ xattr -dr com.apple.quarantine /Applications/Open-SCRL.app
 
 ### Build from source
 
-Requires Xcode 27. Open `macos/OpenSCRL.xcodeproj` and choose **Product ▸ Run**, or build
+Requires Xcode 27 and its Metal Toolchain (`xcodebuild -downloadComponent MetalToolchain`).
+Open `macos/OpenSCRL.xcodeproj` and choose **Product ▸ Run**, or build
 from the command line:
 
 ```bash

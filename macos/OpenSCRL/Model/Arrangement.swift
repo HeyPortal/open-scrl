@@ -38,6 +38,9 @@ extension Layer {
             result.content = .text(p)
         case .image(var p):
             p.cornerRadius *= k; p.strokeWidth *= k
+            p.seamBlend?.width *= k
+            p.seamBlend?.offsetX *= sx; p.seamBlend?.offsetY *= sy
+            p.seamBlend?.analysis = nil
             result.content = .image(p)
         case .shape(var p):
             p.cornerRadius *= k; p.strokeWidth *= k
@@ -89,6 +92,9 @@ extension Slide {
     mutating func deleteLayers(_ ids: [String]) {
         let removed = Set(ids)
         layers.removeAll { removed.contains($0.id) }
+        for i in layers.indices where layers[i].image?.seamBlend.map({ removed.contains($0.targetLayerID) }) == true {
+            layers[i].image?.seamBlend = nil
+        }
         normalizeSingletonGroups()
     }
 
@@ -112,6 +118,14 @@ extension Slide {
             if let top = sources.last { blocks[top.id] = block }
         }
         layers = layers.flatMap { [$0] + (blocks[$0.id] ?? []) }
+        let copiedIDs = Set(copies.values)
+        for i in layers.indices where copiedIDs.contains(layers[i].id) {
+            if let target = layers[i].image?.seamBlend?.targetLayerID {
+                if let newTarget = copies[target] { layers[i].image?.seamBlend?.targetLayerID = newTarget }
+                else { layers[i].image?.seamBlend = nil }
+                layers[i].image?.seamBlend?.analysis = nil
+            }
+        }
         return copies
     }
 
@@ -236,9 +250,14 @@ extension Layer {
     /// Copies in input order, remapping each distinct group once (also used by paste).
     static func freshCopies(_ layers: [Layer]) -> [Layer] {
         var groups: [String: String] = [:]
+        let ids = Dictionary(uniqueKeysWithValues: layers.map { ($0.id, UID.make()) })
         return layers.map { source in
             var copy = source
-            copy.id = UID.make()
+            copy.id = ids[source.id]!
+            if let target = copy.image?.seamBlend?.targetLayerID {
+                if let newTarget = ids[target] { copy.image?.seamBlend?.targetLayerID = newTarget }
+                else { copy.image?.seamBlend = nil }
+            }
             if let group = source.groupID {
                 if groups[group] == nil { groups[group] = UID.make() }
                 copy.groupID = groups[group]

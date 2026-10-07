@@ -15,6 +15,15 @@ struct SelectionInspector: View {
         Form {
             Section { header(layers: layers, bounds: bounds, isOneGroup: isOneGroup) }
 
+            if layers.count == 2 && layers.allSatisfy({ $0.image?.assetID != nil }) {
+                Section("Seam Blend") {
+                    Button("Blend Selected Photos or Videos", systemImage: "square.on.square") { controller.blendSelectedSeam() }
+                        .disabled(!controller.canBlendSelectedSeam)
+                    Text("Align shared detail and match colors along the join.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+
             Section {
                 HStack(spacing: 8) {
                     Button { controller.groupSelection() } label: { Label("Group", systemImage: "square.on.square.dashed").frame(maxWidth: .infinity) }
