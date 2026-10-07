@@ -259,6 +259,32 @@ import Darwin
     let received = NSBitmapImageRep(data: try Data(contentsOf: delivery.get()))!
     check(received.pixelsWide == 80 && received.colorAt(x: 40, y: 80)!.alphaComponent < 0.01, "native provider delivers the complete transparent PNG")
 
+    // Photo grids: free slots stay free, linked spacing is clamped per template.
+    let gridDoc = ProjectDocument(format: CanvasFormat(name: "Landscape", width: 1080, height: 566))
+    gridDoc.perform("Fixture", undoManager: nil) { p in p.slides = [Slide(id: "g1", background: .solid("#ffffff"), layers: [])] }
+    let gc = EditorController(document: gridDoc)
+    gc.selectedSlideID = "g1"
+    let fourGrid = GridTemplate.template(id: "four-grid")!, fourStack = GridTemplate.template(id: "four-stack")!
+    gc.applyGrid(fourGrid, gap: 0, margin: 0)
+    let slots = gc.project.slides[0].grid!.slotIds
+    let target = fourGrid.layout(format: gc.project.format, gap: 40, margin: 0)[1]
+    gc.updateLayer(slots[1]) { $0.x = 123; $0.width = 200 }
+    gc.setSlideGrid(gap: 20)
+    gc.updateLayer(slots[1]) { $0.x = target.minX; $0.y = target.minY; $0.width = target.width; $0.height = target.height }
+    gc.setSlideGrid(gap: 40)
+    gc.setSlideGrid(gap: 60)
+    let kept = gc.project.slides[0].layers.first { $0.id == slots[1] }!
+    check(kept.matches(target), "a hand-resized slot stays put when a later spacing matches its frame")
+    check(gc.project.liveGrid(slide: 0)?.movedSlots == 1, "the free slot still counts as moved by hand")
+    gc.duplicateSlide("g1")
+    let copyGrid = gc.project.slides[1].grid!
+    check(copyGrid.detachedSlotIds?.count == 1 && copyGrid.detachedSlotIds?.first.map { !slots.contains($0) } == true, "duplicating a slide re-ids the free slots")
+    gc.selectedSlideID = "g1"
+    gc.gridLinked = true; gc.gridGap = 120; gc.gridMargin = 120
+    gc.applyGrid(fourStack)
+    let linkedLimit = fourStack.linkedMax(format: gc.project.format)
+    check(linkedLimit == 100 && gc.project.slides[0].grid!.gap == 100 && gc.project.slides[0].grid!.margin == 100, "linked spacing is clamped to what the template fits")
+
     print("ALL \(checks) UI CHECKS PASSED")
 }
 setbuf(stdout, nil)
