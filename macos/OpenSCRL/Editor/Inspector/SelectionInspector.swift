@@ -27,6 +27,10 @@ struct SelectionInspector: View {
                 }
             }
 
+            if blendGroup == nil, layers.count == 2 {
+                PhotoSwapSection(controller: controller, ids: layers.map(\.id))
+            }
+
             if blendGroup == nil { Section {
                 HStack(spacing: 8) {
                     Button { controller.groupSelection() } label: { Label("Group", systemImage: "square.on.square.dashed").frame(maxWidth: .infinity) }

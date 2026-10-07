@@ -21,7 +21,7 @@ interface AssetsState {
   loadForProject: (projectId: string) => Promise<void>;
   clearProject: () => void;
   ensureThumb: (id: string) => Promise<string | undefined>;
-  importFiles: (files: File[] | FileList) => Promise<AssetMeta[]>;
+  importFiles: (files: File[] | FileList, options?: { reuseExisting?: boolean }) => Promise<AssetMeta[]>;
   remove: (id: string) => Promise<void>;
   clearImportMessage: () => void;
 }
@@ -93,7 +93,7 @@ export const useAssets = create<AssetsState>((set, get) => ({
     }
   },
 
-  importFiles: async (files) => {
+  importFiles: async (files, options) => {
     const projectId = useEditor.getState().activeProjectId;
     if (!projectId) {
       set({ importMessage: 'Open a project before importing media.' });
@@ -112,16 +112,19 @@ export const useAssets = create<AssetsState>((set, get) => ({
       return [];
     }
     const imported: AssetMeta[] = [];
+    const usable: AssetMeta[] = [];
     const duplicates: string[] = [];
     const failed: string[] = [];
     for (const f of arr) {
       try {
         const a = await idbImport(f, projectId);
         imported.push(a);
+        usable.push(a);
       } catch (err) {
         if (err instanceof DuplicateAssetError) {
           duplicates.push(f.name);
-          useToasts.getState().addToast(`${f.name} has already been imported.`, 'warning');
+          if (options?.reuseExisting) usable.push(err.existing);
+          else useToasts.getState().addToast(`${f.name} has already been imported.`, 'warning');
           continue;
         }
         console.error('Failed to import', f.name, err);
@@ -129,7 +132,7 @@ export const useAssets = create<AssetsState>((set, get) => ({
       }
     }
     if (get().projectId !== projectId || useEditor.getState().activeProjectId !== projectId) {
-      return imported;
+      return options?.reuseExisting ? usable : imported;
     }
     if (imported.length > 0) {
       const next = [...get().assets, ...imported];
@@ -163,7 +166,7 @@ export const useAssets = create<AssetsState>((set, get) => ({
             : 'No media was imported.',
       });
     }
-    return imported;
+    return options?.reuseExisting ? usable : imported;
   },
 
   remove: async (id) => {

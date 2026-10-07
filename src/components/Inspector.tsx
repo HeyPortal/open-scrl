@@ -32,6 +32,8 @@ import { RotationDial } from './RotationDial';
 import { ColorField, NumberField, Section, Slider } from './ui';
 import { useLayerGesture } from './inspector/useLayerGesture';
 import { Switch } from './inspector/controls';
+import { PhotoSwapSection } from './inspector/PhotoSwapSection';
+import { SlidePhotoActions } from './inspector/SlidePhotoActions';
 import { ImageFrameSection, ShadowSection, TextFillSection, TextHighlightSection, TextOutlineSection } from './inspector/effects';
 import { alignSelection, isMac } from '@/app/actions';
 import { ALIGN_BUTTONS, SelectionInspector } from './inspector/SelectionInspector';
@@ -288,6 +290,7 @@ function ImageInspector({ layer }: { layer: ImageLayer }) {
           </div>
         </div>
       </Section>
+      {layer.assetId && <PhotoSwapSection key={layer.id} ids={[layer.id]} />}
       <ImageFrameSection layer={layer} />
       <ShadowSection layer={layer} />
     </>
@@ -505,6 +508,7 @@ function SlideInspector({ onShowLayers }: { onShowLayers: () => void }) {
           </button>
         )}
       </Section>
+      <SlidePhotoActions slideId={slideId} />
       <Section title="Slide">
         <div className="grid grid-cols-3 gap-1.5">
           <button className="btn btn-secondary btn-sm" onClick={() => addSlide(slideId)} title="Add a slide after this one">

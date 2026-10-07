@@ -53,6 +53,12 @@ Web App and a [native Mac app](#mac-app). Your projects and original media stay 
   the continuous strip in wide view. Preview posts in a phone feed, story, or 3:4 profile grid.
 - **Reusable media** — imports are deduplicated by content and organized by project.
   Click the media item used by the selected image layer again to duplicate that layer.
+- **Photo arrangement** — drop media onto any photo frame to replace its contents while
+  keeping its size, styling, and lock. Multiple files fill the target and then other empty
+  frames on that slide; extras stay in Media. Use **Shuffle Photos** in the slide inspector,
+  or select two frames to **Swap Photos**. A single photo's inspector also lets you choose
+  a partner on another slide or move the photo into an empty frame. Mac blend groups keep
+  their joins when a member is replaced and are excluded from shuffle and swap.
 - **Local-first persistence** — projects autosave in your browser, with IndexedDB fallback
   for media when OPFS writes are unavailable or fail. Save and load errors include retry
   controls, and failed import workers recover for subsequent imports.

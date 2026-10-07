@@ -10,8 +10,11 @@ extension CanvasView {
     static let dropTypes: [NSPasteboard.PasteboardType] = [.openSCRLMedia, .fileURL, .png, .tiff, NSPasteboard.PasteboardType(UTType.jpeg.identifier), NSPasteboard.PasteboardType(UTType.heic.identifier)]
 
     private func dropTarget(at p: CGPoint) -> SceneItem? {
-        guard let item = hitLayer(atView: p), item.layer.image != nil else { return nil }
-        return item
+        guard let project = controller?.project else { return nil }
+        let point = modelPoint(p)
+        return project.scene().reversed().first {
+            $0.layer.image != nil && Geometry.hitTest($0.layer, origin: $0.origin, point: point, tolerance: 3 / zoom)
+        }
     }
 
     private func updateDrop(_ sender: NSDraggingInfo) -> NSDragOperation {
@@ -55,9 +58,10 @@ extension CanvasView {
         // Media dragged from the library.
         if let ids = pasteboard.pasteboardItems?.compactMap({ $0.data(forType: .openSCRLMedia).map { String(decoding: $0, as: UTF8.self) } }), !ids.isEmpty {
             let assets = ids.compactMap { controller.project.asset($0) }
-            guard let first = assets.first else { return false }
+            guard !assets.isEmpty else { return false }
             if let target {
-                controller.assign(first, to: target.layer.id)
+                let placed = controller.assignPhotos(assets, to: target.layer.id)
+                if assets.count > 1 { controller.show("Placed \(placed) of \(assets.count) photos.", style: .success) }
                 controller.selectLayer(target.layer.id)
             } else {
                 for (n, asset) in assets.enumerated() {

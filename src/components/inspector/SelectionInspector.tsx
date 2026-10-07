@@ -31,6 +31,7 @@ import { alignSelection, buildActions, distributeSelection, formatBinding, isMac
 import type { Layer } from '@/types';
 import { NumberField, Section, Slider } from '../ui';
 import { Segmented } from './controls';
+import { PhotoSwapSection } from './PhotoSwapSection';
 import { useEditGesture } from './useLayerGesture';
 
 export const ALIGN_BUTTONS: { edge: AlignEdge; label: string; Icon: typeof AlignStartVertical }[] = [
@@ -115,6 +116,8 @@ export function SelectionInspector({ ids }: { ids: string[] }) {
           </IconButton>
         </div>
       </div>
+
+      {ids.length === 2 && <PhotoSwapSection ids={ids} />}
 
       <Section title="Group">
         <div className="grid grid-cols-2 gap-1.5">

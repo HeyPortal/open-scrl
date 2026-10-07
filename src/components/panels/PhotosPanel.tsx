@@ -7,6 +7,7 @@ import { useToasts } from '@/store/toasts';
 import { useEditorSession } from '@/editor/sessionStore';
 import { slideSpanFor } from '@/core/document/geometry';
 import { getMediaKind } from '@/lib/media';
+import { ASSET_DRAG_TYPE } from '../canvas/mediaDrop';
 import { useContextMenu } from '../Menu';
 import { EmptyState, PanelHeader } from '../ui';
 
@@ -46,6 +47,7 @@ function MediaThumbnail({
           src={url}
           className="w-full h-full object-cover"
           alt={asset.name}
+          draggable={false}
           loading="lazy"
           decoding="async"
           onError={onError}
@@ -94,7 +96,7 @@ export function PhotosPanel() {
 
   const addImageLayer = useEditor((s) => s.addImageLayer);
   const duplicateLayer = useEditor((s) => s.duplicateLayer);
-  const updateLayer = useEditor((s) => s.updateLayer);
+  const assignPhoto = useEditor((s) => s.assignPhoto);
   const selectedLayerId = useEditorSession((s) => s.selectedLayerId);
   const selectedLayer = useEditor((s) => selectedLayerId ? s.doc.layers[selectedLayerId] : undefined);
   const layers = useEditor((s) => s.doc.layers);
@@ -137,7 +139,7 @@ export function PhotosPanel() {
       { label: 'Add to slide', onSelect: () => addImageLayer(asset.id, { width: asset.width, height: asset.height }) },
       { label: spanOf(asset) > 1 ? `Spread across ${spanOf(asset)} slides` : 'Spread across 2 slides', onSelect: () => spread(asset) },
       { label: 'New slide with this', onSelect: () => addMediaAsSlides([asset]) },
-      ...(slot ? [{ label: slot.assetId ? `Replace photo in “${slot.name}”` : `Fill “${slot.name}”`, onSelect: () => updateLayer(slot.id, { assetId: asset.id, locked: false }) }] : []),
+      ...(slot ? [{ label: slot.assetId ? `Replace photo in “${slot.name}”` : `Fill “${slot.name}”`, onSelect: () => { assignPhoto(slot.id, asset.id); } }] : []),
       { separator: true },
       { label: 'Remove from project', danger: true, onSelect: () => void remove(asset.id) },
     ], asset.name);
@@ -154,7 +156,7 @@ export function PhotosPanel() {
       return;
     }
     if (sel) {
-      updateLayer(sel.id, { assetId: asset.id, locked: false });
+      assignPhoto(sel.id, asset.id);
     } else {
       addImageLayer(asset.id, { width: asset.width, height: asset.height });
     }
@@ -170,7 +172,9 @@ export function PhotosPanel() {
       }}
       onDrop={(e) => {
         e.preventDefault();
-        handleFiles(e.dataTransfer.files);
+        // Handled here; the editor shell's import fallback must not import the same files again.
+        e.stopPropagation();
+        void handleFiles(e.dataTransfer.files);
       }}
     >
       <PanelHeader title="Media" action={assets.length > 0 ? <span className="text-xs tabular-nums text-ink-faint">{assets.length}</span> : undefined} />
@@ -221,9 +225,9 @@ export function PhotosPanel() {
           <p className={`rounded-lg px-3 py-2 text-[11px] leading-relaxed ${targetSlot ? 'bg-accent-soft text-accent' : 'text-ink-faint'}`}>
             {targetSlot
               ? targetSlot.assetId
-                ? <>Click to replace the photo in <strong>{targetSlot.name}</strong>, or click its current photo to duplicate it.</>
+                ? <>Click or drag a photo onto <strong>{targetSlot.name}</strong> to replace it, or click its current photo to duplicate it.</>
                 : <>Click a photo to fill <strong>{targetSlot.name}</strong>.</>
-              : 'Click a photo to add it to the slide.'}
+              : 'Click a photo to add it to the slide, or drag it onto a frame or the canvas.'}
           </p>
         )}
       </div>
@@ -238,7 +242,8 @@ export function PhotosPanel() {
                 onClick={() => handleAssetClick(a)}
                 draggable
                 onDragStart={(e) => {
-                  e.dataTransfer.setData('application/x-osc-asset', a.id);
+                  e.dataTransfer.setData(ASSET_DRAG_TYPE, a.id);
+                  e.dataTransfer.effectAllowed = 'copy';
                 }}
                 title={a.name}
               >

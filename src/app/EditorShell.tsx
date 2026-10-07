@@ -30,7 +30,7 @@ export default function EditorShell(){
   const panelOpen=useEditorSession((s)=>s.leftPanelOpen);
   const previewOpen=useEditorView((s)=>s.previewOpen);
   useEffect(()=>{const onKey=(e:KeyboardEvent)=>{if(e.defaultPrevented||useEditorSession.getState().overlay||useEditorView.getState().previewOpen||useContextMenu.getState().menu)return;handleEditorKey(e);};window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey);},[]);
-  return <div className="flex flex-col h-full w-full" onDragOver={(e)=>{if(e.dataTransfer.types.includes('Files'))e.preventDefault();}} onDrop={async(e)=>{const files=Array.from(e.dataTransfer.files).filter(isLikelyMediaFile);if(!files.length)return;e.preventDefault();await importFiles(files);}}>
+  return <div className="flex flex-col h-full w-full" onDragOver={(e)=>{if(e.dataTransfer.types.includes('Files'))e.preventDefault();}} onDrop={async(e)=>{if(e.defaultPrevented)return;const files=Array.from(e.dataTransfer.files).filter(isLikelyMediaFile);if(!files.length)return;e.preventDefault();await importFiles(files);}}>
     <TopBar/><div className="flex flex-1 overflow-hidden min-h-0"><LeftRail/>{panelOpen&&<aside className="w-60 shrink-0 overflow-hidden border-r border-line bg-bg-panel xl:w-64"><PanelContent/></aside>}<div ref={stageRef} className="relative min-w-0 flex-1 overflow-hidden"><Canvas width={size.width} height={size.height}/></div><RightPanel/></div><Filmstrip/><ContextMenuHost/><EditorOverlays/>{previewOpen&&<PhonePreview/>}
   </div>;
 }
