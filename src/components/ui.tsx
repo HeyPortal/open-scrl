@@ -38,7 +38,7 @@ export function LinkedSliders({ linked, onToggle, top, bottom }: { linked: boole
   const border = linked ? 'border-accent' : 'border-line-strong';
   const fill = linked ? 'bg-accent' : 'bg-line-strong';
   return (
-    <div className="flex items-stretch gap-1.5">
+    <div className="flex items-stretch gap-2.5">
       <div className="min-w-0 flex-1 space-y-0.5">{top}{bottom}</div>
       <div className="mb-3.5 mt-[26px] flex shrink-0 items-stretch">
         <div className={`w-2 rounded-r-[3px] border-y border-r ${border}`} aria-hidden />
@@ -46,7 +46,7 @@ export function LinkedSliders({ linked, onToggle, top, bottom }: { linked: boole
           <span className={`h-px w-1.5 ${fill}`} aria-hidden />
           <button
             type="button"
-            className={`icon-btn ${linked ? 'icon-btn-active' : ''}`}
+            className={`icon-btn ml-1 ${linked ? 'icon-btn-active' : ''}`}
             title={linked ? 'Unlink gap and outer margin' : 'Link gap and outer margin'}
             aria-label="Link gap and outer margin"
             aria-pressed={linked}

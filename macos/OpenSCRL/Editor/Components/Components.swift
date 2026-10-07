@@ -339,7 +339,8 @@ struct LinkedSliders<Top: View, Bottom: View>: View {
     private let top: Top
     private let bottom: Bottom
 
-    private let columnWidth: CGFloat = 44
+    /// Space for the bracket column; anything the bracket, connector and button don't use becomes the gap beside the sliders.
+    private let columnWidth: CGFloat = 60
 
     init(linked: Binding<Bool>, @ViewBuilder top: () -> Top, @ViewBuilder bottom: () -> Bottom) {
         _linked = linked
@@ -365,6 +366,7 @@ struct LinkedSliders<Top: View, Bottom: View>: View {
                 .labelStyle(.iconOnly)
                 .controlSize(.small)
                 .help(linked ? "Unlink gap and outer margin" : "Link gap and outer margin")
+                .padding(.leading, 4)
             }
             .frame(width: columnWidth, alignment: .trailing)
             .padding(.top, 25)
