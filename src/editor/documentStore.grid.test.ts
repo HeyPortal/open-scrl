@@ -132,3 +132,72 @@ describe('duplicateSlide with a grid', () => {
     expect(frame(slotIds(copyId)[2])).toEqual(cells[2]);
   });
 });
+
+describe('setGridSpacingForAllSlides', () => {
+  const onePlusTwo = GRID_TEMPLATES.find((t) => t.id === 'one-plus-two')!;
+
+  /** Slide 1: 2×2 grid. Slide 2: 1 + 2 grid. Slide 3: no grid, just a text layer. */
+  function threeSlides() {
+    store().applyGrid(four, 0, 0);
+    store().addSlide();
+    store().applyGrid(onePlusTwo, 0, 0);
+    store().addSlide();
+    store().addTextLayer();
+    const [a, b, c] = store().doc.slideOrder;
+    return { a, b, c };
+  }
+
+  it('copies gap and margin to every other slide with a grid, each following its own template', () => {
+    const { a, b, c } = threeSlides();
+    const textId = store().doc.slides[c].layerOrder[0];
+    const textBefore = { ...store().doc.layers[textId] };
+    store().setSlideGrid(a, { gap: 30, margin: 20 });
+
+    store().setGridSpacingForAllSlides(a);
+
+    expect(store().doc.slides[b].grid).toMatchObject({ templateId: 'one-plus-two', gap: 30, margin: 20 });
+    const cells = layoutGrid(onePlusTwo, store().doc.format, 30, 20);
+    slotIds(b).forEach((id, i) => expect(frame(id)).toEqual(cells[i]));
+    expect(store().doc.slides[a].grid).toMatchObject({ gap: 30, margin: 20 });
+    expect(store().doc.slides[c].grid).toBeUndefined();
+    expect(store().doc.layers[textId]).toEqual(textBefore);
+  });
+
+  it('leaves a slot that was moved by hand on another slide where it is', () => {
+    const { a, b } = threeSlides();
+    const [first, second] = slotIds(b);
+    store().updateLayer(first, { x: 777 });
+    const movedBefore = frame(first);
+    store().setSlideGrid(a, { gap: 30, margin: 20 });
+
+    store().setGridSpacingForAllSlides(a);
+
+    expect(frame(first)).toEqual(movedBefore);
+    expect(frame(second)).toEqual(layoutGrid(onePlusTwo, store().doc.format, 30, 20)[1]);
+  });
+
+  it('is one undo step for all slides', () => {
+    const { a, b } = threeSlides();
+    store().setSlideGrid(a, { gap: 30, margin: 20 });
+    const before = store().past.length;
+
+    store().setGridSpacingForAllSlides(a);
+    expect(store().past.length).toBe(before + 1);
+    store().undo();
+
+    expect(store().doc.slides[b].grid).toMatchObject({ gap: 0, margin: 0 });
+    const flush = layoutGrid(onePlusTwo, store().doc.format, 0, 0);
+    slotIds(b).forEach((id, i) => expect(frame(id)).toEqual(flush[i]));
+    expect(store().doc.slides[a].grid).toMatchObject({ gap: 30, margin: 20 });
+  });
+
+  it('does nothing when the source has no grid, no other slide has one, or the spacing already matches', () => {
+    store().applyGrid(four, 10, 5);
+    store().addSlide();
+    const [a, b] = store().doc.slideOrder;
+    const doc = store().doc;
+    store().setGridSpacingForAllSlides(b);
+    store().setGridSpacingForAllSlides(a);
+    expect(store().doc).toBe(doc);
+  });
+});

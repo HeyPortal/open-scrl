@@ -5,7 +5,7 @@ import { id } from '@/lib/nano';
 import { DEFAULT_FORMAT } from '@/lib/format';
 import { layoutGrid, type GridTemplate } from '@/lib/grids';
 import { migrateDocument } from '@/core/document/migrations';
-import { getLiveGrid, slotMatchesCell } from '@/core/document/grid';
+import { getLiveGrid, relayoutSlideGrid } from '@/core/document/grid';
 import { command, type EditorCommand } from '@/core/document/commands';
 import { getSlideLayers, materializeSlide, expandToGroups, groupMemberIds, selectionUnits } from '@/core/document/selectors';
 import { scaleLayer, slideSpanFor, unionBounds, type AlignEdge, type DistributeAxis } from '@/core/document/geometry';
@@ -90,6 +90,7 @@ export interface EditorState {
   addShapeLayer(shape: 'rect' | 'ellipse'): void;
   applyGrid(template: GridTemplate, gap: number, margin?: number): void;
   setSlideGrid(slideId: string, patch: { gap?: number; margin?: number }): void;
+  setGridSpacingForAllSlides(fromSlideId: string): void;
   updateLayer(id: string, patch: Partial<Layer>): void;
   updateLayers(patches: { id: string; patch: Partial<Layer> }[]): void;
   deleteLayer(id: string): void;
@@ -470,10 +471,13 @@ export const useDocumentStore = create<EditorState>((set, get) => ({
   },
   setSlideGrid: (slideId,patch) => { const s=get();const live=getLiveGrid(s.doc,slideId);if(!live)return;
     const gap=patch.gap??live.grid.gap;const margin=patch.margin??live.grid.margin;if(gap===live.grid.gap&&margin===live.grid.margin)return;
-    const oldCells=layoutGrid(live.template,s.doc.format,live.grid.gap,live.grid.margin);const newCells=layoutGrid(live.template,s.doc.format,gap,margin);
-    get().execute(command('Adjust grid',(d)=>{const slide=d.slides[slideId];const g=slide.grid;if(!g)return;
-      g.slotIds.forEach((lid,i)=>{const layer=d.layers[lid];if(!layer||!slide.layerOrder.includes(lid)||!oldCells[i]||!newCells[i])return;if(!slotMatchesCell(layer,oldCells[i]))return;const c=newCells[i];layer.x=c.x;layer.y=c.y;layer.width=c.w;layer.height=c.h;});
-      g.gap=gap;g.margin=margin;},`grid:${slideId}`));
+    get().execute(command('Adjust grid',(d)=>relayoutSlideGrid(d,slideId,live,s.doc.format,gap,margin),`grid:${slideId}`));
+  },
+  setGridSpacingForAllSlides: (fromSlideId) => { const s=get();const source=getLiveGrid(s.doc,fromSlideId);if(!source)return;
+    const {gap,margin}=source.grid;
+    const targets=s.doc.slideOrder.filter((sid)=>sid!==fromSlideId).flatMap((sid)=>{const live=getLiveGrid(s.doc,sid);return live&&(live.grid.gap!==gap||live.grid.margin!==margin)?[{sid,live}]:[];});
+    if(!targets.length)return;
+    get().execute(command('Apply grid spacing to all slides',(d)=>{for(const t of targets)relayoutSlideGrid(d,t.sid,t.live,s.doc.format,gap,margin);}));
   },
   updateLayer: (layerId, patch) => get().execute(command('Edit layer',(d)=>{if(d.layers[layerId])d.layers[layerId]=fitTextBox({...d.layers[layerId],...patch} as Layer,Object.keys(patch));},`layer:${layerId}:${Object.keys(patch).sort().join(',')}`)),
   updateLayers: (patches) => get().execute(command('Edit layers',(d)=>{for(const p of patches)if(d.layers[p.id])d.layers[p.id]=fitTextBox({...d.layers[p.id],...p.patch} as Layer,Object.keys(p.patch));})),

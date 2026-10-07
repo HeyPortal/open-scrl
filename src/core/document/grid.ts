@@ -1,3 +1,4 @@
+import type { Draft } from 'immer';
 import { GRID_TEMPLATES, layoutGrid, type GridCell, type GridTemplate } from '@/lib/grids';
 import type { Layer, ProjectDocumentV2, SlideGrid } from '@/types';
 
@@ -37,4 +38,35 @@ export function getLiveGrid(doc: ProjectDocumentV2, slideId: string): LiveGrid |
     if (!slotMatchesCell(layer, cells[i])) movedSlots++;
   });
   return liveSlots > 0 ? { grid, template, liveSlots, movedSlots } : null;
+}
+
+/**
+ * Re-lays out one slide's grid inside an Immer draft. Only slots still on their old computed cell move;
+ * hand-moved slots and every other layer are left alone. `live` must come from the document the draft started from.
+ */
+export function relayoutSlideGrid(
+  draft: Draft<ProjectDocumentV2>,
+  slideId: string,
+  live: LiveGrid,
+  format: { width: number; height: number },
+  gap: number,
+  margin: number,
+): void {
+  const slide = draft.slides[slideId];
+  const grid = slide?.grid;
+  if (!slide || !grid) return;
+  const oldCells = layoutGrid(live.template, format, live.grid.gap, live.grid.margin);
+  const newCells = layoutGrid(live.template, format, gap, margin);
+  grid.slotIds.forEach((id, i) => {
+    const layer = draft.layers[id];
+    if (!layer || !slide.layerOrder.includes(id) || !oldCells[i] || !newCells[i]) return;
+    if (!slotMatchesCell(layer, oldCells[i])) return;
+    const c = newCells[i];
+    layer.x = c.x;
+    layer.y = c.y;
+    layer.width = c.w;
+    layer.height = c.h;
+  });
+  grid.gap = gap;
+  grid.margin = margin;
 }

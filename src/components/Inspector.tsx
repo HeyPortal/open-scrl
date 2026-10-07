@@ -439,10 +439,12 @@ function ShapeInspector({ layer }: { layer: ShapeLayer }) {
 function GridSection({ slideId }: { slideId: string }) {
   const doc = useEditor((s) => s.doc);
   const setSlideGrid = useEditor((s) => s.setSlideGrid);
+  const setGridSpacingForAllSlides = useEditor((s) => s.setGridSpacingForAllSlides);
   const linked = useEditorSession((s) => s.gridLinked);
   const setGridLinked = useEditorSession((s) => s.setGridLinked);
   const gesture = useEditGesture('Adjust grid', `gesture:grid:${slideId}`);
   const live = useMemo(() => getLiveGrid(doc, slideId), [doc, slideId]);
+  const gridSlides = useMemo(() => doc.slideOrder.filter((id) => getLiveGrid(doc, id)).length, [doc]);
   if (!live) return null;
   const { grid, template, movedSlots } = live;
   const shared = linkedMax(template, doc.format);
@@ -466,6 +468,11 @@ function GridSection({ slideId }: { slideId: string }) {
         bottom={<Slider ariaLabel="Outer margin" label="Outer margin" display={`${Math.round(margin)} px`} min={0} max={marginMax} value={margin} onChange={setMargin} gesture={gesture} valueText={`${Math.round(margin)} pixels`} />}
       />
       {movedSlots > 0 && <p className="text-[11px] leading-relaxed text-ink-faint">{movedSlots} slot{movedSlots === 1 ? ' was' : 's were'} moved by hand and won’t follow these sliders.</p>}
+      {gridSlides > 1 && (
+        <button className="btn btn-secondary btn-sm w-full" aria-label={`Apply grid spacing to all ${gridSlides} slides`} onClick={() => setGridSpacingForAllSlides(slideId)}>
+          Apply to all {gridSlides} slides
+        </button>
+      )}
     </Section>
   );
 }

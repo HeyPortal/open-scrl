@@ -65,3 +65,34 @@ test('linking gap and outer margin snaps the margin to the gap and moves both to
   await inspector.getByRole('slider', { name: 'Gap', exact: true }).fill('40');
   expect(await grid()).toMatchObject({ gap: 40, margin: 20 });
 });
+
+test('apply to all slides copies the gap and outer margin to every slide with a grid', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: /create|start/i }).first().click();
+  await page.getByRole('navigation', { name: 'Tools' }).getByRole('button', { name: 'Grids', exact: true }).click();
+  await page.getByTitle('Apply “2 × 2” grid').click();
+  const inspector = page.getByRole('tabpanel');
+  await expect(inspector.getByRole('button', { name: /^Apply grid spacing to all/ })).toHaveCount(0);
+
+  await page.getByTitle('Add slide').click();
+  await page.getByTitle('Apply “1 + 2” grid').click();
+  await page.getByTitle('Slide 1', { exact: true }).click();
+  await inspector.getByRole('slider', { name: 'Gap', exact: true }).fill('40');
+  await inspector.getByRole('slider', { name: 'Outer margin', exact: true }).fill('20');
+
+  await inspector.getByRole('button', { name: 'Apply grid spacing to all 2 slides' }).click();
+
+  const grids = await page.evaluate(async () => {
+    const path = '/src/editor/documentStore.ts';
+    const { useDocumentStore } = await import(path) as typeof import('../src/editor/documentStore');
+    const { doc } = useDocumentStore.getState();
+    return doc.slideOrder.map((id) => {
+      const g = doc.slides[id].grid!;
+      return { template: g.templateId, gap: g.gap, margin: g.margin, firstX: doc.layers[g.slotIds[0]].x };
+    });
+  });
+  expect(grids).toEqual([
+    { template: 'four-grid', gap: 40, margin: 20, firstX: 20 },
+    { template: 'one-plus-two', gap: 40, margin: 20, firstX: 20 },
+  ]);
+});
