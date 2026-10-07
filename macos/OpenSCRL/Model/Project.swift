@@ -143,6 +143,7 @@ struct ImageProperties: Hashable, Sendable {
     var stroke: String = "#ffffff"
     /// Border width; 0 means no border.
     var strokeWidth: Double = 0
+    var seamBlend: SeamBlend?
 }
 
 struct TextProperties: Hashable, Sendable {

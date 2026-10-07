@@ -1,9 +1,11 @@
 import AppKit
+import CoreImage
 import Observation
 
 /// The editor's workspace. Like the web app's Konva stage it is viewport-sized and draws the
 /// visible part of the slide deck itself, so memory stays flat at any zoom level. It renders
-/// with the same `Renderer` used for export, then draws selection chrome on top.
+/// with the shared GPU composition used for export, then draws selection chrome on top.
+/// Offscreen drawing and machines without Metal keep the Core Graphics renderer.
 final class CanvasView: NSView {
     // MARK: State
 
@@ -55,7 +57,7 @@ final class CanvasView: NSView {
     var spaceDown = false
     var textEditor: CanvasTextView?
     let textUndoManager = UndoManager()
-    var playback: MediaPlayback?
+    var playbacks: [String: MediaPlayback] = [:]
     var displayLink: CADisplayLink?
     var trackingArea: NSTrackingArea?
     var lastMouseLocation: CGPoint?
@@ -64,6 +66,14 @@ final class CanvasView: NSView {
     var marqueeRect: CGRect?
     /// Guides the current drag last snapped to, so the trackpad taps once per new snap.
     var lastSnapSignature: Set<String> = []
+    private var metalSurface: CanvasMetalSurface?
+    private let chromeOverlay = CanvasChromeOverlay(frame: .zero)
+    /// Internal rendering-state observability for native integration checks.
+    var isPresentingMetal: Bool {
+        guard let surface = metalSurface else { return false }
+        return !surface.isHidden && surface.canPresent && surface.hasPresented
+    }
+    var completedMetalFrameCount: Int { metalSurface?.completedFrameCount ?? 0 }
 
     static let guideColor = NSColor(srgbRed: 1, green: 0.231, blue: 0.541, alpha: 1)
 
@@ -72,6 +82,27 @@ final class CanvasView: NSView {
         wantsLayer = true
         layerContentsRedrawPolicy = .onSetNeedsDisplay
         registerForDraggedTypes(Self.dropTypes)
+        if let renderer = GPUSceneRenderer.shared {
+            let surface = CanvasMetalSurface(renderer: renderer)
+            surface.onUnavailable = { [weak self] in
+                DispatchQueue.main.async {
+                    self?.chromeOverlay.isHidden = true
+                    self?.needsDisplay = true
+                }
+            }
+            metalSurface = surface
+            addSubview(surface)
+            chromeOverlay.drawChrome = { [weak self] cg in
+                guard let self, let controller = self.controller else { return }
+                withObservationTracking {
+                    _ = controller.document.canvasRevision
+                    self.drawAffordances(cg, controller: controller)
+                } onChange: { [weak self] in
+                    DispatchQueue.main.async { self?.needsDisplay = true }
+                }
+            }
+            addSubview(chromeOverlay)
+        }
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -151,6 +182,8 @@ final class CanvasView: NSView {
 
     override func layout() {
         super.layout()
+        if let surface = metalSurface, surface.frame != bounds { surface.frame = bounds }
+        if chromeOverlay.frame != bounds { chromeOverlay.frame = bounds }
         guard let controller else { return }
         let project = controller.project
         let fit = fitZoom(for: project)
@@ -190,6 +223,7 @@ final class CanvasView: NSView {
         layoutTextEditor()
         // Zooming or revealing a slide moves the deck under a still pointer.
         updateSlideHover(lastMouseLocation)
+        needsDisplay = true
     }
 
     /// Scrolls just enough to show the slide; centers it when it doesn't fit.
@@ -205,6 +239,7 @@ final class CanvasView: NSView {
     }
 
     override func setFrameSize(_ newSize: NSSize) {
+        guard newSize != frame.size else { return }
         super.setFrameSize(newSize)
         needsLayout = true
     }
@@ -212,7 +247,19 @@ final class CanvasView: NSView {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         window?.acceptsMouseMovedEvents = true
+        metalSurface?.resetAvailability()
         if window != nil { needsLayout = true }
+    }
+
+    override func viewDidChangeBackingProperties() {
+        super.viewDidChangeBackingProperties()
+        metalSurface?.resetAvailability()
+        needsDisplay = true
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        needsDisplay = true
     }
 
     override func updateTrackingAreas() {
@@ -228,11 +275,14 @@ final class CanvasView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         guard let cg = NSGraphicsContext.current?.cgContext else { return }
         guard let controller else {
+            metalSurface?.clear()
+            chromeOverlay.isHidden = true
             NSColor.underPageBackgroundColor.setFill()
             bounds.fill()
             return
         }
         withObservationTracking {
+            _ = controller.document.canvasRevision
             render(cg, controller: controller)
         } onChange: { [weak self] in
             DispatchQueue.main.async { self?.needsDisplay = true }
@@ -254,7 +304,11 @@ final class CanvasView: NSView {
         let accent = NSColor.controlAccentColor.cgColor
         cg.setFillColor(workspaceColor)
         cg.fill(bounds)
-        guard !project.slides.isEmpty else { return }
+        guard !project.slides.isEmpty else {
+            metalSurface?.clear()
+            chromeOverlay.isHidden = true
+            return
+        }
 
         let W = project.format.width
         let deckRect = CGRect(origin: origin, size: deckSize(project))
@@ -267,14 +321,23 @@ final class CanvasView: NSView {
         cg.fill(deckRect)
         cg.restoreGState()
 
-        var options = RenderOptions(editor: true)
-        options.accent = accent
-        options.interpolation = isInteracting ? .medium : .high
-        if let id = controller.editingTextLayerID { options.hiddenLayerIDs.insert(id) }
-        if let id = dropTargetLayerID { options.highlightedSlotIDs.insert(id) }
-        if let layer = controller.selectedLayer, layer.isEmptyImageSlot { options.highlightedSlotIDs.insert(layer.id) }
+        let options = renderOptions(controller, accent: accent)
         let assets = project.assetsByID
         let images = document.images
+
+        // Real windows present the viewport through Metal. Snapshot/printing contexts draw
+        // synchronously with Core Graphics, so native offscreen checks remain meaningful.
+        if NSGraphicsContext.current?.isDrawingToScreen == true,
+           let surface = metalSurface, surface.canPresent,
+           let composition = metalComposition(project, viewport: visibleModel, images: images,
+                                              options: options, scale: z * surface.pixelsPerPoint) {
+            surface.update(composition)
+            chromeOverlay.isHidden = false
+            chromeOverlay.needsDisplay = true
+            return
+        }
+        metalSurface?.clear()
+        chromeOverlay.isHidden = true
 
         // Content that hangs off the deck is shown faintly so it can still be found and grabbed.
         drawOverflow(cg, project: project, deckRect: deckRect, assets: assets, images: images, options: options)
@@ -291,13 +354,91 @@ final class CanvasView: NSView {
             }
         }
 
+        drawAffordances(cg, controller: controller)
+    }
+
+    private func renderOptions(_ controller: EditorController, accent: CGColor) -> RenderOptions {
+        var options = RenderOptions(editor: true)
+        options.accent = accent
+        options.interpolation = isInteracting ? .medium : .high
+        if let id = controller.editingTextLayerID { options.hiddenLayerIDs.insert(id) }
+        if let id = dropTargetLayerID { options.highlightedSlotIDs.insert(id) }
+        if let layer = controller.selectedLayer, layer.isEmptyImageSlot { options.highlightedSlotIDs.insert(layer.id) }
+        return options
+    }
+
+    private func drawAffordances(_ cg: CGContext, controller: EditorController) {
+        let project = controller.project
+        guard !project.slides.isEmpty else { return }
+        let accent = NSColor.controlAccentColor.cgColor
+        let W = project.format.width
+        let first = max(0, Int(floor((bounds.minX - origin.x) / zoom / W)))
+        let last = min(project.slides.count - 1, Int(floor((bounds.maxX - origin.x) / zoom / W)))
         drawSlideChrome(cg, project: project, controller: controller, first: first, last: last, accent: accent)
         if let cropID = controller.cropLayerID, let item = sceneItem(cropID, in: project) {
-            drawCropOverlay(cg, item: item, project: project, assets: assets, images: images, accent: accent)
+            drawCropOverlay(cg, item: item, project: project, assets: project.assetsByID, images: controller.document.images, accent: accent)
         }
         drawSelection(cg, project: project, controller: controller, accent: accent)
         drawGuides(cg)
         drawMarquee(cg, accent: accent)
+    }
+
+    /// CI coordinates run upward. The logical viewport is the portion of the deck beneath
+    /// this view, keeping allocations constant as the user zooms or adds more slides.
+    func metalComposition(_ project: Project, viewport: CGRect, images: ImageProviding,
+                          options: RenderOptions, scale: CGFloat) -> CIImage? {
+        guard let renderer = GPUSceneRenderer.shared, scale.isFinite, scale > 0 else { return nil }
+        let target = CGRect(x: 0, y: 0, width: viewport.width * scale, height: viewport.height * scale)
+        let assets = project.assetsByID
+        func outputRect(_ logical: CGRect) -> CGRect {
+            CGRect(x: (logical.minX - viewport.minX) * scale,
+                   y: (viewport.maxY - logical.maxY) * scale,
+                   width: logical.width * scale, height: logical.height * scale)
+        }
+        let deckModel = CGRect(origin: .zero, size: project.deckSize)
+        let deck = outputRect(deckModel).intersection(target)
+        var result = CIImage(color: .clear).cropped(to: target)
+        let first = max(0, Int(floor(viewport.minX / project.format.width)))
+        let last = min(project.slides.count - 1, Int(floor(viewport.maxX / project.format.width)))
+        if first <= last {
+            for index in first...last {
+                let rect = outputRect(project.viewport(ofSlide: index))
+                let visible = rect.intersection(target)
+                guard !visible.isNull, !visible.isEmpty else { continue }
+                guard let background = renderer.background(project.slides[index].background, in: rect,
+                                                           assets: assets, images: images, options: options, scale: Double(scale)) else { return nil }
+                result = background.cropped(to: visible).composited(over: result)
+            }
+        }
+        // A layer's frame can be offscreen while its shadow, glyphs or stroke remain visible.
+        // Cull by visual bounds and retain seam partners without decoding distant slides.
+        let items = CanvasSceneVisibility.items(in: project, intersecting: viewport, options: options, scale: scale)
+        guard let content = renderer.scene(items, viewport: viewport, assets: assets, images: images,
+                                           options: options, scale: Double(scale)) else { return nil }
+        if !deck.isNull, !deck.isEmpty { result = content.cropped(to: deck).composited(over: result) }
+
+        // Keep the same faint off-deck preview as the original canvas. Only overflowing
+        // layers enter this scene; clipping excludes the already-composited deck interior.
+        let overflowing = items.filter {
+            !deckModel.contains(Geometry.rotatedBounds(of: $0.globalFrame, degrees: $0.layer.rotation).insetBy(dx: 0.5, dy: 0.5))
+        }
+        if !overflowing.isEmpty {
+            guard let overflow = renderer.scene(overflowing, viewport: viewport, assets: assets, images: images,
+                                                options: options, scale: Double(scale)) else { return nil }
+            let faint = overflow.applyingFilter("CIColorMatrix", parameters: ["inputAVector": CIVector(x: 0, y: 0, z: 0, w: 0.28)])
+            if deck.isNull || deck.isEmpty {
+                result = faint.composited(over: result)
+            } else {
+                let outside = [CGRect(x: 0, y: 0, width: target.width, height: deck.minY),
+                               CGRect(x: 0, y: deck.maxY, width: target.width, height: target.maxY - deck.maxY),
+                               CGRect(x: 0, y: deck.minY, width: deck.minX, height: deck.height),
+                               CGRect(x: deck.maxX, y: deck.minY, width: target.maxX - deck.maxX, height: deck.height)]
+                for rect in outside where rect.width > 0 && rect.height > 0 {
+                    result = faint.cropped(to: rect).composited(over: result)
+                }
+            }
+        }
+        return result.cropped(to: target)
     }
 
     var isInteracting: Bool {
@@ -327,9 +468,7 @@ final class CanvasView: NSView {
         cg.beginTransparencyLayer(auxiliaryInfo: nil)
         cg.translateBy(x: origin.x, y: origin.y)
         cg.scaleBy(x: zoom, y: zoom)
-        for item in overflowing {
-            Renderer.drawLayer(item.layer, origin: item.origin, cg: cg, assets: assets, images: images, options: options)
-        }
+        Renderer.drawScene(overflowing, cg: cg, assets: assets, images: images, options: options)
         cg.endTransparencyLayer()
         cg.restoreGState()
     }
@@ -618,16 +757,36 @@ final class CanvasView: NSView {
 
     func syncPlayback() {
         guard let controller else { return }
-        let asset = controller.selectedLayer?.image?.assetID.flatMap { controller.project.asset($0) }
-        let wanted = (asset?.mediaKind.isAnimated == true && Preferences.playAnimatedMedia) ? asset : nil
-        if playback?.assetID == wanted?.id { return }
-        playback?.stop()
-        if let old = playback?.assetID { controller.document.images.playbackFrames[old] = nil }
-        playback = nil
+        let project = controller.project
+        var connected = Set(controller.selectedLayerID.map { [$0] } ?? [])
+        let layers = project.slides.flatMap(\.layers).filter { $0.visible }
+        var changed = true
+        while changed {
+            changed = false
+            for layer in layers {
+                if let target = layer.image?.seamBlend?.targetLayerID,
+                   project.layer(target)?.visible == true, connected.contains(layer.id) || connected.contains(target) {
+                    if connected.insert(layer.id).inserted { changed = true }
+                    if connected.insert(target).inserted { changed = true }
+                }
+            }
+        }
+        let wanted = Preferences.playAnimatedMedia ? Dictionary(layers.filter { connected.contains($0.id) }.compactMap { layer -> (String, MediaAsset)? in
+            guard let asset = project.asset(layer.image?.assetID), asset.mediaKind.isAnimated else { return nil }
+            return (asset.id, asset)
+        }, uniquingKeysWith: { a, _ in a }) : [:]
+        if Set(playbacks.keys) == Set(wanted.keys) { return }
+        for (id, playback) in playbacks {
+            playback.stop()
+            controller.document.images.playbackFrames[id] = nil
+            controller.document.images.gpuPlaybackFrames[id] = nil
+        }
+        playbacks = [:]
         displayLink?.invalidate()
         displayLink = nil
-        guard let wanted else { needsDisplay = true; return }
-        playback = MediaPlayback(asset: wanted, media: controller.document.media, maxPixel: 1280)
+        guard !wanted.isEmpty else { needsDisplay = true; return }
+        let epoch = CACurrentMediaTime()
+        for (id, asset) in wanted { playbacks[id] = MediaPlayback(asset: asset, media: controller.document.media, maxPixel: 1280, startTime: epoch) }
         let link = displayLink(target: self, selector: #selector(stepPlayback))
         link.preferredFrameRateRange = CAFrameRateRange(minimum: 24, maximum: 60, preferred: 30)
         link.add(to: .main, forMode: .common)
@@ -635,18 +794,26 @@ final class CanvasView: NSView {
     }
 
     @objc private func stepPlayback() {
-        guard let playback, let controller, let frame = playback.currentFrame() else { return }
-        if controller.document.images.playbackFrames[playback.assetID] !== frame {
-            controller.document.images.playbackFrames[playback.assetID] = frame
-            needsDisplay = true
+        guard let controller else { return }
+        for (id, playback) in playbacks {
+            if let frame = playback.currentGPUFrame(), controller.document.images.gpuPlaybackFrames[id] !== frame {
+                controller.document.images.gpuPlaybackFrames[id] = frame
+                controller.document.images.playbackFrames[id] = nil
+                needsDisplay = true
+            }
         }
     }
 
     func teardown() {
-        playback?.stop()
+        for (id, playback) in playbacks {
+            playback.stop()
+            controller?.document.images.playbackFrames[id] = nil
+            controller?.document.images.gpuPlaybackFrames[id] = nil
+        }
         displayLink?.invalidate()
         displayLink = nil
-        if let id = playback?.assetID { controller?.document.images.playbackFrames[id] = nil }
-        playback = nil
+        playbacks = [:]
+        metalSurface?.clear()
+        chromeOverlay.isHidden = true
     }
 }

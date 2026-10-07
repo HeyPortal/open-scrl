@@ -1,5 +1,6 @@
 import Foundation
 import CoreGraphics
+import CoreImage
 import ImageIO
 import Observation
 
@@ -7,7 +8,7 @@ import Observation
 /// Main-thread only. Requests for a missing tier return the closest loaded image and decode the
 /// right one in the background; `revision` changes when new images arrive so views redraw.
 @Observable
-final class ImageCache: ImageProviding {
+final class ImageCache: GPUImageProviding {
     private(set) var revision = 0
 
     @ObservationIgnored private let media: MediaStore
@@ -19,9 +20,16 @@ final class ImageCache: ImageProviding {
 
     /// Animated frames currently playing in the editor, keyed by asset ID.
     @ObservationIgnored var playbackFrames: [String: CGImage] = [:]
+    @ObservationIgnored var gpuPlaybackFrames: [String: CIImage] = [:] {
+        didSet {
+            playbackBridges = playbackBridges.filter { gpuPlaybackFrames[$0.key] === $0.value.source }
+        }
+    }
+    @ObservationIgnored private var playbackBridges: [String: (source: CIImage, image: CGImage)] = [:]
 
     private struct Entry {
         var image: CGImage
+        var gpuImage: CIImage
         var bytes: Int
         var lastUse: UInt64
     }
@@ -41,6 +49,13 @@ final class ImageCache: ImageProviding {
 
     func image(for asset: MediaAsset, pixelEdge: CGFloat) -> CGImage? {
         _ = revision
+        if let frame = gpuPlaybackFrames[asset.id] {
+            if let bridge = playbackBridges[asset.id], bridge.source === frame { return bridge.image }
+            if let image = VideoImageBridge.cgImage(frame) {
+                playbackBridges[asset.id] = (frame, image)
+                return image
+            }
+        }
         if let frame = playbackFrames[asset.id] { return frame }
         let tier = tier(for: asset, pixelEdge: pixelEdge)
         clock &+= 1
@@ -51,6 +66,14 @@ final class ImageCache: ImageProviding {
         }
         load(asset, tier: tier)
         return bestLoaded(asset.id, near: tier)
+    }
+
+    func gpuImage(for asset: MediaAsset, pixelEdge: CGFloat) -> CIImage? {
+        _ = revision
+        if let frame = gpuPlaybackFrames[asset.id] { return frame }
+        guard let image = image(for: asset, pixelEdge: pixelEdge) else { return nil }
+        if let entry = entries[asset.id]?.values.first(where: { $0.image === image }) { return entry.gpuImage }
+        return CIImage(cgImage: image)
     }
 
     /// Synchronous decode for one-off needs such as the Finder thumbnail written on save.
@@ -97,7 +120,8 @@ final class ImageCache: ImageProviding {
         let bytes = image.bytesPerRow * image.height
         if let old = entries[assetID]?[tier] { totalBytes -= old.bytes }
         clock &+= 1
-        entries[assetID, default: [:]][tier] = Entry(image: image, bytes: bytes, lastUse: clock)
+        entries[assetID, default: [:]][tier] = Entry(image: image, gpuImage: CIImage(cgImage: image),
+                                                   bytes: bytes, lastUse: clock)
         totalBytes += bytes
         evictIfNeeded()
         scheduleRevision()
@@ -132,6 +156,9 @@ final class ImageCache: ImageProviding {
     func forget(_ assetID: String) {
         for (_, entry) in entries[assetID] ?? [:] { totalBytes -= entry.bytes }
         entries[assetID] = nil
+        playbackFrames[assetID] = nil
+        gpuPlaybackFrames[assetID] = nil
+        playbackBridges[assetID] = nil
     }
 
     /// Forces a redraw, e.g. when a playback frame changed.

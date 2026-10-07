@@ -39,6 +39,7 @@ extension EditorController {
             .init(id: "hide", title: allVisible ? "Hide \(target)" : "Show \(target)", group: .edit, symbol: "eye.slash", shortcut: "⇧⌘H", isEnabled: id != nil, run: { self.toggleSelection(\.visible, name: allVisible ? "Hide" : "Show") }),
             .init(id: "edit-text", title: "Edit Text", group: .edit, symbol: "character.cursor.ibeam", shortcut: "↩", isEnabled: single && layer?.text != nil, run: { if let id { self.beginTextEditing(id) } }),
             .init(id: "crop", title: "Adjust Crop", group: .edit, symbol: "crop", shortcut: "↩", isEnabled: single && layer?.image?.assetID != nil, run: { if let id { self.beginCropEditing(id) } }),
+            .init(id: "blend-seam", title: "Blend Seam", group: .edit, symbol: "square.on.square", keywords: "blend feather join stitch match colors photos video", isEnabled: canBlendSelectedSeam, run: { self.blendSelectedSeam() }),
             .init(id: "rename", title: "Rename Layer", group: .edit, symbol: "pencil", isEnabled: single, run: { if let id { self.requestRename(id) } }),
 
             .init(id: "front", title: "Bring to Front", group: .arrange, symbol: "square.3.layers.3d.top.filled", shortcut: "⌥⌘]", isEnabled: canArrangeSelection(.front), run: { self.arrangeSelection(.front) }),

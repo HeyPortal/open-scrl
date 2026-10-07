@@ -21,6 +21,7 @@ struct CanvasRepresentable: NSViewRepresentable {
         _ = controller.editingTextLayerID
         _ = controller.cropLayerID
         _ = controller.selectedLayer?.image?.assetID
+        _ = controller.project
         view.syncWithController()
     }
 

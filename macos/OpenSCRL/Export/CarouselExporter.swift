@@ -17,6 +17,15 @@ struct ExportOptions: Sendable {
 enum CarouselExporter {
     static func renderStill(_ project: Project, slide index: Int, images: ExportImageSource, scale: Double) -> CGImage? {
         let width = Int((project.format.width * scale).rounded()), height = Int((project.format.height * scale).rounded())
+        if let gpu = GPUSceneRenderer.shared,
+           let graph = gpu.slide(project, index: index, images: images, scale: scale) {
+            let aligned = graph.transformed(by: CGAffineTransform(translationX: 0,
+                                    y: Double(height) - project.format.height * scale))
+            if let image = gpu.context.createCGImage(aligned, from: CGRect(x: 0, y: 0, width: width, height: height),
+                                                     format: .RGBA8, colorSpace: HexColor.srgb) {
+                return image
+            }
+        }
         guard let cg = ImageDecoding.makeContext(width: width, height: height) else { return nil }
         cg.interpolationQuality = .high
         cg.scaleBy(x: scale, y: scale)

@@ -103,6 +103,8 @@ final class EditorController {
     var exportState: ExportState?
     /// Layer whose name field the inspector should focus.
     var renameRequest: String?
+    var analyzingSeamLayerID: String?
+    @ObservationIgnored var seamAnalysisTask: Task<Void, Never>?
 
     @ObservationIgnored private var bannerTask: Task<Void, Never>?
     @ObservationIgnored var exportTask: Task<Void, Never>?
@@ -122,6 +124,7 @@ final class EditorController {
     }
 
     func beginGesture() { document.beginGesture() }
+    func beginCanvasGesture() { document.beginGesture(canvasPreview: true) }
     func endGesture(_ name: String) { document.endGesture(name, undoManager: undoManager) }
     func cancelGesture() { document.cancelGesture() }
 
@@ -363,7 +366,7 @@ final class EditorController {
     /// otherwise add a new photo to the slide.
     func useAsset(_ asset: MediaAsset) {
         if let layer = selectedLayer, let props = layer.image {
-            if props.assetID == asset.id { duplicateLayer(layer.id); return }
+            if props.assetID == asset.id { duplicateLayer(layer.id, using: asset); return }
             assign(asset, to: layer.id)
         } else {
             addImage(asset)
@@ -373,12 +376,22 @@ final class EditorController {
     func assign(_ asset: MediaAsset, to layerID: String, name: String? = nil) {
         let wasEmpty = project.layer(layerID)?.isEmptyImageSlot ?? false
         updateLayer(layerID, name ?? (wasEmpty ? "Fill Photo Slot" : "Replace Photo")) { l in
-            l.image?.assetID = asset.id
-            l.image?.cropOffsetX = 0
-            l.image?.cropOffsetY = 0
-            l.image?.cropScale = 1
-            l.locked = false
+            self.assign(asset, to: &l)
         }
+    }
+
+    private func assign(_ asset: MediaAsset, to layer: inout Layer) {
+        guard layer.image != nil else { return }
+        // Empty grid slots keep their layout; replacements start at the photo's original ratio.
+        if !layer.isEmptyImageSlot {
+            layer.frame = makeImageLayer(asset, center: layer.frame.center).frame
+        }
+        layer.image?.assetID = asset.id
+        layer.image?.cropOffsetX = 0
+        layer.image?.cropOffsetY = 0
+        layer.image?.cropScale = 1
+        layer.image?.seamBlend = nil
+        layer.locked = false
     }
 
     func applyGrid(_ template: GridTemplate, gap: Double? = nil) {
@@ -421,9 +434,10 @@ final class EditorController {
     /// The selection already holds whole groups unless the user stepped into one.
     func deleteSelection() { deleteLayers(selectedLayerIDs) }
 
-    func duplicateLayer(_ id: String, offset: Double = 24) {
+    func duplicateLayer(_ id: String, offset: Double = 24, using asset: MediaAsset? = nil) {
         guard let loc = project.locate(layer: id) else { return }
         var copy = project.slides[loc.slide].layers[loc.index]
+        if let asset { assign(asset, to: &copy) }
         copy.id = UID.make()
         copy.x += offset
         copy.y += offset
@@ -591,9 +605,7 @@ final class EditorController {
             case .fill(let layerID):
                 var queue = usable
                 p.updateLayer(layerID) { l in
-                    l.image?.assetID = queue.removeFirst().id
-                    l.image?.cropOffsetX = 0; l.image?.cropOffsetY = 0; l.image?.cropScale = 1
-                    l.locked = false
+                    self.assign(queue.removeFirst(), to: &l)
                 }
                 newSelection = layerID
                 // Extra files fill the slide's other empty slots, then become new photos.

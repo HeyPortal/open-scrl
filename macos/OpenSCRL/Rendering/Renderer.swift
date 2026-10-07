@@ -125,17 +125,32 @@ enum Renderer {
         cg.saveGState()
         cg.clip(to: local)
         drawBackground(project.slides[index].background, in: local, cg: cg, images: images, assets: assets, checkerboard: options.editor)
-        for item in project.scene(intersecting: viewport) {
-            let origin = CGPoint(x: item.origin.x - viewport.minX, y: item.origin.y)
-            drawLayer(item.layer, origin: origin, cg: cg, assets: assets, images: images, options: options)
+        let items = project.scene(intersecting: viewport).map { item in
+            var local = item
+            local.origin.x -= viewport.minX
+            return local
         }
+        drawScene(items, cg: cg, assets: assets, images: images, options: options)
         cg.restoreGState()
+    }
+
+    /// Draws an ordered scene consistently in slides, filmstrip thumbnails, and overflow.
+    static func drawScene(_ items: [SceneItem], cg: CGContext, assets: [String: MediaAsset],
+                          images: ImageProviding?, options: RenderOptions) {
+        var lowerLayers: [String: SceneItem] = [:]
+        for item in items {
+            let target = item.layer.image?.seamBlend.flatMap { lowerLayers[$0.targetLayerID] }
+            drawLayer(item.layer, origin: item.origin, cg: cg, assets: assets, images: images, options: options, seamTarget: target)
+            if !options.hiddenLayerIDs.contains(item.layer.id) {
+                lowerLayers[item.layer.id] = item
+            }
+        }
     }
 
     // MARK: Layers
 
     static func drawLayer(_ layer: Layer, origin: CGPoint, cg: CGContext, assets: [String: MediaAsset],
-                          images: ImageProviding?, options: RenderOptions) {
+                          images: ImageProviding?, options: RenderOptions, seamTarget: SceneItem? = nil) {
         guard layer.visible, !options.hiddenLayerIDs.contains(layer.id), layer.width > 0, layer.height > 0 else { return }
         cg.saveGState()
         cg.translateBy(x: origin.x + layer.width / 2, y: origin.y + layer.height / 2)
@@ -152,7 +167,7 @@ enum Renderer {
         let box = CGSize(width: layer.width, height: layer.height)
         switch layer.content {
         case .image(let props):
-            drawImage(props, layerID: layer.id, box: box, cg: cg, assets: assets, images: images, options: options)
+            drawImage(props, layer: layer, origin: origin, box: box, cg: cg, assets: assets, images: images, options: options, seamTarget: seamTarget)
         case .shape(let props):
             drawShape(props, box: box, cg: cg)
         case .text(let props):
@@ -203,8 +218,9 @@ enum Renderer {
         return max(0.01, sqrt(m.a * m.a + m.b * m.b))
     }
 
-    private static func drawImage(_ props: ImageProperties, layerID: String, box: CGSize, cg: CGContext,
-                                  assets: [String: MediaAsset], images: ImageProviding?, options: RenderOptions) {
+    private static func drawImage(_ props: ImageProperties, layer: Layer, origin: CGPoint, box: CGSize, cg: CGContext,
+                                  assets: [String: MediaAsset], images: ImageProviding?, options: RenderOptions, seamTarget: SceneItem?) {
+        let layerID = layer.id
         let clip = MaskGeometry.path(props.mask, size: box, cornerRadius: props.cornerRadius)
         guard let assetID = props.assetID else {
             if options.editor { drawSlotPlaceholder(box: box, clip: clip, cg: cg, highlighted: options.highlightedSlotIDs.contains(layerID), accent: options.accent, missing: false) }
@@ -221,7 +237,16 @@ enum Renderer {
         cg.clip()
         if let image = images?.image(for: asset, pixelEdge: edge) {
             cg.interpolationQuality = options.interpolation
-            drawImageFlipped(image, in: mediaRect, cg: cg)
+            if let blend = props.seamBlend?.sanitized, let target = seamTarget,
+               let targetAsset = assets[target.layer.image?.assetID ?? ""], target.layer.opacity > 0,
+               let targetImage = images?.image(for: targetAsset, pixelEdge: edge),
+               let blended = SeamRenderer.image(image, asset: asset,
+                    foreground: SceneItem(layer: layer, slideIndex: target.slideIndex, origin: origin), target: target,
+                    blend: blend, pixelScale: deviceScale(cg), assets: assets, targetImage: targetImage) {
+                drawImageFlipped(blended, in: CGRect(origin: .zero, size: box), cg: cg)
+            } else {
+                drawImageFlipped(image, in: mediaRect, cg: cg)
+            }
         } else if options.editor {
             cg.setFillColor(CGColor(gray: 0.5, alpha: 0.16))
             cg.fill(CGRect(origin: .zero, size: box))

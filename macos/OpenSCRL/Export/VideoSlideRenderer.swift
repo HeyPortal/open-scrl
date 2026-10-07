@@ -1,7 +1,6 @@
 import AVFoundation
 import CoreImage
 import ImageIO
-import VideoToolbox
 
 enum ExportError: LocalizedError {
     case cancelled
@@ -19,12 +18,18 @@ enum ExportError: LocalizedError {
 
 /// Decodes a video's frames in order (looping), oriented by the track's transform.
 private final class VideoFrameReader {
+    private struct Frame {
+        let time: Double
+        // Retain the decoder's buffer while its lazy Core Image graph is in use.
+        let pixels: CVReadOnlyPixelBuffer
+        let image: CIImage
+    }
     private let asset: AVURLAsset
     private let composition: AVVideoComposition?
     private var reader: AVAssetReader?
     private var provider: AVAssetReaderOutput.Provider<CMReadySampleBuffer<CMSampleBuffer.DynamicContent>>?
-    private var current: (time: Double, image: CGImage)?
-    private var upcoming: (time: Double, image: CGImage)?
+    private var current: Frame?
+    private var upcoming: Frame?
     let duration: Double
 
     init(url: URL) async throws {
@@ -38,7 +43,11 @@ private final class VideoFrameReader {
         reader?.cancelReading()
         let reader = try AVAssetReader(asset: asset)
         let tracks = try await asset.loadTracks(withMediaType: .video)
-        let settings: [String: Any] = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
+        let settings: [String: Any] = [
+            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+            kCVPixelBufferMetalCompatibilityKey as String: true,
+            kCVPixelBufferIOSurfacePropertiesKey as String: [:],
+        ]
         let output: AVAssetReaderOutput
         if let composition {
             let composed = AVAssetReaderVideoCompositionOutput(videoTracks: tracks, videoSettings: settings)
@@ -57,19 +66,18 @@ private final class VideoFrameReader {
         upcoming = nil
     }
 
-    private func readNext() async throws -> (Double, CGImage)? {
+    private func readNext() async throws -> Frame? {
         guard let provider, let sample = try await provider.next() else { return nil }
-        let image: CGImage? = sample.withUnsafeSampleBuffer { buffer in
+        let frame: Frame? = sample.withUnsafeSampleBuffer { buffer in
             guard let pixels = CMSampleBufferGetImageBuffer(buffer) else { return nil }
-            var image: CGImage?
-            VTCreateCGImageFromCVPixelBuffer(pixels, options: nil, imageOut: &image)
-            return image
+            return Frame(time: sample.presentationTimeStamp.seconds,
+                         pixels: CVReadOnlyPixelBuffer(unsafeBuffer: pixels),
+                         image: CIImage(cvPixelBuffer: pixels))
         }
-        guard let image else { return nil }
-        return (sample.presentationTimeStamp.seconds, image)
+        return frame
     }
 
-    func frame(at time: Double) async throws -> CGImage? {
+    func frame(at time: Double) async throws -> CIImage? {
         let t = duration > 0 ? time.truncatingRemainder(dividingBy: duration) : 0
         if let current, t + 0.0005 < current.time { try await restart() }
         while true {
@@ -119,7 +127,7 @@ enum VideoSlideRenderer {
     }
 
     static func render(project: Project, slide index: Int, media: MediaStore, scale: Double, fps: Int,
-                       to url: URL, progress: @escaping @Sendable (Double) -> Void) async throws {
+                       to url: URL, useGPU: Bool = true, progress: @escaping @Sendable (Double) -> Void) async throws {
         let duration = duration(of: project, slide: index)
         let total = max(1, Int((duration * Double(fps)).rounded()))
         // H.264 needs even dimensions.
@@ -163,24 +171,49 @@ enum VideoSlideRenderer {
                 AVVideoMaxKeyFrameIntervalKey: fps * 2,
             ],
         ])
-        let receiver = writer.inputPixelBufferReceiver(for: input, pixelBufferAttributes: CVPixelBufferCreationAttributes(
+        var pixelAttributes = CVPixelBufferCreationAttributes(
             pixelFormatType: CVPixelFormatType(rawValue: kCVPixelFormatType_32BGRA),
             size: CVImageSize(width: width, height: height),
-            compatibility: [.cgImage, .cgBitmapContext]))
+            compatibility: [.metalTexture, .cgImage, .cgBitmapContext])
+        pixelAttributes.backing = .ioSurface
+        let receiver = writer.inputPixelBufferReceiver(for: input, pixelBufferAttributes: pixelAttributes)
         try writer.start()
         writer.startSession(atSourceTime: .zero)
 
         let assets = project.assetsByID
+        let gpu = useGPU ? GPUSceneRenderer.shared : nil
         do {
             for frame in 0..<total {
                 try Task.checkCancellation()
                 let time = Double(frame) / Double(fps)
                 for (id, frames) in gifs { images.frameOverrides[id] = frames.frame(at: time) }
-                for (id, reader) in videos { images.frameOverrides[id] = try await reader.frame(at: time) }
+                for (id, reader) in videos { images.gpuFrameOverrides[id] = try await reader.frame(at: time) }
 
                 guard let pool = receiver.pixelBufferPool else { throw ExportError.encoderFailed(writer.error?.localizedDescription ?? "") }
                 let buffer = try pool.makeMutablePixelBuffer()
                 let drawn = buffer.withUnsafeBuffer { pixels -> Bool in
+                    if let gpu, let graph = gpu.slide(project, index: index, images: images, scale: pixelScale) {
+                        let extent = CGRect(x: 0, y: 0, width: width, height: height)
+                        // Preserve the CPU path's top edge when H.264's even rounding makes
+                        // the output height slightly different from the uniformly scaled slide.
+                        let aligned = graph.transformed(by: CGAffineTransform(translationX: 0,
+                                                y: CGFloat(height) - CGFloat(project.format.height * pixelScale)))
+                        let opaque = aligned.composited(over: CIImage(color: .white)).cropped(to: extent)
+                        let destination = CIRenderDestination(pixelBuffer: pixels)
+                        destination.isFlipped = true
+                        destination.colorSpace = HexColor.srgb
+                        destination.alphaMode = .none
+                        do {
+                            let task = try gpu.context.startTask(toRender: opaque, from: extent,
+                                                                to: destination, at: .zero)
+                            // AVAssetWriter must not receive a buffer whose GPU writes are in flight.
+                            _ = try task.waitUntilCompleted()
+                            return true
+                        } catch {
+                            // Unsupported resources or a GPU render failure use the established
+                            // CPU composition, including lazily bridged current video frames.
+                        }
+                    }
                     CVPixelBufferLockBaseAddress(pixels, [])
                     defer { CVPixelBufferUnlockBaseAddress(pixels, []) }
                     guard let context = CGContext(data: CVPixelBufferGetBaseAddress(pixels), width: width, height: height, bitsPerComponent: 8,

@@ -4,6 +4,10 @@ import AppKit
 final class CanvasTextView: NSTextView {
     var onCancel: (() -> Void)?
     var onCommit: (() -> Void)?
+    /// Reapplying NSTextView geometry during SwiftUI's constraint pass dirties the parent
+    /// layout again. Retain the logical frame, since rotation changes NSView's frame bounds.
+    var canvasLayoutFrame: CGRect?
+    var canvasLayoutRotation: Double?
 
     override func cancelOperation(_ sender: Any?) { onCancel?() }
 
@@ -101,9 +105,15 @@ extension CanvasView: NSTextViewDelegate {
         case .center: frame = frame.insetBy(dx: -slack / 2, dy: 0)
         case .right: frame.origin.x -= slack; frame.size.width += slack
         }
-        editor.frameCenterRotation = 0
-        editor.frame = CGRect(x: frame.minX, y: frame.minY, width: max(4, frame.width), height: max(frame.height, (item.layer.text?.fontSize ?? 12) * zoom))
-        editor.frameCenterRotation = -item.layer.rotation
+        let layoutFrame = CGRect(x: frame.minX, y: frame.minY, width: max(4, frame.width), height: max(frame.height, (item.layer.text?.fontSize ?? 12) * zoom))
+        let rotation = -item.layer.rotation
+        if editor.canvasLayoutFrame != layoutFrame || editor.canvasLayoutRotation != rotation {
+            editor.frameCenterRotation = 0
+            editor.frame = layoutFrame
+            editor.frameCenterRotation = rotation
+            editor.canvasLayoutFrame = layoutFrame
+            editor.canvasLayoutRotation = rotation
+        }
     }
 
     func textDidChange(_ notification: Notification) {

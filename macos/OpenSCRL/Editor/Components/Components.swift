@@ -44,9 +44,7 @@ struct SlideThumbnail: View, Equatable {
                 Renderer.drawBackground(scene.background, in: rect, cg: cg, images: images, assets: scene.assets, checkerboard: editorPlaceholders)
                 var options = RenderOptions(editor: editorPlaceholders)
                 options.interpolation = .medium
-                for item in scene.items {
-                    Renderer.drawLayer(item.layer, origin: item.origin, cg: cg, assets: scene.assets, images: images, options: options)
-                }
+                Renderer.drawScene(scene.items, cg: cg, assets: scene.assets, images: images, options: options)
             }
         }
         .aspectRatio(scene.format.aspectRatio, contentMode: .fit)

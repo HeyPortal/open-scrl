@@ -204,7 +204,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
@@ -217,7 +217,8 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.2.0;
+				MARKETING_VERSION = 0.4.1;
+				MTLLINKER_FLAGS = "$(inherited) -framework CoreImage";
 				PRODUCT_BUNDLE_IDENTIFIER = com.heyportal.OpenSCRL;
 				PRODUCT_MODULE_NAME = OpenSCRL;
 				PRODUCT_NAME = "Open-SCRL";
@@ -236,7 +237,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
@@ -249,7 +250,8 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.2.0;
+				MARKETING_VERSION = 0.4.1;
+				MTLLINKER_FLAGS = "$(inherited) -framework CoreImage";
 				PRODUCT_BUNDLE_IDENTIFIER = com.heyportal.OpenSCRL;
 				PRODUCT_MODULE_NAME = OpenSCRL;
 				PRODUCT_NAME = "Open-SCRL";
