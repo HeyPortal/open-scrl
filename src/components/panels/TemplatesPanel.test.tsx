@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { GRID_TEMPLATES, layoutGrid, linkedMax } from '@/lib/grids';
 import { getLiveGrid } from '@/core/document/grid';
 import { newDocument, useDocumentStore } from '@/editor/documentStore';
@@ -12,6 +12,8 @@ vi.mock('@/app/actions', () => ({ isMac: false }));
 const landscape = { width: 1080, height: 566 };
 const fourStack = GRID_TEMPLATES.find((t) => t.id === 'four-stack')!;
 
+afterEach(cleanup);
+
 beforeEach(() => {
   const doc = newDocument();
   useDocumentStore.setState({ doc: { ...doc, format: { ...doc.format, ...landscape } }, past: [], future: [], transaction: null, selectedSlideId: '' });
@@ -19,6 +21,16 @@ beforeEach(() => {
 });
 
 describe('TemplatesPanel with linked spacing', () => {
+  it('snaps a grid that already exists when linking is switched on', () => {
+    useDocumentStore.getState().applyGrid(fourStack, 120, 0);
+    render(<TemplatesPanel />);
+
+    fireEvent.click(screen.getByRole('button', { name: /link gap and outer margin/i }));
+
+    const { doc } = useDocumentStore.getState();
+    expect(getLiveGrid(doc, doc.slideOrder[0])!.grid).toMatchObject({ gap: 100, margin: 100 });
+  });
+
   it('stores a gap and margin the inspector can show when the template cannot fit the linked value', () => {
     render(<TemplatesPanel />);
     fireEvent.change(screen.getByLabelText(/gap between photos/i), { target: { value: '120' } });

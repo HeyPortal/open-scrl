@@ -33,6 +33,7 @@ function GridThumb({ tpl, gap, margin, ratio }: { tpl: GridTemplate; gap: number
 
 export function TemplatesPanel() {
   const applyGrid = useEditor((s) => s.applyGrid);
+  const linkGridSpacing = useEditor((s) => s.linkGridSpacing);
   const format = useEditor((s) => s.doc.format);
   const [gap, setGap] = useState(0);
   const [margin, setMargin] = useState(0);
@@ -43,7 +44,7 @@ export function TemplatesPanel() {
   const sharedMax = Math.min(MAX_GRID_INSET, marginMax);
   const setBoth = (v: number) => { setGap(v); setMargin(v); };
   const toggleLinked = () => {
-    if (!linked) setBoth(Math.min(gap, sharedMax));
+    if (!linked) { setBoth(Math.min(gap, sharedMax)); linkGridSpacing(); }
     setGridLinked(!linked);
   };
   const ratio = format.width / format.height;

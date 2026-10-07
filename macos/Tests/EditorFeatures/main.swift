@@ -303,6 +303,22 @@ import Darwin
     rc.setSlideGrid(gap: 40)
     check(rc.project.slides[0].layers.first { $0.id == rs[1] }!.matches(fourGrid.layout(format: rc.project.format, gap: 40, margin: 0)[1]), "a re-attached slot follows the grid again")
 
+    // Linking switched on after grids exist snaps every grid slide to equal, fitting values.
+    let lDoc = ProjectDocument(format: CanvasFormat(name: "Landscape", width: 1080, height: 566))
+    lDoc.perform("Fixture", undoManager: nil) { p in p.slides = [Slide(id: "l1", background: .solid("#ffffff"), layers: []), Slide(id: "l2", background: .solid("#ffffff"), layers: [])] }
+    let lc = EditorController(document: lDoc)
+    lc.selectedSlideID = "l1"; lc.applyGrid(fourStack, gap: 120, margin: 0)
+    lc.selectedSlideID = "l2"; lc.applyGrid(fourGrid, gap: 30, margin: 10)
+    lc.linkGridSpacing()
+    let g1 = lc.project.slides[0].grid!, g2 = lc.project.slides[1].grid!
+    check(g1.gap == 100 && g1.margin == 100, "linking caps an existing grid to what its template fits")
+    check(g2.gap == 30 && g2.margin == 30, "linking snaps another slide's margin to its gap")
+    let stackCells = fourStack.layout(format: lc.project.format, gap: 100, margin: 100)
+    check(lc.project.slides[0].layers.first { $0.id == g1.slotIds[0] }!.matches(stackCells[0]), "linking relays out the slots")
+    let linkedState = lc.project
+    lc.linkGridSpacing()
+    check(lc.project == linkedState, "linking again changes nothing")
+
     print("ALL \(checks) UI CHECKS PASSED")
 }
 setbuf(stdout, nil)

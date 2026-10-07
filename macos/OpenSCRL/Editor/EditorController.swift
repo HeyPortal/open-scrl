@@ -456,6 +456,20 @@ final class EditorController {
         }
     }
 
+    /// Makes gap and margin equal on every slide with a grid, capped at what each template fits, so the inspector
+    /// never shows a value that isn't stored. Slots moved by hand are left alone.
+    func linkGridSpacing() {
+        let targets: [(index: Int, live: LiveGrid, value: Double)] = project.slides.indices.compactMap { i in
+            guard let live = project.liveGrid(slide: i) else { return nil }
+            let v = min(live.grid.gap, live.template.linkedMax(format: project.format))
+            return live.grid.gap == v && live.grid.margin == v ? nil : (i, live, v)
+        }
+        guard !targets.isEmpty else { return }
+        perform("Link Grid Spacing") { p in
+            for t in targets { p.relayoutGrid(slide: t.index, live: t.live, gap: t.value, margin: t.value) }
+        }
+    }
+
     /// Snaps the selected slide's moved or free grid slots back onto their cells so they follow the sliders again.
     func reattachGridSlots() {
         let index = selectedSlideIndex

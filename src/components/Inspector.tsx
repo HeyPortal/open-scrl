@@ -441,6 +441,7 @@ function GridSection({ slideId }: { slideId: string }) {
   const setSlideGrid = useEditor((s) => s.setSlideGrid);
   const setGridSpacingForAllSlides = useEditor((s) => s.setGridSpacingForAllSlides);
   const reattachGridSlots = useEditor((s) => s.reattachGridSlots);
+  const linkGridSpacing = useEditor((s) => s.linkGridSpacing);
   const linked = useEditorSession((s) => s.gridLinked);
   const setGridLinked = useEditorSession((s) => s.setGridLinked);
   const gesture = useEditGesture('Adjust grid', `gesture:grid:${slideId}`);
@@ -457,7 +458,7 @@ function GridSection({ slideId }: { slideId: string }) {
   const setGap = (v: number) => setSlideGrid(slideId, linked ? { gap: v, margin: v } : { gap: v });
   const setMargin = (v: number) => setSlideGrid(slideId, linked ? { gap: v, margin: v } : { margin: v });
   const toggleLinked = () => {
-    if (!linked) { const v = Math.min(grid.gap, shared); setSlideGrid(slideId, { gap: v, margin: v }); }
+    if (!linked) linkGridSpacing();
     setGridLinked(!linked);
   };
   return (

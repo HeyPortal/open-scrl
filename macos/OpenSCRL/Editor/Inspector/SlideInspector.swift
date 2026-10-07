@@ -54,7 +54,7 @@ struct SlideInspector: View {
                 Section {
                     // Linked: either slider sets both, so the spacing stays equal.
                     LinkedSliders(linked: Binding(get: { linked }, set: { on in
-                        if on { let v = min(live.grid.gap, shared); controller.setSlideGrid(gap: v, margin: v) }
+                        if on { controller.linkGridSpacing() }
                         controller.gridLinked = on
                     })) {
                         GestureSlider(title: "Gap", value: Binding(get: { gap }, set: { let v = $0.rounded(); controller.setSlideGrid(gap: v, margin: linked ? v : nil) }),

@@ -192,6 +192,41 @@ describe('reattachGridSlots', () => {
   });
 });
 
+describe('linkGridSpacing', () => {
+  const landscape = { width: 1080, height: 566 };
+  const fourStack = GRID_TEMPLATES.find((t) => t.id === 'four-stack')!;
+  const useLandscape = () => useDocumentStore.setState((s) => ({ doc: { ...s.doc, format: { ...s.doc.format, ...landscape } } }));
+
+  it('snaps existing grids to equal values that fit their template, in one undo step', () => {
+    useLandscape();
+    store().applyGrid(fourStack, 120, 0);
+    store().addSlide();
+    store().applyGrid(four, 30, 10);
+    const [a, b] = store().doc.slideOrder;
+    const before = store().past.length;
+
+    store().linkGridSpacing();
+
+    // 120 px of gap and margin does not fit four stacked rows on a 566 px tall slide; 100 does.
+    expect(store().doc.slides[a].grid).toMatchObject({ gap: 100, margin: 100 });
+    expect(store().doc.slides[b].grid).toMatchObject({ gap: 30, margin: 30 });
+    const cells = layoutGrid(fourStack, landscape, 100, 100);
+    slotIds(a).forEach((id, i) => expect(frame(id)).toEqual(cells[i]));
+    expect(store().past.length).toBe(before + 1);
+
+    store().undo();
+    expect(store().doc.slides[a].grid).toMatchObject({ gap: 120, margin: 0 });
+    expect(store().doc.slides[b].grid).toMatchObject({ gap: 30, margin: 10 });
+  });
+
+  it('is a no-op when every grid already has equal, fitting spacing', () => {
+    store().applyGrid(four, 20, 20);
+    const doc = store().doc;
+    store().linkGridSpacing();
+    expect(store().doc).toBe(doc);
+  });
+});
+
 describe('duplicateSlide with a grid', () => {
   it('re-ids the copied slots so adjusting the copy does not move the original', () => {
     store().applyGrid(four, 0, 0);

@@ -82,7 +82,7 @@ struct GridsPanel: View {
             VStack(alignment: .leading, spacing: 14) {
                 PanelHeader(title: "Photo Grids", subtitle: "Replaces the current slide’s layers with empty photo slots. Undo with ⌘Z.")
                 LinkedSliders(linked: Binding(get: { controller.gridLinked }, set: { on in
-                    if on { controller.gridGap = min(controller.gridGap, sharedMax); controller.gridMargin = controller.gridGap }
+                    if on { controller.gridGap = min(controller.gridGap, sharedMax); controller.gridMargin = controller.gridGap; controller.linkGridSpacing() }
                     controller.gridLinked = on
                 })) {
                     VStack(alignment: .leading, spacing: 2) {
