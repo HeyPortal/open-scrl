@@ -81,44 +81,36 @@ struct GridsPanel: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 PanelHeader(title: "Photo Grids", subtitle: "Replaces the current slide’s layers with empty photo slots. Undo with ⌘Z.")
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack {
-                        Text("Gap between photos").foregroundStyle(.secondary)
-                        Spacer()
-                        Text("\(Int(controller.gridGap)) px").monospacedDigit().foregroundStyle(.secondary)
+                LinkedSliders(linked: Binding(get: { controller.gridLinked }, set: { on in
+                    if on { controller.gridGap = min(controller.gridGap, sharedMax); controller.gridMargin = controller.gridGap }
+                    controller.gridLinked = on
+                })) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack {
+                            Text("Gap between photos").foregroundStyle(.secondary)
+                            Spacer()
+                            Text("\(Int(controller.gridGap)) px").monospacedDigit().foregroundStyle(.secondary)
+                        }
+                        .font(.callout)
+                        Slider(value: Binding(get: { min(controller.gridGap, controller.gridLinked ? sharedMax : 120) },
+                                              set: { controller.gridGap = $0.rounded(); if controller.gridLinked { controller.gridMargin = controller.gridGap } }),
+                               in: 0...(controller.gridLinked ? sharedMax : 120))
+                            .controlSize(.small).labelsHidden()
                     }
-                    .font(.callout)
-                    Slider(value: Binding(get: { min(controller.gridGap, controller.gridLinked ? sharedMax : 120) },
-                                          set: { controller.gridGap = $0.rounded(); if controller.gridLinked { controller.gridMargin = controller.gridGap } }),
-                           in: 0...(controller.gridLinked ? sharedMax : 120))
-                        .controlSize(.small).labelsHidden()
-                }
-                HStack {
-                    Spacer()
-                    Toggle(isOn: Binding(get: { controller.gridLinked }, set: { on in
-                        if on { controller.gridGap = min(controller.gridGap, sharedMax); controller.gridMargin = controller.gridGap }
-                        controller.gridLinked = on
-                    })) {
-                        Label("Link gap and outer margin", systemImage: "link")
+                } bottom: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack {
+                            Text("Outer margin").foregroundStyle(.secondary)
+                            Spacer()
+                            Text("\(Int(controller.gridMargin)) px").monospacedDigit().foregroundStyle(.secondary)
+                        }
+                        .font(.callout)
+                        Slider(value: Binding(get: { controller.gridMargin },
+                                              set: { controller.gridMargin = $0.rounded(); if controller.gridLinked { controller.gridGap = controller.gridMargin } }),
+                               in: 0...marginMax)
+                            .controlSize(.small).labelsHidden()
+                            .accessibilityLabel("Outer margin")
                     }
-                    .toggleStyle(.button)
-                    .labelStyle(.iconOnly)
-                    .controlSize(.small)
-                    .help("Link gap and outer margin")
-                    Spacer()
-                }
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack {
-                        Text("Outer margin").foregroundStyle(.secondary)
-                        Spacer()
-                        Text("\(Int(controller.gridMargin)) px").monospacedDigit().foregroundStyle(.secondary)
-                    }
-                    .font(.callout)
-                    Slider(value: Binding(get: { controller.gridMargin },
-                                          set: { controller.gridMargin = $0.rounded(); if controller.gridLinked { controller.gridGap = controller.gridMargin } }),
-                           in: 0...marginMax)
-                        .controlSize(.small).labelsHidden()
-                        .accessibilityLabel("Outer margin")
                 }
                 LazyVGrid(columns: columns, spacing: 8) {
                     ForEach(GridTemplate.all) { template in

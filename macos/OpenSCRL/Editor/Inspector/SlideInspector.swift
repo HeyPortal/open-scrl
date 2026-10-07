@@ -53,24 +53,16 @@ struct SlideInspector: View {
                 let gap = min(live.grid.gap, gapMax)
                 Section {
                     // Linked: either slider sets both, so the spacing stays equal.
-                    GestureSlider(title: "Gap", value: Binding(get: { gap }, set: { let v = $0.rounded(); controller.setSlideGrid(gap: v, margin: linked ? v : nil) }),
-                                  range: 0...gapMax, display: "\(Int(gap)) px", controller: controller, undoName: "Adjust Grid")
-                    HStack {
-                        Spacer()
-                        Toggle(isOn: Binding(get: { linked }, set: { on in
-                            if on { let v = min(live.grid.gap, shared); controller.setSlideGrid(gap: v, margin: v) }
-                            controller.gridLinked = on
-                        })) {
-                            Label("Link gap and outer margin", systemImage: "link")
-                        }
-                        .toggleStyle(.button)
-                        .labelStyle(.iconOnly)
-                        .controlSize(.small)
-                        .help("Link gap and outer margin")
-                        Spacer()
+                    LinkedSliders(linked: Binding(get: { linked }, set: { on in
+                        if on { let v = min(live.grid.gap, shared); controller.setSlideGrid(gap: v, margin: v) }
+                        controller.gridLinked = on
+                    })) {
+                        GestureSlider(title: "Gap", value: Binding(get: { gap }, set: { let v = $0.rounded(); controller.setSlideGrid(gap: v, margin: linked ? v : nil) }),
+                                      range: 0...gapMax, display: "\(Int(gap)) px", controller: controller, undoName: "Adjust Grid")
+                    } bottom: {
+                        GestureSlider(title: "Outer Margin", value: Binding(get: { margin }, set: { let v = $0.rounded(); controller.setSlideGrid(gap: linked ? v : nil, margin: v) }),
+                                      range: 0...max(1, marginMax), display: "\(Int(margin)) px", controller: controller, undoName: "Adjust Grid")
                     }
-                    GestureSlider(title: "Outer Margin", value: Binding(get: { margin }, set: { let v = $0.rounded(); controller.setSlideGrid(gap: linked ? v : nil, margin: v) }),
-                                  range: 0...max(1, marginMax), display: "\(Int(margin)) px", controller: controller, undoName: "Adjust Grid")
                     if live.movedSlots > 0 {
                         Text("\(live.movedSlots) slot\(live.movedSlots == 1 ? " was" : "s were") moved by hand and won’t follow these sliders.")
                             .font(.caption).foregroundStyle(.secondary)
