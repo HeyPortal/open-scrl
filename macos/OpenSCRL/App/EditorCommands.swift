@@ -112,7 +112,7 @@ struct EditorCommands: Commands {
                 .disabled(layer?.text == nil || layers.count > 1)
             Button("Adjust Crop") { if let id { editor?.beginCropEditing(id) } }
                 .disabled(layer?.image?.assetID == nil || layers.count > 1)
-            Button("Blend Seam") { editor?.blendSelectedSeam() }
+            Button("Blend Photos") { editor?.blendSelectedSeam() }
                 .disabled(editor?.canBlendSelectedSeam != true)
             Button("Rename Layer") { if let id { editor?.requestRename(id) } }
                 .disabled(id == nil || layers.count > 1)

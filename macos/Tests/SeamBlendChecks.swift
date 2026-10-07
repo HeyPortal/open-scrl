@@ -126,6 +126,8 @@ struct SeamBlendChecks {
         let match = SeamRenderer.analyze(foreground: SceneItem(layer: shifted, slideIndex: 0, origin: .zero),
                                          target: SceneItem(layer: reference, slideIndex: 0, origin: .zero), edge: .left, images: fixtures, assets: matchAssets)!
         expect(match.alignmentFound, "Shared details are detected")
+        expect(match.sameScene == true && match.regionCount > 1, "Shared photos get a regional seamless match")
+        expect(SeamBlend(targetLayerID: reference.id, analysis: match).resolvedStyle == .seamless, "Automatic selects Seamless for shared scenes")
         expect(abs(match.shiftX + 6) <= 1 && abs(match.shiftY - 4) <= 1, "Registration translation has the correct direction")
         expect(!match.path.isEmpty && match.path.allSatisfy { (0...1).contains($0) }, "Content-aware seam produces a valid path")
         fixtures.images["bright"] = picture(96, 96) { x, y in pattern(x, y) * 1.15 + SIMD3(repeating: 0.06) }
@@ -152,6 +154,13 @@ struct SeamBlendChecks {
         expect(render(colorProject, fixtures).sample(90, 48) == originalFar, "Color correction leaves pixels away from the seam intact")
         var moved = bright; moved.x = 1
         expect(!colorMatch.matches(moved, reference, edge: .left), "Changing geometry invalidates old matching data")
+        var override = SeamBlend(targetLayerID: reference.id, analysis: match, style: .soft)
+        expect(override.resolvedStyle == .soft, "A manual Soft choice overrides a shared-scene match")
+        override.analysis?.sameScene = false
+        override.style = .automatic
+        expect(override.resolvedStyle == .soft, "Automatic trusts the refined scene check over an old alignment flag")
+        override.style = .seamless
+        expect(override.resolvedStyle == .seamless, "A manual Seamless choice overrides a different-scene match")
         print("PASS: automatic alignment direction, content-aware path, localized color matching, and invalidation")
 
         let document = ProjectDocument(format: project.format)
@@ -174,6 +183,40 @@ struct SeamBlendChecks {
         expect(abs(decoded.createdAt.timeIntervalSince(blended.createdAt)) < 0.001 && abs(decoded.updatedAt.timeIntervalSince(blended.updatedAt)) < 0.001, "Millisecond project timestamps survive serialization")
         var legacy = blended; legacy.slides[0].layers[1].image?.seamBlend = nil
         expect(try ProjectFile.decode(ProjectFile(project: legacy).encoded()).makeProject().hasSameContent(as: legacy), "Old projects without seam settings still open")
+        var oldJSON = try JSONSerialization.jsonObject(with: JSONEncoder().encode(front.image!.seamBlend!)) as! [String: Any]
+        for key in ["version", "style", "edgeStyle", "colorReach"] { oldJSON.removeValue(forKey: key) }
+        let originalBlend = try JSONDecoder().decode(SeamBlend.self, from: JSONSerialization.data(withJSONObject: oldJSON))
+        expect(originalBlend.version == 1 && !originalBlend.isRefined, "Versionless saved blends retain their original look")
+        oldJSON["version"] = SeamBlend.refinedVersion
+        oldJSON["edgeStyle"] = "torn"
+        let removedEdge = try JSONDecoder().decode(SeamBlend.self, from: JSONSerialization.data(withJSONObject: oldJSON))
+        expect(removedEdge.edgeStyle == .clean && removedEdge.isRefined && removedEdge.targetLayerID == "red",
+               "Saved Torn Paper blends reopen as Clean without losing the blend")
+        var styled = blended
+        styled.slides[0].layers[1].image?.seamBlend = SeamBlend(targetLayerID: "red", analysis: match, style: .seamless,
+                                                             edgeStyle: .glow, colorReach: .wholePhoto)
+        expect(try ProjectFile.decode(ProjectFile(project: styled).encoded()).makeProject().hasSameContent(as: styled),
+               "Style overrides, glow edges, whole-photo matching, and regional data survive project saves")
+        let upgradeDocument = ProjectDocument(format: project.format)
+        upgradeDocument.perform("Legacy fixture", undoManager: nil) {
+            $0 = project; $0.slides[0].layers[1].image?.seamBlend = originalBlend
+        }
+        let upgradeController = EditorController(document: upgradeDocument)
+        let upgradeUndo = UndoManager(); upgradeUndo.groupsByEvent = false; upgradeController.undoManager = upgradeUndo
+        upgradeUndo.beginUndoGrouping(); upgradeController.updateLayer("blue") { $0.name = "Renamed" }; upgradeUndo.endUndoGrouping()
+        expect(upgradeDocument.project.layer("blue")?.image?.seamBlend?.version == 1, "Unrelated edits preserve old blend appearance")
+        let upgradeBefore = upgradeDocument.project
+        upgradeController.beginGesture()
+        upgradeController.updateLayer("blue") { $0.image?.seamBlend?.width = 28 }
+        upgradeController.updateLayer("blue") { $0.image?.seamBlend?.width = 30 }
+        upgradeUndo.beginUndoGrouping(); upgradeController.endGesture("Adjust Seam Blend"); upgradeUndo.endUndoGrouping()
+        expect(upgradeDocument.project.layer("blue")?.image?.seamBlend?.isRefined == true, "Editing an old blend automatically switches to the new look")
+        upgradeUndo.undo(); expect(upgradeDocument.project.hasSameContent(as: upgradeBefore), "Undo restores both the old look and slider value")
+        upgradeUndo.redo(); expect(upgradeDocument.project.layer("blue")?.image?.seamBlend?.isRefined == true, "Redo restores the upgraded blend")
+        upgradeUndo.undo()
+        upgradeUndo.beginUndoGrouping(); upgradeController.updateLayer("red") { $0.x += 1 }; upgradeUndo.endUndoGrouping()
+        expect(upgradeDocument.project.layer("blue")?.image?.seamBlend?.isRefined == true, "Editing the partner's geometry upgrades its linked blend")
+        upgradeUndo.undo(); expect(upgradeDocument.project.hasSameContent(as: upgradeBefore), "Partner edits and blend upgrades undo together")
         undo.beginUndoGrouping(); controller.duplicateSlide(blended.slides[0].id); undo.endUndoGrouping()
         let copied = document.project.slides[1]
         expect(copied.layers[1].image?.seamBlend?.targetLayerID == copied.layers[0].id, "Duplicating a slide remaps its seam partner")
@@ -209,7 +252,112 @@ struct SeamBlendChecks {
         pairController.seamAnalysisTask?.cancel()
         expect(pairDocument.project.layer("blue")?.image?.seamBlend?.targetLayerID == "red", "Blending two selected photos uses their selected partner, even with a closer third photo")
         pairController.selectLayers(["red", "blue", "reference"])
-        expect(!pairController.canBlendSelectedSeam, "Ambiguous three-layer selections cannot silently blend an arbitrary pair")
+        expect(pairController.canBlendSelectedSeam, "Three-photo selections expose the blend group action")
+
+        let groupDocument = ProjectDocument(format: CanvasFormat(name: "Group", width: 288, height: 96))
+        groupDocument.perform("Group fixture", undoManager: nil) { p in
+            p.assets = [asset("red"), asset("blue"), asset("reference"), asset("shifted")]
+            p.slides[0].layers = [layer("reference", x: 192), layer("red"), layer("blue", x: 96)]
+        }
+        for photo in groupDocument.project.assets {
+            groupDocument.media.register(photo.id, wrapper: FileWrapper(regularFileWithContents: ImageDecoding.pngData(fixtures.images[photo.id]!)!))
+        }
+        let groupController = EditorController(document: groupDocument)
+        let groupUndo = UndoManager(); groupUndo.groupsByEvent = false; groupController.undoManager = groupUndo
+        func groupEdit(_ body: () -> Void) { groupUndo.beginUndoGrouping(); body(); groupUndo.endUndoGrouping() }
+        groupController.selectLayers(["reference", "red", "blue"])
+        let groupBefore = groupDocument.project
+        groupEdit { groupController.blendSelectedSeam() }
+        await groupController.seamAnalysisTask?.value
+        let groupCreated = groupDocument.project
+        let members = groupController.selectedBlendGroup!
+        expect(members.map(\.id) == ["red", "blue", "reference"], "Three photos form a spatially ordered group regardless of selection or paint order")
+        expect(Set(members.compactMap(\.groupID)).count == 1 && members.allSatisfy { $0.groupKind == .blend }, "Every photo has persistent blend group metadata")
+        expect(members[0].image?.seamBlend == nil && members[1].image?.seamBlend?.targetLayerID == "red" && members[2].image?.seamBlend?.targetLayerID == "blue", "A three-photo group has two linked joins")
+        expect(members.dropFirst().allSatisfy { $0.image?.seamBlend?.analysis != nil }, "Creation matches every join")
+        expect(members.allSatisfy { $0.width == 96 && $0.height == 96 }, "Creating a multi-photo blend preserves each photo's dimensions")
+        expect(groupController.analyzingSeamLayerIDs.isEmpty, "Batch matching clears its progress state")
+        groupUndo.undo()
+        expect(groupDocument.project.hasSameContent(as: groupBefore) && !groupUndo.canUndo, "Creation, placements, grouping, and all matching undo in one step")
+        groupUndo.redo()
+        expect(groupDocument.project.hasSameContent(as: groupCreated), "Redo restores every group member and completed join")
+        expect(try ProjectFile.decode(ProjectFile(project: groupCreated).encoded()).makeProject().hasSameContent(as: groupCreated), "Blend group metadata and every join survive saving")
+        groupController.selectLayer(nil); groupController.pickLayer("blue", additive: false)
+        expect(groupController.selectedBlendGroup?.count == 3 && groupController.selectionUnitCount == 1, "Clicking any photo picks the group as one canvas object")
+        groupController.enterGroup("blue")
+        expect(groupController.selectedLayerIDs == ["blue"] && groupController.enteredGroupID != nil, "The photo strip can select one group member")
+        groupController.beginCropEditing("blue")
+        expect(groupController.cropLayerID == "blue", "An individual group member enters crop editing")
+        groupController.endModes(); groupController.selectParent()
+        expect(groupController.selectedBlendGroup?.count == 3, "Returning from a member restores the special group selection")
+        groupEdit { groupController.updateBlendGroup(\.edgeStyle, value: .organic) }
+        expect(groupController.selectedBlendGroup!.dropFirst().allSatisfy { $0.image?.seamBlend?.edgeStyle == .organic }, "Group edge controls update all joins")
+        groupEdit { groupController.updateLayer("reference") { $0.image?.seamBlend?.edgeStyle = .glow } }
+        expect(groupDocument.project.layer("blue")?.image?.seamBlend?.edgeStyle == .organic && groupDocument.project.layer("reference")?.image?.seamBlend?.edgeStyle == .glow, "Tuning one pair leaves another pair unchanged")
+        let oldFrames = groupController.selectedBlendGroup!.map(\.frame)
+        groupEdit { groupController.moveLayers(groupController.selectedLayerIDs, dx: 7, dy: 11) }
+        expect(zip(oldFrames, groupController.selectedBlendGroup!).allSatisfy { $0.1.frame.origin == CGPoint(x: $0.0.minX + 7, y: $0.0.minY + 11) }, "Moving a blend moves all its photos together")
+        expect(groupController.selectedBlendGroup!.dropFirst().allSatisfy { photo in
+            guard let blend = photo.image?.seamBlend, let target = groupDocument.project.layer(blend.targetLayerID) else { return false }
+            return blend.analysis?.matches(photo, target, edge: blend.edge) == true
+        }, "Moving the group preserves valid matching for every join")
+        let oldBounds = Geometry.unionBounds(of: groupController.selectedBlendGroup!)!
+        groupEdit { groupController.scaleSelection(from: oldBounds, to: CGRect(x: oldBounds.minX, y: oldBounds.minY, width: oldBounds.width * 2, height: oldBounds.height * 2)) }
+        expect(groupController.selectedBlendGroup!.dropFirst().allSatisfy { photo in
+            guard let blend = photo.image?.seamBlend, let target = groupDocument.project.layer(blend.targetLayerID) else { return false }
+            return blend.analysis?.matches(photo, target, edge: blend.edge) == true
+        }, "Uniform group resizing scales and preserves each stored match")
+        groupEdit { groupController.updateLayer("blue") { $0.image?.cropScale = 1.2 } }
+        let cropped = groupDocument.project.layer("blue")!, cropBlend = cropped.image!.seamBlend!
+        expect(cropBlend.analysis?.matches(cropped, groupDocument.project.layer("red")!, edge: cropBlend.edge) == false, "Cropping a single photo invalidates its old match")
+        let copies = Layer.freshCopies(groupController.selectedBlendGroup!)
+        expect(Set(copies.compactMap(\.groupID)).count == 1 && copies[0].groupID != members[0].groupID && copies.allSatisfy { $0.groupKind == .blend }, "Clipboard copies form their own blend group")
+        expect(copies[1].image?.seamBlend?.targetLayerID == copies[0].id && copies[2].image?.seamBlend?.targetLayerID == copies[1].id, "Clipboard copies remap every join in a chain")
+        expect(!groupController.seamCandidates(for: "red").contains { $0.id == "reference" }, "Blend groups reject partners above the foreground and cyclic chains")
+        groupEdit { groupController.removeSeamBlend("blue") }
+        expect(groupController.selectedBlendGroup?.count == 3 && groupDocument.project.layer("blue")?.image?.seamBlend == nil, "Removing one join retains the blend group and its member UI")
+        groupEdit { groupController.startSeamBlend("blue", with: "red") }
+        await groupController.seamAnalysisTask?.value
+        expect(groupController.selectedBlendGroup?.count == 3 && groupDocument.project.layer("reference")?.image?.seamBlend?.edgeStyle == .glow, "Reconnecting a pair preserves other joins and the group selection")
+        let beforeAdding = groupDocument.project
+        groupEdit { groupController.useAsset(asset("shifted")) }
+        await groupController.seamAnalysisTask?.value
+        expect(groupController.selectedBlendGroup?.count == 4 && groupController.selectedBlendGroup!.last?.image?.assetID == "shifted", "Choosing media for a group adds a fourth photo")
+        expect(groupDocument.project.layer("red")?.image?.assetID == "red" && groupDocument.project.layer("blue")?.image?.assetID == "blue", "Adding media retains the original photos")
+        groupUndo.undo()
+        expect(groupDocument.project.hasSameContent(as: beforeAdding), "Adding a photo and its match undo together")
+        groupUndo.redo()
+        groupController.selectBlendGroup(containing: "blue")
+        let beforeSeparating = groupDocument.project
+        groupEdit { groupController.separateBlendGroup() }
+        expect(groupController.selectedBlendGroup == nil && groupController.selectedLayers.allSatisfy { $0.groupID == nil && $0.groupKind == nil && $0.image?.seamBlend == nil }, "Separate Photos removes grouping and effects from every member")
+        groupUndo.undo()
+        expect(groupDocument.project.hasSameContent(as: beforeSeparating), "Separate Photos is fully undoable")
+        let legacyGroupDocument = ProjectDocument(format: project.format)
+        legacyGroupDocument.perform("Legacy pair", undoManager: nil) { $0 = project }
+        let legacyGroupController = EditorController(document: legacyGroupDocument)
+        let legacyPixels = render(legacyGroupDocument.project, fixtures).bytes
+        legacyGroupController.selectLayer("blue")
+        legacyGroupController.pickLayer("blue", additive: false)
+        expect(legacyGroupController.selectedBlendGroup?.count == 2, "Selecting an existing ungrouped blend creates its special group")
+        expect(render(legacyGroupDocument.project, fixtures).bytes == legacyPixels, "Grouping an existing blend preserves its pixels")
+        let interveningDocument = ProjectDocument(format: project.format)
+        interveningDocument.perform("Intervening artwork", undoManager: nil) { p in
+            p = project
+            p.slides[0].layers.insert(Layer(id: "art", name: "Artwork", x: 48, y: 0, width: 48, height: 96,
+                                           content: .shape(ShapeProperties(shape: .rect, fill: "#00ff00"))), at: 1)
+        }
+        let interveningBefore = interveningDocument.project
+        EditorController(document: interveningDocument).pickLayer("blue", additive: false)
+        expect(interveningDocument.project.hasSameContent(as: interveningBefore), "Picking an old blend with intervening artwork preserves its stacking")
+        var verticalGroup = groupBefore
+        verticalGroup.slides[0].layers = [layer("blue", y: 96), layer("reference", y: 192), layer("red")]
+        let verticalDocument = ProjectDocument(format: verticalGroup.format)
+        verticalDocument.perform("Vertical fixture", undoManager: nil) { $0 = verticalGroup }
+        let verticalController = EditorController(document: verticalDocument)
+        verticalController.selectAllLayers(); verticalController.blendSelectedSeam(); verticalController.seamAnalysisTask?.cancel()
+        expect(verticalController.selectedBlendGroup?.map(\.id) == ["red", "blue", "reference"] && verticalController.selectedBlendGroup!.dropFirst().allSatisfy { $0.image?.seamBlend?.edge == .top }, "Vertical groups link photos from top to bottom")
+        print("PASS: multi-photo groups, per-pair edits, member crop, transforms, persistence, and grouped undo")
 
         let matchDocument = ProjectDocument(format: colorProject.format)
         matchDocument.perform("Matched fixture", undoManager: nil) { p in
@@ -228,6 +376,15 @@ struct SeamBlendChecks {
         expect(matchDocument.project.hasSameContent(as: matchBefore) && !matchUndo.canUndo, "Creation and automatic matching undo together in one step")
         matchUndo.redo()
         expect(matchDocument.project.layer("bright")?.image?.seamBlend?.analysis != nil, "Redo restores the completed analysis")
+        matchDocument.perform("Legacy match fixture", undoManager: nil) { $0.slides[0].layers[1].image?.seamBlend?.version = 1 }
+        matchUndo.removeAllActions()
+        let legacyMatchBefore = matchDocument.project
+        matchUndo.beginUndoGrouping()
+        matchController.updateSeamMatch("bright")
+        await matchController.seamAnalysisTask?.value
+        matchUndo.endUndoGrouping()
+        expect(matchDocument.project.layer("bright")?.image?.seamBlend?.isRefined == true, "Update Match upgrades an old blend even when its match data is identical")
+        matchUndo.undo(); expect(matchDocument.project.hasSameContent(as: legacyMatchBefore) && !matchUndo.canUndo, "Match and look upgrade undo in one step")
         print("PASS: PR 15 masks, selection, group resizing, clipboard links, and automatic matching undo")
 
         let firstURL = output.appending(path: "first.mp4"), secondURL = output.appending(path: "second.mp4")
@@ -280,9 +437,10 @@ struct SeamBlendChecks {
         print("PASS: real two-video MP4 export, advancing frames, and linked live playback")
 
         // A real project for checking the native inspector without touching user documents.
-        let demo = ProjectDocument(format: CanvasFormat(name: "Seam Demo", width: 640, height: 400))
+        let demo = ProjectDocument(format: CanvasFormat(name: "Blend Group Demo", width: 880, height: 400))
         let demoController = EditorController(document: demo)
-        for (id, warm) in [("Cool landscape", false), ("Warm landscape", true)] {
+        for (index, entry) in [("Cool landscape", false), ("Warm landscape", true), ("Forest landscape", false)].enumerated() {
+            let (id, warm) = entry
             let image = picture(400, 320) { x, y in
                 let horizon = 165 + Int(sin(Double(x) / 43) * 24) + (warm ? 9 : 0)
                 let sky = Double(y) / 320
@@ -294,11 +452,11 @@ struct SeamBlendChecks {
             demo.media.register(id, wrapper: FileWrapper(regularFileWithContents: ImageDecoding.pngData(image)!))
             demo.perform("Demo", undoManager: nil) { p in
                 p.assets.append(photo)
-                p.slides[0].layers.append(layer(id, x: warm ? 260 : 20, y: 40, width: 360, height: 288))
+                p.slides[0].layers.append(layer(id, x: Double(20 + index * 240), y: 40, width: 360, height: 288))
             }
         }
-        demoController.selectLayer("Warm landscape")
-        demoController.startSeamBlend("Warm landscape", with: "Cool landscape")
+        demoController.selectAllLayers()
+        demoController.blendSelectedSeam()
         await demoController.seamAnalysisTask?.value
         let snapshot = try await demo.snapshot(contentType: .openSCRLProject)
         let wrapper = try ProjectDocument.makeFileWrapper(snapshot, previous: nil)
@@ -329,7 +487,7 @@ struct SeamBlendChecks {
                                         gain: [0.8, 1.2, 0.9], bias: [0.03, -0.01, 0.02], shiftX: 3, shiftY: -2,
                                         alignmentFound: true, path: (0..<24).map { 0.5 + sin(Double($0) / 5) * 0.12 })
             let blend = SeamBlend(targetLayerID: base.id, edge: edge, width: 24, position: 0.6,
-                                  colorMatch: 0.65, alignment: 0.75, offsetX: 1, offsetY: -1, analysis: analysis)
+                                  colorMatch: 0.65, alignment: 0.75, offsetX: 1, offsetY: -1, analysis: analysis, version: 1)
             let cpu = SeamRenderer.imageCPU(image, asset: a, foreground: foreground, target: target, blend: blend,
                                             pixelScale: scale, assets: assets, targetImage: image)!
             let accelerated = gpu.image(image, asset: a, foreground: foreground, target: target, blend: blend,

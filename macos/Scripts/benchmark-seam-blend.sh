@@ -15,6 +15,7 @@ xcrun swiftc -O -whole-module-optimization \
   "$MAC_ROOT/OpenSCRL/Rendering/TextLayout.swift" \
   "$MAC_ROOT/OpenSCRL/Rendering/Renderer.swift" \
   "$MAC_ROOT/OpenSCRL/Rendering/SeamRenderer.swift" \
+  "$MAC_ROOT/OpenSCRL/Rendering/SeamRegions.swift" \
   "$MAC_ROOT/OpenSCRL/Rendering/SeamGPU.swift" \
   "$MAC_ROOT/Tests/SeamBlendPerformance.swift" -o "$OUTPUT/check"
 OPENSCRL_METALLIB="$OUTPUT/default.metallib" "$OUTPUT/check"

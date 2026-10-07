@@ -218,7 +218,7 @@ extension Background: Codable {
 
 extension Layer: Codable {
     private enum CodingKeys: String, CodingKey {
-        case id, kind, name, x, y, width, height, rotation, opacity, visible, locked, groupId, shadow
+        case id, kind, name, x, y, width, height, rotation, opacity, visible, locked, groupId, groupKind, shadow
         case assetId, cornerRadius, cropOffsetX, cropOffsetY, cropScale, mask, seamBlend
         case text, fontFamily, fontSize, fontWeight, italic, fill, align, letterSpacing, lineHeight
         case fillGradient, highlight, autoFit
@@ -242,6 +242,7 @@ extension Layer: Codable {
         visible = try c.decodeIfPresent(Bool.self, forKey: .visible) ?? true
         locked = try c.decodeIfPresent(Bool.self, forKey: .locked) ?? false
         groupID = (try? c.decodeIfPresent(String.self, forKey: .groupId)) ?? nil
+        groupKind = groupID == nil ? nil : (try? c.decodeIfPresent(LayerGroupKind.self, forKey: .groupKind)) ?? nil
         shadow = (try? c.decodeIfPresent(Shadow.self, forKey: .shadow)) ?? nil
         switch kind {
         case "image":
@@ -300,6 +301,7 @@ extension Layer: Codable {
         try c.encode(visible, forKey: .visible)
         try c.encode(locked, forKey: .locked)
         try c.encodeIfPresent(groupID, forKey: .groupId)
+        try c.encodeIfPresent(groupKind, forKey: .groupKind)
         try c.encodeIfPresent(shadow, forKey: .shadow)
         switch content {
         case .image(let p):

@@ -104,6 +104,7 @@ final class EditorController {
     /// Layer whose name field the inspector should focus.
     var renameRequest: String?
     var analyzingSeamLayerID: String?
+    var analyzingSeamLayerIDs: Set<String> = []
     @ObservationIgnored var seamAnalysisTask: Task<Void, Never>?
 
     @ObservationIgnored private var bannerTask: Task<Void, Never>?
@@ -120,7 +121,34 @@ final class EditorController {
     // MARK: - Undo plumbing
 
     func perform(_ name: String, coalesce key: String? = nil, _ body: (inout Project) -> Void) {
-        document.perform(name, undoManager: undoManager, coalesce: key, body)
+        document.perform(name, undoManager: undoManager, coalesce: key) { next in
+            let previous = next
+            body(&next)
+            // Opening and saving preserve old blends. Editing a blend or either photo's
+            // geometry upgrades it within the same undo step, including slider gestures.
+            for slide in next.slides.indices {
+                for index in next.slides[slide].layers.indices {
+                    let layer = next.slides[slide].layers[index]
+                    guard let oldLayer = previous.layer(layer.id), let old = oldLayer.image?.seamBlend,
+                          let blend = layer.image?.seamBlend else { continue }
+                    let partnerChanged = previous.layer(old.targetLayerID).map(SeamSource.init)
+                        != next.layer(blend.targetLayerID).map(SeamSource.init)
+                    if !old.isRefined && (old != blend || SeamSource(oldLayer) != SeamSource(layer) || partnerChanged) {
+                        next.slides[slide].layers[index].image?.seamBlend?.version = SeamBlend.refinedVersion
+                    }
+                    if layer.groupKind == .blend, let group = layer.groupID,
+                       old.edge == blend.edge, old.targetLayerID == blend.targetLayerID,
+                       blend.analysis == nil || blend.analysis == old.analysis,
+                       SeamSource(oldLayer) != SeamSource(layer) || partnerChanged,
+                       let target = next.layer(blend.targetLayerID), target.groupID == group,
+                       let oldTarget = previous.layer(old.targetLayerID), let analysis = old.analysis,
+                       analysis.matches(oldLayer, oldTarget, edge: old.edge),
+                       let rebased = analysis.rebased(from: oldLayer, to: layer, partnerFrom: oldTarget, partnerTo: target) {
+                        next.slides[slide].layers[index].image?.seamBlend?.analysis = rebased
+                    }
+                }
+            }
+        }
     }
 
     func beginGesture() { document.beginGesture() }
@@ -365,6 +393,7 @@ final class EditorController {
     /// selected photo layer; clicking the photo it already shows duplicates that layer;
     /// otherwise add a new photo to the slide.
     func useAsset(_ asset: MediaAsset) {
+        if selectedBlendGroup != nil { addAssetToBlendGroup(asset.id); return }
         if let layer = selectedLayer, let props = layer.image {
             if props.assetID == asset.id { duplicateLayer(layer.id, using: asset); return }
             assign(asset, to: layer.id)

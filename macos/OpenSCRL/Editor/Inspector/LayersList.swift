@@ -107,6 +107,12 @@ struct LayersList: View {
             let order = (controller.selectedSlide?.layers ?? []).map(\.id).filter(ids.contains)
             guard !order.isEmpty else { controller.selectLayer(nil); return }
             let clicked = new.subtracting(shown).first.map { groups[$0]?.first ?? $0 }
+            if order.count == 1, controller.project.layer(order[0])?.groupID == nil {
+                controller.groupExistingBlend(containing: order[0])
+                if !controller.blendGroupMembers(containing: order[0]).isEmpty {
+                    controller.selectBlendGroup(containing: order[0]); return
+                }
+            }
             controller.selectLayers(order, primary: clicked)
         })
     }
@@ -186,6 +192,7 @@ private struct GroupRow: View {
         let locked = members.allSatisfy(\.locked)
         let visible = members.contains(where: \.visible)
         let ids = Set(members.map(\.id))
+        let blended = members.allSatisfy { $0.groupKind == .blend }
         HStack(spacing: 6) {
             Button(action: toggle) {
                 Image(systemName: "chevron.right")
@@ -196,12 +203,12 @@ private struct GroupRow: View {
             .buttonStyle(.borderless)
             .foregroundStyle(.secondary)
             .help(collapsed ? "Show layers" : "Hide layers")
-            Image(systemName: "square.on.square.dashed")
+            Image(systemName: blended ? "photo.stack" : "square.on.square.dashed")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(.secondary)
                 .frame(width: 24, height: 24)
                 .background(RoundedRectangle(cornerRadius: 5, style: .continuous).fill(.quaternary.opacity(0.7)))
-            Text("Group").lineLimit(1).strikethrough(!visible).foregroundStyle(visible ? .primary : .secondary)
+            Text(blended ? "Blend Group" : "Group").lineLimit(1).strikethrough(!visible).foregroundStyle(visible ? .primary : .secondary)
             Text("\(members.count)").monospacedDigit().foregroundStyle(.tertiary)
             Spacer(minLength: 4)
             if locked || hovering {
@@ -219,7 +226,7 @@ private struct GroupRow: View {
         .padding(.vertical, 2)
         .onHover { hovering = $0 }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Group of \(members.count)\(collapsed ? ", collapsed" : "")")
+        .accessibilityLabel("\(blended ? "Blend Group" : "Group") of \(members.count)\(collapsed ? ", collapsed" : "")")
     }
 
     private func set(_ ids: Set<String>, _ key: WritableKeyPath<Layer, Bool>, _ value: Bool, name: String) {

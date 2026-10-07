@@ -175,6 +175,8 @@ struct ShapeProperties: Hashable, Sendable {
     var cornerRadius: Double = 0
 }
 
+enum LayerGroupKind: String, Codable, Sendable { case blend }
+
 struct Layer: Identifiable, Hashable, Sendable {
     enum Content: Hashable, Sendable {
         case image(ImageProperties)
@@ -196,6 +198,7 @@ struct Layer: Identifiable, Hashable, Sendable {
     var locked: Bool = false
     /// Layers on the same slide sharing a group ID are selected, moved and arranged together.
     var groupID: String?
+    var groupKind: LayerGroupKind?
     var shadow: Shadow?
     var content: Content
 
@@ -386,14 +389,19 @@ extension Project {
             let dx = Double(s) * format.width
             for layer in slide.layers where includeHidden || layer.visible {
                 let origin = CGPoint(x: layer.x + dx, y: layer.y)
-                if let rect {
-                    let bounds = Geometry.rotatedBounds(of: CGRect(origin: origin, size: CGSize(width: layer.width, height: layer.height)), degrees: layer.rotation)
-                    if !bounds.intersects(rect) { continue }
-                }
                 items.append(SceneItem(layer: layer, slideIndex: s, origin: origin))
             }
         }
-        return items
+        guard let rect else { return items }
+        let indices = Dictionary(uniqueKeysWithValues: items.enumerated().map { ($0.element.layer.id, $0.offset) })
+        var included = Set(items.indices.filter { Geometry.rotatedBounds(of: items[$0].globalFrame, degrees: items[$0].layer.rotation).intersects(rect) })
+        var pending = Array(included)
+        while let index = pending.popLast() {
+            guard let id = items[index].layer.image?.seamBlend?.targetLayerID,
+                  let partner = indices[id], partner < index, items[partner].layer.image != nil else { continue }
+            if included.insert(partner).inserted { pending.append(partner) }
+        }
+        return items.enumerated().compactMap { included.contains($0.offset) ? $0.element : nil }
     }
 
     /// Indices of slides whose content is affected by a layer at `frame` (global coords).

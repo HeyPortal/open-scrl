@@ -84,8 +84,11 @@ extension Slide {
 
     mutating func normalizeSingletonGroups() {
         let counts = Dictionary(layers.compactMap(\.groupID).map { ($0, 1) }, uniquingKeysWith: +)
+        let invalidBlendGroups = Set(layers.filter { $0.groupID != nil && ($0.image == nil || $0.groupKind != .blend) }.compactMap(\.groupID))
         for i in layers.indices {
             if let group = layers[i].groupID, counts[group] == 1 { layers[i].groupID = nil }
+            if layers[i].groupID == nil { layers[i].groupKind = nil }
+            else if let group = layers[i].groupID, invalidBlendGroups.contains(group) { layers[i].groupKind = nil }
         }
     }
 
@@ -138,7 +141,7 @@ extension Slide {
         let insertion = layers[..<top].filter { !selected.contains($0.id) }.count
         let group = UID.make()
         let block = layers.filter { selected.contains($0.id) }.map { layer -> Layer in
-            var copy = layer; copy.groupID = group; return copy
+            var copy = layer; copy.groupID = group; copy.groupKind = nil; return copy
         }
         layers.removeAll { selected.contains($0.id) }
         layers.insert(contentsOf: block, at: insertion)
@@ -147,7 +150,9 @@ extension Slide {
 
     mutating func ungroupLayers(_ ids: [String]) {
         let selected = Set(expandedToGroups(ids))
-        for i in layers.indices where selected.contains(layers[i].id) { layers[i].groupID = nil }
+        for i in layers.indices where selected.contains(layers[i].id) {
+            layers[i].groupID = nil; layers[i].groupKind = nil
+        }
     }
 
     mutating func moveLayers(_ ids: [String], dx: Double, dy: Double) {

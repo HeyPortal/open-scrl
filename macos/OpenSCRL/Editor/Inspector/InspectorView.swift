@@ -98,7 +98,7 @@ struct LayerInspector: View {
                         .foregroundStyle(.secondary)
                     if layer.groupID != nil {
                         Text("·").foregroundStyle(.secondary)
-                        Button("In a Group") { controller.selectParent() }
+                        Button(layer.groupKind == .blend ? "In a Blend Group" : "In a Group") { controller.selectParent() }
                             .buttonStyle(.link)
                             .help("Select the whole group (Esc)")
                     }

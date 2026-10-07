@@ -92,19 +92,20 @@ final class GPUSceneRenderer {
         var lower: [String: SceneItem] = [:]
         // Live prepared images stay local to this frame's graph; no video frame history is cached.
         var prepared: [String: CIImage] = [:]
+        var lastDrawnLayerID: String?
         for item in items {
             let layer = item.layer
             guard layer.visible, !options.hiddenLayerIDs.contains(layer.id), layer.width > 0, layer.height > 0 else { continue }
             var local: CIImage?
             if let props = layer.image {
                 local = photo(item, assets: assets, images: images, options: options, scale: scale)
-                if let original = local { prepared[layer.id] = original }
-                if let blend = props.seamBlend?.sanitized, let target = lower[blend.targetLayerID],
+                if var blend = props.seamBlend?.sanitized, let target = lower[blend.targetLayerID],
                    let targetProps = target.layer.image, let targetAsset = assets[targetProps.assetID ?? ""],
                    target.layer.opacity > 0, let source = local,
                    let partner = prepared[target.layer.id],
                    let bounds = overlap(foreground: item, target: target, targetAsset: targetAsset,
                                         assets: assets, images: images, scale: scale, preview: options.editor) {
+                    if blend.isRefined, lastDrawnLayerID != blend.targetLayerID { blend.version = 1 }
                     let placement = transform(target, viewport: viewport, scale: scale)
                         .concatenating(transform(item, viewport: viewport, scale: scale).inverted())
                     let localExtent = CGRect(x: 0, y: 0, width: layer.width * scale, height: layer.height * scale)
@@ -120,6 +121,8 @@ final class GPUSceneRenderer {
                 if knownAsset, props.strokeWidth > 0, !HexColor.isTransparent(props.stroke), let border = border(layer, scale: scale, preview: options.editor) {
                     local = border.composited(over: local ?? transparent(border.extent))
                 }
+                // A seam partner is mixed as drawn, border included, without editor tints.
+                if let drawn = local { prepared[layer.id] = drawn }
                 if knownAsset, options.highlightedSlotIDs.contains(layer.id),
                    let mask = mask(layer, scale: scale, preview: options.editor) {
                     let tint = tint(mask, color: options.accent.copy(alpha: 0.28) ?? options.accent)
@@ -146,6 +149,7 @@ final class GPUSceneRenderer {
             }
             output = image.composited(over: output).cropped(to: extent)
             lower[layer.id] = item
+            if layer.opacity > 0 { lastDrawnLayerID = layer.id }
         }
         return output.cropped(to: extent)
     }
@@ -318,7 +322,7 @@ final class GPUSceneRenderer {
     private func staticContent(_ layer: Layer, options: RenderOptions, scale: Double) -> CIImage? {
         var neutral = layer
         neutral.x = 0; neutral.y = 0; neutral.rotation = 0; neutral.opacity = 1; neutral.shadow = nil
-        neutral.id = "cached"; neutral.name = ""; neutral.groupID = nil
+        neutral.id = "cached"; neutral.name = ""; neutral.groupID = nil; neutral.groupKind = nil
         var content = neutral.content
         if case .image(var props) = content { props.seamBlend = nil; content = .image(props); neutral.content = content }
         let highlighted = options.highlightedSlotIDs.contains(layer.id)

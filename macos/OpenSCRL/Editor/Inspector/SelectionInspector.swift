@@ -12,19 +12,22 @@ struct SelectionInspector: View {
         let bounds = Geometry.unionBounds(of: layers) ?? .zero
         let isOneGroup = units == 1 && Set(layers.compactMap(\.groupID)).count == 1
         let allLocked = layers.allSatisfy(\.locked)
+        let blendGroup = controller.selectedBlendGroup
         Form {
             Section { header(layers: layers, bounds: bounds, isOneGroup: isOneGroup) }
 
-            if layers.count == 2 && layers.allSatisfy({ $0.image?.assetID != nil }) {
+            if let blendGroup {
+                BlendGroupSection(controller: controller, members: blendGroup)
+            } else if layers.count >= 2 && layers.allSatisfy({ $0.image?.assetID != nil }) {
                 Section("Seam Blend") {
-                    Button("Blend Selected Photos or Videos", systemImage: "square.on.square") { controller.blendSelectedSeam() }
+                    Button("Blend \(layers.count) Photos", systemImage: "photo.stack") { controller.blendSelectedSeam() }
                         .disabled(!controller.canBlendSelectedSeam)
                     Text("Align shared detail and match colors along the join.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
 
-            Section {
+            if blendGroup == nil { Section {
                 HStack(spacing: 8) {
                     Button { controller.groupSelection() } label: { Label("Group", systemImage: "square.on.square.dashed").frame(maxWidth: .infinity) }
                         .disabled(!controller.canGroupNow)
@@ -41,7 +44,7 @@ struct SelectionInspector: View {
                     .foregroundStyle(.secondary)
             } header: {
                 Text("Group")
-            }
+            } }
 
             Section {
                 if units >= 2 {
@@ -131,13 +134,13 @@ struct SelectionInspector: View {
         let kinds = Set(layers.map(\.kindName))
         let noun = kinds.count == 1 ? (layers.first?.kindName ?? "Layers") : "Layers"
         return HStack(spacing: 10) {
-            Image(systemName: isOneGroup ? "square.on.square.dashed" : "square.stack.3d.up")
+            Image(systemName: controller.selectedBlendGroup != nil ? "photo.stack" : isOneGroup ? "square.on.square.dashed" : "square.stack.3d.up")
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(.tint)
                 .frame(width: 30, height: 30)
                 .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(.tint.opacity(0.15)))
             VStack(alignment: .leading, spacing: 1) {
-                Text(isOneGroup ? "Group of \(layers.count)" : "\(layers.count) \(noun)").font(.headline)
+                Text(controller.selectedBlendGroup != nil ? "Blend Group · \(layers.count) Photos" : isOneGroup ? "Group of \(layers.count)" : "\(layers.count) \(noun)").font(.headline)
                 Text("\(Int(bounds.width.rounded())) × \(Int(bounds.height.rounded()))\(allLocked ? " · Locked" : "")")
                     .font(.caption)
                     .monospacedDigit()

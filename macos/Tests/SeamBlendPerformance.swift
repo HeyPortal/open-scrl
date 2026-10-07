@@ -26,13 +26,17 @@ struct SeamBlendPerformance {
                                     alignmentFound: true, path: (0..<128).map { 0.5 + sin(Double($0) / 20) * 0.1 })
         let assets = [asset.id: asset]
         var checksum = 0
-        for backend in ["CPU", "GPU"] { for scale in [1.0, 2.0] {
+        for backend in ["CPU Classic", "GPU Classic", "Seamless", "Soft", "Organic", "Glow"] { for scale in [1.0, 2.0] {
             var times: [Double] = []
             for step in -2..<10 {
-                let blend = SeamBlend(targetLayerID: base.id, width: Double(80 + step * 3), analysis: analysis)
+                var blend = SeamBlend(targetLayerID: base.id, width: Double(80 + step * 3), analysis: analysis)
+                blend.version = backend.hasSuffix("Classic") ? 1 : SeamBlend.refinedVersion
+                blend.style = ["Soft", "Organic", "Glow"].contains(backend) ? .soft : .seamless
+                if backend == "Organic" { blend.edgeStyle = .organic }
+                if backend == "Glow" { blend.edgeStyle = .glow }
                 let start = CACurrentMediaTime()
                 autoreleasepool {
-                    let result = backend == "CPU"
+                    let result = backend.hasPrefix("CPU")
                         ? SeamRenderer.imageCPU(image, asset: asset, foreground: foreground, target: target,
                                                 blend: blend, pixelScale: scale, assets: assets, targetImage: image)!
                         : gpu.image(image, asset: asset, foreground: foreground, target: target,

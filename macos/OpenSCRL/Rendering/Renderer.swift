@@ -137,12 +137,56 @@ enum Renderer {
     /// Draws an ordered scene consistently in slides, filmstrip thumbnails, and overflow.
     static func drawScene(_ items: [SceneItem], cg: CGContext, assets: [String: MediaAsset],
                           images: ImageProviding?, options: RenderOptions) {
+        // Compose refined joins together, using the same graph as the live canvas and
+        // exports. Materializing joins one at a time changes nested blur sampling at 2×.
+        if items.contains(where: { $0.layer.image?.seamBlend?.isRefined == true }),
+           let renderer = GPUSceneRenderer.shared {
+            let viewport = cg.boundingBoxOfClipPath, scale = deviceScale(cg)
+            if !viewport.isNull, !viewport.isInfinite, viewport.width > 0, viewport.height > 0,
+               viewport.width * scale <= 8192, viewport.height * scale <= 8192,
+               viewport.width * viewport.height * scale * scale <= 32 * 1024 * 1024,
+               let graph = renderer.scene(items, viewport: viewport, assets: assets, images: images, options: options, scale: scale),
+               let image = renderer.context.createCGImage(graph, from: graph.extent, format: .RGBA8, colorSpace: HexColor.srgb) {
+                drawImageFlipped(image, in: viewport, cg: cg)
+                return
+            }
+        }
         var lowerLayers: [String: SceneItem] = [:]
+        var prepared: [String: CGImage] = [:]
+        let partners = Set(items.compactMap { $0.layer.image?.seamBlend?.targetLayerID })
+        var lastDrawnLayerID: String?
         for item in items {
-            let target = item.layer.image?.seamBlend.flatMap { lowerLayers[$0.targetLayerID] }
-            drawLayer(item.layer, origin: item.origin, cg: cg, assets: assets, images: images, options: options, seamTarget: target)
-            if !options.hiddenLayerIDs.contains(item.layer.id) {
+            var layer = item.layer
+            let target = layer.image?.seamBlend.flatMap { lowerLayers[$0.targetLayerID] }
+            // Mixing the partner's pixels would cover intervening layers. Preserve their
+            // composition with the original alpha feather until the photos are adjacent.
+            if let blend = layer.image?.seamBlend, blend.isRefined, lastDrawnLayerID != blend.targetLayerID {
+                layer.image?.seamBlend?.version = 1
+            }
+            let preparedTarget = target.flatMap { prepared[$0.layer.id] }
+            drawLayer(layer, origin: item.origin, cg: cg, assets: assets, images: images, options: options, seamTarget: target,
+                      preparedSeamTarget: preparedTarget)
+            if item.layer.visible, item.layer.opacity > 0, !options.hiddenLayerIDs.contains(item.layer.id) {
+                if partners.contains(layer.id), layer.image?.seamBlend != nil {
+                    // Retain a blended partner's local pixels for subsequent joins, matching
+                    // the GPU graph. Undo the layer rotation so this raster remains local.
+                    var flat = layer; flat.opacity = 1; flat.shadow = nil
+                    var localTarget = target
+                    localTarget?.origin.x -= item.origin.x; localTarget?.origin.y -= item.origin.y
+                    let wanted = deviceScale(cg)
+                    let scale = wanted * min(1, 8192 / max(layer.width * wanted, layer.height * wanted))
+                    let w = max(1, Int(ceil(layer.width * scale))), h = max(1, Int(ceil(layer.height * scale)))
+                    prepared[layer.id] = SeamRenderer.Pixels(width: w, height: h) { context in
+                        context.scaleBy(x: Double(w) / layer.width, y: Double(h) / layer.height)
+                        context.translateBy(x: layer.width / 2, y: layer.height / 2)
+                        context.rotate(by: -Geometry.radians(layer.rotation))
+                        context.translateBy(x: -layer.width / 2, y: -layer.height / 2)
+                        drawLayer(flat, origin: .zero, cg: context, assets: assets, images: images, options: RenderOptions(),
+                                  seamTarget: localTarget, preparedSeamTarget: preparedTarget)
+                    }?.image()
+                }
                 lowerLayers[item.layer.id] = item
+                lastDrawnLayerID = item.layer.id
             }
         }
     }
@@ -150,7 +194,8 @@ enum Renderer {
     // MARK: Layers
 
     static func drawLayer(_ layer: Layer, origin: CGPoint, cg: CGContext, assets: [String: MediaAsset],
-                          images: ImageProviding?, options: RenderOptions, seamTarget: SceneItem? = nil) {
+                          images: ImageProviding?, options: RenderOptions, seamTarget: SceneItem? = nil,
+                          preparedSeamTarget: CGImage? = nil) {
         guard layer.visible, !options.hiddenLayerIDs.contains(layer.id), layer.width > 0, layer.height > 0 else { return }
         cg.saveGState()
         cg.translateBy(x: origin.x + layer.width / 2, y: origin.y + layer.height / 2)
@@ -167,7 +212,8 @@ enum Renderer {
         let box = CGSize(width: layer.width, height: layer.height)
         switch layer.content {
         case .image(let props):
-            drawImage(props, layer: layer, origin: origin, box: box, cg: cg, assets: assets, images: images, options: options, seamTarget: seamTarget)
+            drawImage(props, layer: layer, origin: origin, box: box, cg: cg, assets: assets, images: images, options: options, seamTarget: seamTarget,
+                      preparedSeamTarget: preparedSeamTarget)
         case .shape(let props):
             drawShape(props, box: box, cg: cg)
         case .text(let props):
@@ -219,7 +265,8 @@ enum Renderer {
     }
 
     private static func drawImage(_ props: ImageProperties, layer: Layer, origin: CGPoint, box: CGSize, cg: CGContext,
-                                  assets: [String: MediaAsset], images: ImageProviding?, options: RenderOptions, seamTarget: SceneItem?) {
+                                  assets: [String: MediaAsset], images: ImageProviding?, options: RenderOptions, seamTarget: SceneItem?,
+                                  preparedSeamTarget: CGImage?) {
         let layerID = layer.id
         let clip = MaskGeometry.path(props.mask, size: box, cornerRadius: props.cornerRadius)
         guard let assetID = props.assetID else {
@@ -242,7 +289,7 @@ enum Renderer {
                let targetImage = images?.image(for: targetAsset, pixelEdge: edge),
                let blended = SeamRenderer.image(image, asset: asset,
                     foreground: SceneItem(layer: layer, slideIndex: target.slideIndex, origin: origin), target: target,
-                    blend: blend, pixelScale: deviceScale(cg), assets: assets, targetImage: targetImage) {
+                    blend: blend, pixelScale: deviceScale(cg), assets: assets, targetImage: targetImage, preparedTargetImage: preparedSeamTarget) {
                 drawImageFlipped(blended, in: CGRect(origin: .zero, size: box), cg: cg)
             } else {
                 drawImageFlipped(image, in: mediaRect, cg: cg)
