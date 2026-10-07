@@ -29,7 +29,7 @@ import { useEditorSession } from '@/editor/sessionStore';
 import type { ImageLayer, Layer, ShapeLayer, TextLayer } from '@/types';
 import { GRADIENT_SWATCHES, SOLID_SWATCHES, backgroundCss, backgroundLabel, sameBackground } from '@/lib/palette';
 import { RotationDial } from './RotationDial';
-import { ColorField, LinkToggle, NumberField, Section, Slider } from './ui';
+import { ColorField, LinkedSliders, NumberField, Section, Slider } from './ui';
 import { useEditGesture, useLayerGesture } from './inspector/useLayerGesture';
 import { Switch } from './inspector/controls';
 import { PhotoSwapSection } from './inspector/PhotoSwapSection';
@@ -459,9 +459,12 @@ function GridSection({ slideId }: { slideId: string }) {
   };
   return (
     <Section title="Photo grid" action={<span className="text-[11px] text-ink-faint">{template.name}</span>}>
-      <Slider ariaLabel="Gap" label="Gap" display={`${Math.round(gap)} px`} min={0} max={gapMax} value={gap} onChange={setGap} gesture={gesture} valueText={`${Math.round(gap)} pixels`} />
-      <LinkToggle linked={linked} onToggle={toggleLinked} />
-      <Slider ariaLabel="Outer margin" label="Outer margin" display={`${Math.round(margin)} px`} min={0} max={marginMax} value={margin} onChange={setMargin} gesture={gesture} valueText={`${Math.round(margin)} pixels`} />
+      <LinkedSliders
+        linked={linked}
+        onToggle={toggleLinked}
+        top={<Slider ariaLabel="Gap" label="Gap" display={`${Math.round(gap)} px`} min={0} max={gapMax} value={gap} onChange={setGap} gesture={gesture} valueText={`${Math.round(gap)} pixels`} />}
+        bottom={<Slider ariaLabel="Outer margin" label="Outer margin" display={`${Math.round(margin)} px`} min={0} max={marginMax} value={margin} onChange={setMargin} gesture={gesture} valueText={`${Math.round(margin)} pixels`} />}
+      />
       {movedSlots > 0 && <p className="text-[11px] leading-relaxed text-ink-faint">{movedSlots} slot{movedSlots === 1 ? ' was' : 's were'} moved by hand and won’t follow these sliders.</p>}
     </Section>
   );
