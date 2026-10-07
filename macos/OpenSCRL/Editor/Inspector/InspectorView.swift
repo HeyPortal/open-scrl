@@ -46,6 +46,7 @@ struct LayerInspector: View {
             switch layer.content {
             case .image:
                 ImageSections(controller: controller, layer: layer)
+                PhotoSwapSection(controller: controller, ids: [layer.id])
                 PhotoFrameSections(controller: controller, layer: layer)
                 SeamBlendSection(controller: controller, layer: layer)
             case .text:

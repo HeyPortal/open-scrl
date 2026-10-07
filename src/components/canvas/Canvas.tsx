@@ -6,6 +6,7 @@ import { useAssets } from '@/store/assets';
 import { MAX_ZOOM, MIN_ZOOM, useEditorSession } from '@/editor/sessionStore';
 import { useEditorView } from '@/editor/viewStore';
 import { clickWouldNarrow, enterGroup, narrowTo, pickLayer } from '@/editor/selectionActions';
+import { useToasts } from '@/store/toasts';
 import { useContextMenu } from '@/components/Menu';
 import { layerMenu } from '@/app/menus';
 import { isMac } from '@/app/actions';
@@ -24,6 +25,7 @@ import { TextEditor } from './TextEditor';
 import { SlideHeaders } from './SlideHeaders';
 import { SlideBackground } from './SlideBackground';
 import { SELECTION_COLOR } from './SelectionOutline';
+import { addPhotosAt, describeFill, dragCarriesAsset, dragCarriesFiles, locateDrop, readDroppedAssetId, readDroppedFiles, type DropLocation } from './mediaDrop';
 
 const SNAP_THRESHOLD_PX = 6;
 const PADDING = 32;
@@ -97,6 +99,8 @@ export function Canvas({ width, height }: { width: number; height: number }) {
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [resizeSeams, setResizeSeams] = useState<{ x: number; y: number; height: number }[]>([]);
   const [marquee, setMarquee] = useState<Bounds | null>(null);
+  // What a media drag would land on right now; hovering never changes the selection.
+  const [dropHover, setDropHover] = useState<{ slideId: string; layerId: string | null } | null>(null);
   // Live view transform for window listeners: clicking a slide can scroll the canvas mid-gesture.
   const viewRef = useRef({ offset: viewportOffset, zoom });
   useLayoutEffect(() => { viewRef.current = { offset: viewportOffset, zoom }; }, [viewportOffset, zoom]);
@@ -253,6 +257,73 @@ export function Canvas({ width, height }: { width: number; height: number }) {
   const onTouchStart=(event:Konva.KonvaEventObject<TouchEvent>)=>{const touches=event.evt.touches;const el=scrollRef.current;if(!el)return;if(touches.length===1&&event.target!==event.target.getStage())return;const x=[...touches].reduce((n,p)=>n+p.clientX,0)/touches.length;const y=[...touches].reduce((n,p)=>n+p.clientY,0)/touches.length;const distance=touches.length>1?Math.hypot(touches[0].clientX-touches[1].clientX,touches[0].clientY-touches[1].clientY):0;touch.current={x,y,distance,zoom,left:el.scrollLeft,top:el.scrollTop};};
   const onTouchMove=(event:Konva.KonvaEventObject<TouchEvent>)=>{const start=touch.current;const el=scrollRef.current;const touches=event.evt.touches;if(!start||!el||!touches.length)return;event.evt.preventDefault();const x=[...touches].reduce((n,p)=>n+p.clientX,0)/touches.length;const y=[...touches].reduce((n,p)=>n+p.clientY,0)/touches.length;if(touches.length>1&&start.distance>0){const distance=Math.hypot(touches[0].clientX-touches[1].clientX,touches[0].clientY-touches[1].clientY);setZoom(Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,start.zoom*distance/start.distance)));}el.scrollLeft=start.left-(x-start.x);el.scrollTop=start.top-(y-start.y);scheduleScrollSync();};
 
+  const clearDropHover = useCallback(() => setDropHover(null), []);
+  useEffect(() => {
+    // A cancelled drag (Esc, drop elsewhere) must not leave the highlight behind.
+    window.addEventListener('dragend', clearDropHover);
+    window.addEventListener('drop', clearDropHover);
+    return () => { window.removeEventListener('dragend', clearDropHover); window.removeEventListener('drop', clearDropHover); };
+  }, [clearDropHover]);
+
+  /** Hit-tests in document coordinates from the live scroll position, so it holds while the canvas scrolls or zooms. */
+  const locateDragPoint = (clientX: number, clientY: number) => {
+    const el = scrollRef.current; if (!el) return null;
+    const rect = el.getBoundingClientRect();
+    return locateDrop(useEditor.getState().doc, { x: (el.scrollLeft + clientX - rect.left - originX) / zoom, y: (el.scrollTop + clientY - rect.top - centeredY) / zoom });
+  };
+  const onMediaDragOver = (event: React.DragEvent) => {
+    const asset = dragCarriesAsset(event.dataTransfer);
+    if (!asset && !dragCarriesFiles(event.dataTransfer)) return;
+    event.preventDefault();
+    const location = locateDragPoint(event.clientX, event.clientY);
+    // Files can still be imported from anywhere; a thumbnail needs a slide to land on.
+    event.dataTransfer.dropEffect = location || !asset ? 'copy' : 'none';
+    const next = location ? { slideId: location.slideId, layerId: location.frame?.id ?? null } : null;
+    setDropHover((old) => old?.slideId === next?.slideId && old?.layerId === next?.layerId ? old : next);
+  };
+  const onMediaDragLeave = (event: React.DragEvent) => {
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) clearDropHover();
+  };
+  const dropAsset = (assetId: string, location: DropLocation | null) => {
+    const { assets: known, projectId } = useAssets.getState();
+    const asset = projectId === useEditor.getState().activeProjectId ? known.find((a) => a.id === assetId) : undefined;
+    if (!asset) { useToasts.getState().addToast('That media is no longer in this project.', 'warning'); return; }
+    if (!location) return;
+    const { frame } = location;
+    if (!frame) { addPhotosAt(location.slideId, location.point, [asset]); return; }
+    // Dropping a photo on the frame that already shows it changes nothing, so keep its crop.
+    if (frame.assetId === asset.id || useEditor.getState().assignPhoto(frame.id, asset.id)) pickLayer(frame.id, false);
+  };
+  const dropFiles = async (files: File[], location: DropLocation | null) => {
+    const projectId = useEditor.getState().activeProjectId;
+    const imported = await useAssets.getState().importFiles(files, { reuseExisting: true });
+    const editor = useEditor.getState();
+    // Everything is imported once here; a project switch mid-import only keeps the files.
+    if (!imported.length || editor.activeProjectId !== projectId || !location) return;
+    const toast = useToasts.getState().addToast;
+    const frame = editor.doc.layers[location.frame?.id ?? ''];
+    if (location.frame) {
+      if (frame?.kind !== 'image') return;
+      const placed = editor.assignPhotos(frame.id, imported.map((a) => a.id));
+      if (placed > 0) pickLayer(frame.id, false);
+      toast(describeFill(placed, imported.length), placed > 0 ? 'success' : 'warning');
+      return;
+    }
+    if (!editor.doc.slides[location.slideId]) return;
+    addPhotosAt(location.slideId, location.point, imported);
+  };
+  const onMediaDrop = (event: React.DragEvent) => {
+    const assetId = readDroppedAssetId(event.dataTransfer);
+    const files = assetId ? [] : readDroppedFiles(event.dataTransfer);
+    if (!assetId && !files.length) return;
+    // Claim the drop so the shell's import fallback doesn't import the same files again.
+    event.preventDefault(); event.stopPropagation();
+    clearDropHover();
+    const location = locateDragPoint(event.clientX, event.clientY);
+    if (assetId) dropAsset(assetId, location);
+    else void dropFiles(files, location);
+  };
+
   const slideModel = (slideId: string): Slide => ({ id: slideId, background: doc.slides[slideId].background, layers: getSlideLayers(doc, slideId) });
   const localMoving = (node: Konva.Node, layer: DocLayer, transformed = false) => {
     const scaleX = transformed ? node.scaleX() : 1; const scaleY = transformed ? node.scaleY() : 1;
@@ -368,8 +439,10 @@ export function Canvas({ width, height }: { width: number; height: number }) {
   const stripWidth = (visibleRange.end - visibleRange.start + 1) * fmt.width;
   const selectedIndex = doc.slideOrder.indexOf(selectedSlideId);
   const multi = !!selectionBox;
+  const dropLayer = dropHover?.layerId ? doc.layers[dropHover.layerId] : undefined;
+  const dropIndex = dropHover ? doc.slideOrder.indexOf(dropHover.slideId) : -1;
 
-  return <div ref={workspaceRef} className="workspace relative h-full w-full overflow-hidden select-none">
+  return <div ref={workspaceRef} className="workspace relative h-full w-full overflow-hidden select-none" onDragEnter={onMediaDragOver} onDragOver={onMediaDragOver} onDragLeave={onMediaDragLeave} onDrop={onMediaDrop}>
     <div ref={scrollRef} data-testid="canvas-scroll" onScroll={scheduleScrollSync} className="absolute inset-0 overflow-auto scrollbar-thin"><div style={{width:spacerWidth,height:spacerHeight}} /></div>
     <div className="absolute inset-0 pointer-events-auto overflow-hidden">
       <Stage ref={stageRef} width={Math.max(1,width)} height={Math.max(1,height)} onWheel={onWheel} onContextMenu={(e)=>{e.evt.preventDefault();openContextMenu(e.evt.clientX,e.evt.clientY,layerMenu(),'Canvas actions');}} onMouseDown={(e)=>{if(e.target!==e.target.getStage())return;if(e.evt.button===0)startMarquee(e.evt);else selectPageAtPointer();}} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={()=>{if(touch.current)selectPageAtPointer();touch.current=null;}}>
@@ -390,6 +463,9 @@ export function Canvas({ width, height }: { width: number; height: number }) {
           {wideMode&&visibleSlides.slice(1).map(({index})=><Line key={`seam-${index}`} points={[index*fmt.width,0,index*fmt.width,fmt.height]} stroke="#ffffff" opacity={0.45} strokeWidth={1/zoom} dash={[6/zoom,5/zoom]}/>)}
           {wideMode&&selectedIndex>=visibleRange.start&&selectedIndex<=visibleRange.end&&<Rect x={selectedIndex*fmt.width} y={fmt.height+8/zoom} width={fmt.width} height={3/zoom} cornerRadius={1.5/zoom} fill={SELECTION_COLOR}/>}
           {resizeSeams.map((seam)=><Group key={`seam-${seam.x}`}><Rect x={seam.x-6/zoom} y={seam.y} width={12/zoom} height={seam.height} fill="#ff3b8a" opacity={0.2}/><Line points={[seam.x,seam.y,seam.x,seam.y+seam.height]} stroke="#ff3b8a" strokeWidth={3/zoom} dash={[10/zoom,6/zoom]}/></Group>)}
+          {dropHover&&dropIndex>=0&&(dropLayer
+            ?<Rect x={dropIndex*fmt.width+dropLayer.x+dropLayer.width/2} y={dropLayer.y+dropLayer.height/2} offsetX={dropLayer.width/2} offsetY={dropLayer.height/2} width={dropLayer.width} height={dropLayer.height} rotation={dropLayer.rotation} stroke={SELECTION_COLOR} strokeWidth={4/zoom} fill="rgba(124,92,255,0.22)"/>
+            :<Rect x={dropIndex*fmt.width} width={fmt.width} height={fmt.height} stroke={SELECTION_COLOR} strokeWidth={3/zoom} dash={[12/zoom,8/zoom]} fill="rgba(124,92,255,0.06)"/>)}
           {guides.map((g,i)=>g.orientation==='v'?<Line key={i} points={[guideOffsetX+g.position,g.start,guideOffsetX+g.position,g.end]} stroke="#ff3b8a" strokeWidth={1/zoom}/>:<Line key={i} points={[guideOffsetX+g.start,g.position,guideOffsetX+g.end,g.position]} stroke="#ff3b8a" strokeWidth={1/zoom}/>)}
         </Group></KLayer>
       </Stage>

@@ -9,6 +9,7 @@ import { command, type EditorCommand } from '@/core/document/commands';
 import { getSlideLayers, materializeSlide, expandToGroups, groupMemberIds, selectionUnits } from '@/core/document/selectors';
 import { scaleLayer, slideSpanFor, unionBounds, type AlignEdge, type DistributeAxis } from '@/core/document/geometry';
 import { measureTextHeight } from '@/render/paint/text';
+import { canSwapPhotoFrames, filledPhotoFrames, setFramePhoto, shuffledPhotoIds } from '@/core/document/photos';
 import { listProjectSummaries, preserveLegacyBackup, readProject, writeProject, type StoredProjectSummary } from '@/storage/database';
 import { assetRepository } from '@/assets/indexeddb/IndexedDbAssetRepository';
 import { useEditorSession } from './sessionStore';
@@ -80,6 +81,10 @@ export interface EditorState {
   duplicateSlide(id: string): void;
   moveSlide(from: number, to: number): void;
   addImageLayer(assetId: string, dim: { width: number; height: number }): void;
+  assignPhoto(layerId: string, assetId: string | null): boolean;
+  assignPhotos(targetLayerId: string, assetIds: string[]): number;
+  shufflePhotos(slideId?: string): boolean;
+  swapPhotos(sourceId: string, targetId: string): boolean;
   addTextLayer(text?: string): void;
   addShapeLayer(shape: 'rect' | 'ellipse'): void;
   applyGrid(template: GridTemplate, gap: number): void;
@@ -402,6 +407,48 @@ export const useDocumentStore = create<EditorState>((set, get) => ({
     const layer: ImageLayer = { id: id(), kind: 'image', name: 'Photo', x: (fmt.width-width)/2, y: (fmt.height-height)/2, width, height, rotation: 0, opacity: 1, visible: true, locked: false, assetId, cornerRadius: 0, cropOffsetX: 0, cropOffsetY: 0, cropScale: 1 };
     const sid = useEditorSession.getState().selectedSlideId || s.doc.slideOrder[0];
     get().execute(command('Add photo', (d) => { d.layers[layer.id] = layer; d.slides[sid].layerOrder.push(layer.id); })); get().selectLayer(layer.id);
+  },
+  assignPhoto: (layerId, assetId) => {
+    const layer = get().doc.layers[layerId];
+    if (get().readOnlyError || layer?.kind !== 'image') return false;
+    get().execute(command(assetId === null ? 'Clear photo' : layer.assetId ? 'Replace photo' : 'Fill photo frame', (d) => {
+      setFramePhoto(d.layers[layerId] as ImageLayer, assetId);
+    }));
+    return true;
+  },
+  assignPhotos: (targetLayerId, assetIds) => {
+    const { doc, readOnlyError } = get();
+    const target = doc.layers[targetLayerId];
+    const slideId = findLayerSlide(doc, targetLayerId);
+    if (readOnlyError || !slideId || target?.kind !== 'image' || assetIds.length === 0) return 0;
+    const targets = [targetLayerId, ...getSlideLayers(doc, slideId)
+      .filter((layer) => layer.id !== targetLayerId && layer.kind === 'image' && layer.visible && layer.assetId === null)
+      .map((layer) => layer.id)].slice(0, assetIds.length);
+    get().execute(command(targets.length === 1 ? 'Replace photo' : 'Place photos', (d) => {
+      targets.forEach((layerId, index) => setFramePhoto(d.layers[layerId] as ImageLayer, assetIds[index]));
+    }));
+    return targets.length;
+  },
+  shufflePhotos: (slideId) => {
+    const { doc, readOnlyError } = get();
+    if (readOnlyError) return false;
+    const frames = filledPhotoFrames(doc, slideId ?? (useEditorSession.getState().selectedSlideId || doc.slideOrder[0]));
+    const shuffled = shuffledPhotoIds(frames.map((layer) => layer.assetId!));
+    if (!shuffled) return false;
+    get().execute(command('Shuffle photos', (d) => {
+      frames.forEach((layer, index) => setFramePhoto(d.layers[layer.id] as ImageLayer, shuffled[index]));
+    }));
+    return true;
+  },
+  swapPhotos: (sourceId, targetId) => {
+    const { doc, readOnlyError } = get();
+    if (readOnlyError || !canSwapPhotoFrames(doc, sourceId, targetId)) return false;
+    const source = doc.layers[sourceId] as ImageLayer, target = doc.layers[targetId] as ImageLayer;
+    get().execute(command(source.assetId && target.assetId ? 'Swap photos' : 'Move photo', (d) => {
+      setFramePhoto(d.layers[sourceId] as ImageLayer, target.assetId);
+      setFramePhoto(d.layers[targetId] as ImageLayer, source.assetId);
+    }));
+    return true;
   },
   addTextLayer: (text = 'Double-click to edit') => {
     const s = get(); const f = s.doc.format; const sid = useEditorSession.getState().selectedSlideId || s.doc.slideOrder[0];

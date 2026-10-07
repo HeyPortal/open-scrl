@@ -53,6 +53,12 @@ Web App and a [native Mac app](#mac-app). Your projects and original media stay 
   the continuous strip in wide view. Preview posts in a phone feed, story, or 3:4 profile grid.
 - **Reusable media** — imports are deduplicated by content and organized by project.
   Click the media item used by the selected image layer again to duplicate that layer.
+- **Photo arrangement** — drop media onto any photo frame to replace its contents while
+  keeping its size, styling, and lock. Multiple files fill the target and then other empty
+  frames on that slide; extras stay in Media. Use **Shuffle Photos** in the slide inspector,
+  or select two frames to **Swap Photos**. A single photo's inspector also lets you choose
+  a partner on another slide or move the photo into an empty frame. Mac blend groups keep
+  their joins when a member is replaced and are excluded from shuffle and swap.
 - **Local-first persistence** — projects autosave in your browser, with IndexedDB fallback
   for media when OPFS writes are unavailable or fail. Save and load errors include retry
   controls, and failed import workers recover for subsequent imports.
@@ -158,6 +164,7 @@ and GPU frames keep completing during each gesture; its loop timings include a f
 Download `Open-SCRL-<version>.dmg` from
 [Releases](https://github.com/HeyPortal/open-scrl/releases), open it, and drag **Open-SCRL**
 onto the **Applications** folder. It requires macOS 27 on a Mac with Apple silicon.
+See the [Mac changelog](./macos/CHANGELOG.md) for release changes.
 
 Preview builds are ad-hoc signed and not notarized, so macOS blocks the first launch. Open
 **System Settings ▸ Privacy & Security** and click **Open Anyway**, or remove the download

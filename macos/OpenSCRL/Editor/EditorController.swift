@@ -403,24 +403,16 @@ final class EditorController {
     }
 
     func assign(_ asset: MediaAsset, to layerID: String, name: String? = nil) {
+        guard project.layer(layerID)?.image != nil else { return }
         let wasEmpty = project.layer(layerID)?.isEmptyImageSlot ?? false
-        updateLayer(layerID, name ?? (wasEmpty ? "Fill Photo Slot" : "Replace Photo")) { l in
-            self.assign(asset, to: &l)
+        perform(name ?? (wasEmpty ? "Fill Photo Slot" : "Replace Photo")) { p in
+            p.updateLayer(layerID) { self.assign(asset, to: &$0) }
+            PhotoFrames.updateBlends(in: &p, changedIDs: [layerID])
         }
     }
 
     private func assign(_ asset: MediaAsset, to layer: inout Layer) {
-        guard layer.image != nil else { return }
-        // Empty grid slots keep their layout; replacements start at the photo's original ratio.
-        if !layer.isEmptyImageSlot {
-            layer.frame = makeImageLayer(asset, center: layer.frame.center).frame
-        }
-        layer.image?.assetID = asset.id
-        layer.image?.cropOffsetX = 0
-        layer.image?.cropOffsetY = 0
-        layer.image?.cropScale = 1
-        layer.image?.seamBlend = nil
-        layer.locked = false
+        PhotoFrames.setPhoto(asset.id, in: &layer)
     }
 
     func applyGrid(_ template: GridTemplate, gap: Double? = nil) {
@@ -466,7 +458,7 @@ final class EditorController {
     func duplicateLayer(_ id: String, offset: Double = 24, using asset: MediaAsset? = nil) {
         guard let loc = project.locate(layer: id) else { return }
         var copy = project.slides[loc.slide].layers[loc.index]
-        if let asset { assign(asset, to: &copy) }
+        if let asset, copy.image?.assetID != asset.id { assign(asset, to: &copy) }
         copy.id = UID.make()
         copy.x += offset
         copy.y += offset
@@ -604,8 +596,9 @@ final class EditorController {
                 failed.append(url.lastPathComponent)
             }
         }
-        place(added: added, usable: usable, placement: placement)
-        reportImport(added: added.count, duplicates: duplicates, failed: failed, skipped: skipped, placement: placement)
+        let placed = place(added: added, usable: usable, placement: placement)
+        reportImport(added: added.count, duplicates: duplicates, failed: failed, skipped: skipped,
+                     placement: placement, placed: placed, total: usable.count)
     }
 
     func importImageData(_ data: Data, type: UTType, name: String, placement: MediaPlacement) async {
@@ -621,9 +614,11 @@ final class EditorController {
         }
     }
 
-    private func place(added: [MediaAsset], usable: [MediaAsset], placement: MediaPlacement) {
-        guard !usable.isEmpty else { return }
+    @discardableResult
+    private func place(added: [MediaAsset], usable: [MediaAsset], placement: MediaPlacement) -> Int {
+        guard !usable.isEmpty else { return 0 }
         var newSelection: String?
+        var placed = 0
         let project = self.project
         let actionName = added.isEmpty ? "Add Photo" : added.count == 1 ? "Import Media" : "Import \(added.count) Media Files"
         perform(actionName) { p in
@@ -632,48 +627,40 @@ final class EditorController {
             case .libraryOnly:
                 break
             case .fill(let layerID):
-                var queue = usable
-                p.updateLayer(layerID) { l in
-                    self.assign(queue.removeFirst(), to: &l)
-                }
-                newSelection = layerID
-                // Extra files fill the slide's other empty slots, then become new photos.
-                if let loc = p.locate(layer: layerID) {
-                    for i in p.slides[loc.slide].layers.indices where !queue.isEmpty && p.slides[loc.slide].layers[i].isEmptyImageSlot {
-                        p.slides[loc.slide].layers[i].image?.assetID = queue.removeFirst().id
-                        p.slides[loc.slide].layers[i].locked = false
-                    }
-                    for (n, asset) in queue.enumerated() {
-                        var layer = self.makeImageLayer(asset)
-                        layer.x += Double(n) * 24; layer.y += Double(n) * 24
-                        p.slides[loc.slide].layers.append(layer)
-                    }
+                if let loc = p.locate(layer: layerID), p.layer(layerID)?.image != nil {
+                    let targets = [layerID] + p.slides[loc.slide].layers.filter {
+                        $0.id != layerID && $0.visible && $0.isEmptyImageSlot && $0.groupKind != .blend
+                    }.map(\.id)
+                    let assignments = Array(zip(targets, usable))
+                    for (id, asset) in assignments { p.updateLayer(id) { PhotoFrames.setPhoto(asset.id, in: &$0) } }
+                    PhotoFrames.updateBlends(in: &p, changedIDs: Set(assignments.map { $0.0 }))
+                    placed = assignments.count
+                    newSelection = layerID
                 }
             case .add(let slideIndex, let center):
                 guard p.slides.indices.contains(slideIndex) else { return }
-                var queue = usable
-                // Dropping several files on a grid fills its empty slots first.
-                if usable.count > 1 {
-                    for i in p.slides[slideIndex].layers.indices where !queue.isEmpty && p.slides[slideIndex].layers[i].isEmptyImageSlot {
-                        p.slides[slideIndex].layers[i].image?.assetID = queue.removeFirst().id
-                        p.slides[slideIndex].layers[i].locked = false
-                    }
-                }
                 let local = center.map { CGPoint(x: $0.x - Double(slideIndex) * project.format.width, y: $0.y) }
-                for (n, asset) in queue.enumerated() {
+                for (n, asset) in usable.enumerated() {
                     var layer = self.makeImageLayer(asset, center: local)
                     layer.x += Double(n) * 24; layer.y += Double(n) * 24
                     p.slides[slideIndex].layers.append(layer)
                     newSelection = layer.id
+                    placed += 1
                 }
             }
         }
         if let newSelection { selectLayer(newSelection) }
+        return placed
     }
 
-    private func reportImport(added: Int, duplicates: Int, failed: [String], skipped: Int, placement: MediaPlacement) {
+    private func reportImport(added: Int, duplicates: Int, failed: [String], skipped: Int,
+                              placement: MediaPlacement, placed: Int, total: Int) {
         var parts: [String] = []
         if added > 0 { parts.append("Imported \(added) media file\(added == 1 ? "" : "s").") }
+        if case .fill = placement, total > 0 {
+            parts.append("Placed \(placed) of \(total) photos.")
+            if placed < total { parts.append("The remaining photos stay in Media.") }
+        }
         if duplicates > 0, placement == .libraryOnly {
             parts.append("\(duplicates) duplicate file\(duplicates == 1 ? " was" : "s were") already in this project.")
         }

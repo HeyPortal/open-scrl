@@ -10,6 +10,7 @@ struct SlideInspector: View {
         let slide = controller.selectedSlide
         let count = project.slides.count
         let layers = slide?.layers.count ?? 0
+        let hasPhotoFrames = slide?.layers.contains { $0.visible && $0.kind == .image && $0.groupKind != .blend } ?? false
 
         Form {
             Section {
@@ -74,6 +75,18 @@ struct SlideInspector: View {
                     }
                 }
                 LabeledContent("Size", value: "\(project.format.dimensions) px")
+            }
+
+            if hasPhotoFrames {
+                Section("Photos") {
+                    Button { _ = controller.shufflePhotos() } label: { Label("Shuffle Photos", systemImage: "shuffle") }
+                        .disabled(!controller.canShufflePhotos)
+                    Text(controller.canShufflePhotos
+                         ? "Photos trade places while every frame stays where it is."
+                         : "Add at least two different photos to this slide to shuffle them.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Section("Slide") {
