@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { GRID_TEMPLATES, MAX_GRID_INSET, maxMargin, type GridTemplate } from '@/lib/grids';
+import { GRID_TEMPLATES, MAX_GRID_INSET, linkedMax, maxMargin, type GridTemplate } from '@/lib/grids';
 import { useEditor } from '@/store/editor';
 import { useEditorSession } from '@/editor/sessionStore';
 import { LinkedSliders, PanelHeader, Slider } from '../ui';
@@ -60,19 +60,25 @@ export function TemplatesPanel() {
         />
       </div>
       <div className="grid min-h-0 flex-1 grid-cols-3 content-start gap-2 overflow-auto border-t border-line px-3 py-3 scrollbar-thin">
-        {GRID_TEMPLATES.map((t) => (
-          <button
-            key={t.id}
-            className="tile group flex flex-col items-stretch gap-1.5 p-1.5 text-center"
-            onClick={() => applyGrid(t, gap, margin)}
-            title={`Apply “${t.name}” grid`}
-          >
-            <div className="flex aspect-[4/5] items-center justify-center rounded-lg bg-bg-inset p-1.5">
-              <GridThumb tpl={t} gap={gap} margin={margin} ratio={ratio} />
-            </div>
-            <span className="block truncate text-[11px] font-medium text-ink-dim group-hover:text-ink">{t.name}</span>
-          </button>
-        ))}
+        {GRID_TEMPLATES.map((t) => {
+          // Linked spacing has to fit this template, or the inspector would show a smaller value than the one stored.
+          const v = Math.min(gap, linkedMax(t, format));
+          const tGap = linked ? v : gap;
+          const tMargin = linked ? v : margin;
+          return (
+            <button
+              key={t.id}
+              className="tile group flex flex-col items-stretch gap-1.5 p-1.5 text-center"
+              onClick={() => applyGrid(t, tGap, tMargin)}
+              title={`Apply “${t.name}” grid`}
+            >
+              <div className="flex aspect-[4/5] items-center justify-center rounded-lg bg-bg-inset p-1.5">
+                <GridThumb tpl={t} gap={tGap} margin={tMargin} ratio={ratio} />
+              </div>
+              <span className="block truncate text-[11px] font-medium text-ink-dim group-hover:text-ink">{t.name}</span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

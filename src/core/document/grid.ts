@@ -29,13 +29,14 @@ export function getLiveGrid(doc: ProjectDocumentV2, slideId: string): LiveGrid |
   if (!template) return null;
   const onSlide = new Set(slide.layerOrder);
   const cells = layoutGrid(template, doc.format, grid.gap, grid.margin);
+  const detached = new Set(grid.detachedSlotIds);
   let liveSlots = 0;
   let movedSlots = 0;
   grid.slotIds.forEach((id, i) => {
     const layer = doc.layers[id];
     if (!layer || !onSlide.has(id) || !cells[i]) return;
     liveSlots++;
-    if (!slotMatchesCell(layer, cells[i])) movedSlots++;
+    if (detached.has(id) || !slotMatchesCell(layer, cells[i])) movedSlots++;
   });
   return liveSlots > 0 ? { grid, template, liveSlots, movedSlots } : null;
 }
@@ -57,16 +58,22 @@ export function relayoutSlideGrid(
   if (!slide || !grid) return;
   const oldCells = layoutGrid(live.template, format, live.grid.gap, live.grid.margin);
   const newCells = layoutGrid(live.template, format, gap, margin);
+  const detached = new Set(grid.detachedSlotIds);
   grid.slotIds.forEach((id, i) => {
     const layer = draft.layers[id];
     if (!layer || !slide.layerOrder.includes(id) || !oldCells[i] || !newCells[i]) return;
-    if (!slotMatchesCell(layer, oldCells[i])) return;
+    if (detached.has(id)) return;
+    if (!slotMatchesCell(layer, oldCells[i])) {
+      detached.add(id);
+      return;
+    }
     const c = newCells[i];
     layer.x = c.x;
     layer.y = c.y;
     layer.width = c.w;
     layer.height = c.h;
   });
+  if (detached.size > 0) grid.detachedSlotIds = [...detached];
   grid.gap = gap;
   grid.margin = margin;
 }

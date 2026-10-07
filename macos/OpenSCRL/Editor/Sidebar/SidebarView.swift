@@ -116,7 +116,9 @@ struct GridsPanel: View {
                     ForEach(GridTemplate.all) { template in
                         Button { controller.applyGrid(template) } label: {
                             VStack(spacing: 6) {
-                                GridPreview(template: template, ratio: controller.project.format.aspectRatio, gap: controller.gridGap, margin: controller.gridMargin)
+                                GridPreview(template: template, ratio: controller.project.format.aspectRatio,
+                                            gap: controller.gridLinked ? min(controller.gridGap, template.linkedMax(format: controller.project.format)) : controller.gridGap,
+                                            margin: controller.gridLinked ? min(controller.gridGap, template.linkedMax(format: controller.project.format)) : controller.gridMargin)
                                     .frame(height: 64)
                                 Text(template.name).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                             }

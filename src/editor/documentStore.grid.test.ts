@@ -59,6 +59,43 @@ describe('setSlideGrid', () => {
     expect(store().doc.slides[sid()].grid).toMatchObject({ gap: 20, margin: 60 });
   });
 
+  it('keeps a hand-resized slot free when a later spacing makes its size match the grid again', () => {
+    store().applyGrid(four, 0, 0);
+    const [a, b] = slotIds();
+    const target = layoutGrid(four, store().doc.format, 40, 0)[1];
+    store().updateLayer(b, { x: 123, width: 200 });
+    store().setSlideGrid(sid(), { gap: 20 });
+    // The user drags the slot to exactly where the 40 px grid would put it.
+    store().updateLayer(b, { x: target.x, y: target.y, width: target.w, height: target.h });
+    const bBefore = frame(b);
+
+    store().setSlideGrid(sid(), { gap: 40 });
+    store().setSlideGrid(sid(), { gap: 60 });
+
+    expect(frame(b)).toEqual(bBefore);
+    expect(frame(a)).toEqual(layoutGrid(four, store().doc.format, 60, 0)[0]);
+    expect(getLiveGrid(store().doc, sid())!.movedSlots).toBe(1);
+  });
+
+  it('copies the free slots to a duplicated slide and honours them in apply-to-all', () => {
+    store().applyGrid(four, 0, 0);
+    const b = slotIds()[1];
+    store().updateLayer(b, { x: 321 });
+    store().setSlideGrid(sid(), { gap: 10 });
+    store().duplicateSlide(sid());
+    const copyId = store().doc.slideOrder[1];
+    const copyB = slotIds(copyId)[1];
+    const resized = frame(copyB);
+    const target = layoutGrid(four, store().doc.format, 30, 0)[1];
+    store().updateLayer(copyB, { x: target.x, y: target.y, width: target.w, height: target.h });
+
+    store().setSlideGrid(copyId, { gap: 30 });
+
+    expect(store().doc.slides[copyId].grid!.detachedSlotIds).toEqual([copyB]);
+    expect(frame(copyB)).toEqual({ x: target.x, y: target.y, w: target.w, h: target.h });
+    expect(resized).not.toEqual(frame(copyB));
+  });
+
   it('keeps the remaining slots on their own cells when a middle slot was deleted', () => {
     store().applyGrid(four, 0, 0);
     store().deleteLayer(slotIds()[1]);

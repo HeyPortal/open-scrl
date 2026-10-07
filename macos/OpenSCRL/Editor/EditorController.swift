@@ -286,6 +286,7 @@ final class EditorController {
         if var grid = copy.grid {
             let idMap = Dictionary(uniqueKeysWithValues: zip(project.slides[index].layers.map(\.id), copy.layers.map(\.id)))
             grid.slotIds = grid.slotIds.map { idMap[$0] ?? UID.make() }
+            grid.detachedSlotIds = grid.detachedSlotIds?.compactMap { idMap[$0] }
             copy.grid = grid
         }
         perform("Duplicate Slide") { $0.slides.insert(copy, at: index + 1) }
@@ -426,7 +427,8 @@ final class EditorController {
 
     func applyGrid(_ template: GridTemplate, gap: Double? = nil, margin: Double? = nil) {
         let index = selectedSlideIndex
-        let gap = gap ?? gridGap, margin = margin ?? gridMargin
+        var (gap, margin) = (gap ?? gridGap, margin ?? gridMargin)
+        if gridLinked { gap = min(gap, template.linkedMax(format: project.format)); margin = gap }
         let cells = template.layout(format: project.format, gap: gap, margin: margin)
         let layers = cells.enumerated().map { i, cell in
             Layer(id: UID.make(), name: "Photo \(i + 1)", x: cell.minX, y: cell.minY, width: cell.width, height: cell.height,

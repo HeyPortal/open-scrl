@@ -396,7 +396,11 @@ export const useDocumentStore = create<EditorState>((set, get) => ({
         d.layers[nid] = copy;
       }
       // slotIds must stay index-aligned with the template cells, so a slot that no longer exists gets a fresh unused id rather than being dropped.
-      const grid = source.grid && { ...source.grid, slotIds: source.grid.slotIds.map((old) => idMap.get(old) ?? id()) };
+      const grid = source.grid && {
+        ...source.grid,
+        slotIds: source.grid.slotIds.map((old) => idMap.get(old) ?? id()),
+        ...(source.grid.detachedSlotIds ? { detachedSlotIds: source.grid.detachedSlotIds.flatMap((old) => idMap.get(old) ?? []) } : {}),
+      };
       d.slides[nextId] = { ...source, id: nextId, layerOrder: newLayerIds, ...(grid ? { grid } : {}) };
       d.slideOrder.splice(d.slideOrder.indexOf(slideId) + 1, 0, nextId);
     })); get().selectSlide(nextId);

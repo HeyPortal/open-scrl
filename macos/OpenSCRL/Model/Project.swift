@@ -245,6 +245,8 @@ struct SlideGrid: Codable, Hashable, Sendable {
     var gap: Double
     var margin: Double
     var slotIds: [String]
+    /// Slots a relayout found off their computed cell; they stay free even if a later spacing lines up with them again.
+    var detachedSlotIds: [String]? = nil
 }
 
 struct Slide: Identifiable, Hashable, Sendable {

@@ -168,6 +168,8 @@ export interface SlideGrid {
   gap: number;
   margin: number;
   slotIds: string[];
+  /** Slots a relayout found off their computed cell; they stay free even if a later spacing lines up with them again. */
+  detachedSlotIds?: string[];
 }
 
 export interface SlideRecord {

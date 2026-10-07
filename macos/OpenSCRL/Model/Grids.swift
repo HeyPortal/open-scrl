@@ -175,11 +175,12 @@ extension Project {
     func liveGrid(slide index: Int) -> LiveGrid? {
         guard slides.indices.contains(index), let grid = slides[index].grid, let template = GridTemplate.template(id: grid.templateId) else { return nil }
         let cells = template.layout(format: format, gap: grid.gap, margin: grid.margin)
+        let detached = Set(grid.detachedSlotIds ?? [])
         var live = 0, moved = 0
         for (i, id) in grid.slotIds.enumerated() where i < cells.count {
             guard let layer = slides[index].layers.first(where: { $0.id == id }) else { continue }
             live += 1
-            if !layer.matches(cells[i]) { moved += 1 }
+            if detached.contains(id) || !layer.matches(cells[i]) { moved += 1 }
         }
         return live > 0 ? LiveGrid(grid: grid, template: template, movedSlots: moved) : nil
     }
@@ -193,13 +194,16 @@ extension Project {
         guard slides.indices.contains(index), var grid = slides[index].grid else { return }
         let oldCells = live.template.layout(format: format, gap: live.grid.gap, margin: live.grid.margin)
         let newCells = live.template.layout(format: format, gap: gap, margin: margin)
+        var detached = Set(grid.detachedSlotIds ?? [])
         for (i, id) in grid.slotIds.enumerated() where i < oldCells.count && i < newCells.count {
-            guard let li = slides[index].layers.firstIndex(where: { $0.id == id }), slides[index].layers[li].matches(oldCells[i]) else { continue }
+            guard !detached.contains(id), let li = slides[index].layers.firstIndex(where: { $0.id == id }) else { continue }
+            guard slides[index].layers[li].matches(oldCells[i]) else { detached.insert(id); continue }
             slides[index].layers[li].x = newCells[i].minX
             slides[index].layers[li].y = newCells[i].minY
             slides[index].layers[li].width = newCells[i].width
             slides[index].layers[li].height = newCells[i].height
         }
+        if !detached.isEmpty { grid.detachedSlotIds = grid.slotIds.filter { detached.contains($0) } }
         grid.gap = gap
         grid.margin = margin
         slides[index].grid = grid
