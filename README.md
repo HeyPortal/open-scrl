@@ -164,6 +164,7 @@ and GPU frames keep completing during each gesture; its loop timings include a f
 Download `Open-SCRL-<version>.dmg` from
 [Releases](https://github.com/HeyPortal/open-scrl/releases), open it, and drag **Open-SCRL**
 onto the **Applications** folder. It requires macOS 27 on a Mac with Apple silicon.
+See the [Mac changelog](./macos/CHANGELOG.md) for release changes.
 
 Preview builds are ad-hoc signed and not notarized, so macOS blocks the first launch. Open
 **System Settings ▸ Privacy & Security** and click **Open Anyway**, or remove the download
