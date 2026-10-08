@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./public/pwa-192.png" alt="Open-SCRL logo" width="88" height="88" />
+  <img src="./docs/images/logo.png" alt="Open-SCRL logo" width="100" height="100" />
 </p>
 
 <h1 align="center">Open-SCRL</h1>
