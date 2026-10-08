@@ -45,6 +45,14 @@ open build/Build/Products/Release/Open-SCRL.app
 - Shortcuts are in the menu bar and in **Help ▸ Keyboard Shortcuts** (`⌘ /`). `⌥ ⌘ P` opens
   the phone preview and `⇧ ⌥ ⌘ P` opens it full screen.
 
+Set **Gap between photos** and **Outer margin** in Photo Grids before choosing a layout.
+After adding photos, select the slide and use the inspector's **Photo Grid** section to
+adjust the spacing. The link control makes gap and margin equal, with a limit that fits
+the layout. **Apply to All N Slides** copies the spacing to every slide with a grid while
+keeping each slide's layout. Frames moved or resized by hand stay in place; choose
+**Re-attach Moved Slots** to return them to their grid cells. Grid settings are saved with
+the project, and spacing changes support undo.
+
 ## Seam blending
 
 Select two or more photo or video layers and choose **Arrange ▸ Blend Photos**, or choose a partner
