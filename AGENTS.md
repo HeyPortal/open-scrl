@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for coding agents (and humans) working in this repository. `CLAUDE.md` just imports this file.
 
 Open-SCRL is a local-first photo grid / social carousel maker. The repo holds two independent codebases: a React PWA (repo root, `src/`) and a native SwiftUI Mac app (`macos/`). They share only the on-disk project JSON schema (`ProjectDocumentV2`); there is no shared code.
 
@@ -63,3 +63,63 @@ Web and Mac projects are stored separately and don't transfer between apps yet.
 ## Docs
 
 `PLAN.md` is the original plan with proposed features (not a list of what's implemented); `PERFORMANCE_REVIEW.md` records performance/reliability fixes and known limitations.
+
+## Commits and pull requests
+
+Nothing goes straight to `main`. Every change lands through a PR that is merged with a merge commit (not squashed), so each commit on the branch ends up in history and should stand on its own.
+
+**Remotes.** `origin` is `HeyPortal/open-scrl`, the canonical repo. Maintainers push branches there. Contributors push to their fork (e.g. the `nelson-ens` remote) and open the PR against `HeyPortal/open-scrl:main`. CI on a fork PR waits until a maintainer approves the run.
+
+**Branches.** Branch from an up-to-date `main`:
+
+- `feature/<short-topic>` for features and fixes (e.g. `feature/photo-frame-workflows`)
+- `release/macos-vX.Y.Z` for a Mac release (see below)
+
+Rebase on `main` before asking for review if it has moved, and say in the PR what conflicted and how you resolved it.
+
+**Commits.**
+
+- Subject in the imperative and sentence case, no trailing period, about 70 characters max: `Preserve photo frames and add shuffle and explicit swap`. Conventional prefixes (`fix(grid): …`, `feat(mac): …`) have also been used and are fine, but use one style throughout a branch.
+- Add a body when the why isn't obvious from the subject. Wrap it at 72 columns.
+- Keep each commit buildable. Split unrelated changes, and when a feature touches both apps it's fine to commit web and Mac separately (`… (web)` / `feat(mac): …`).
+- Agents end the message with a `Co-Authored-By:` trailer for the model that wrote it.
+- Don't commit build output (`dist/`, `macos/build/`, `test-results/`) or local media.
+
+**Before opening a PR,** run what CI runs. If you skip a step, say so in the PR.
+
+```bash
+npm run verify
+npm run test:e2e
+```
+
+If you touched `macos/`, also build it in Xcode 27 and run the scripts in `macos/Scripts/` that cover your change (`test-gpu-rendering.sh`, `test-canvas-rendering.sh`, `test-seam-blend.sh`, `check-features.sh`; see `docs/mac.md`). If you changed the project schema, update both `src/core/document` (plus a migration) and `ProjectFile.swift` in the same PR.
+
+**Opening the PR.** Use `gh pr create --repo HeyPortal/open-scrl --base main`. The title has the same style as a commit subject. In the body:
+
+- `## Summary`: what changed for the user and why, in a few bullets or a short paragraph
+- Changes worth calling out for review (file or component names help), and anything left out on purpose
+- `## Verification`: the commands you ran with their results (test counts), plus manual checks. Be explicit about what you couldn't run, such as "Mac app not built: no Metal toolchain here."
+- `Closes #N` for each issue it resolves
+- Screenshots or a short recording for UI changes
+- PRs written by an agent end with the `🤖 Generated with …` line
+
+Update the README or `docs/` when user-visible behavior changes. Keep the README short and put detail in `docs/`.
+
+## Mac releases
+
+1. Branch `release/macos-vX.Y.Z` from `main`.
+2. In `macos/OpenSCRL.xcodeproj/project.pbxproj`, bump `MARKETING_VERSION` to `X.Y.Z` and `CURRENT_PROJECT_VERSION` by one. Each appears twice (Debug and Release).
+3. Add an entry at the top of `CHANGELOG.md`: `## X.Y.Z — YYYY-MM-DD (build N)`, a one-line summary, user-facing bullets (no internals), and a `[Changes since <prev>](https://github.com/HeyPortal/open-scrl/compare/macos-v<prev>...macos-vX.Y.Z)` link.
+4. Commit as `Prepare Mac X.Y.Z release and changelog` and open the PR. Releases may be bundled with the feature PR they ship.
+5. After merging, from the merge commit on `main`: build Release, run `macos/Scripts/make-dmg.sh`, then `shasum -a 256 Open-SCRL-X.Y.Z.dmg > SHA256SUMS.txt`.
+6. Publish:
+
+   ```bash
+   gh release create macos-vX.Y.Z --repo HeyPortal/open-scrl --target main \
+     --title "Open-SCRL for Mac X.Y.Z" --notes-file <notes.md> \
+     macos/build/dmg/Open-SCRL-X.Y.Z.dmg SHA256SUMS.txt CHANGELOG.md
+   ```
+
+   The notes start with `## What's new` and follow the changelog entry. Builds are ad-hoc signed and not notarized.
+
+Tags, releases, and pushes to `origin` are public. Agents should confirm with the user before creating or publishing any of them.
