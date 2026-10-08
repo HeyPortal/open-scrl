@@ -4,6 +4,18 @@ Every release of Open-SCRL for Mac, newest first. Each version is published on t
 [Releases page](https://github.com/HeyPortal/open-scrl/releases) with its disk image,
 checksums, and a copy of this changelog.
 
+## 0.5.6 — 2026-10-08 (build 8)
+
+Fine-tune photo grid spacing before and after adding your photos.
+
+- Set the gap between photos and the outer margin around a grid in Photo Grids, then adjust them later in the slide inspector's Photo Grid section without replacing your photos.
+- Link gap and outer margin to keep them equal. Spacing adjusts to fit each layout, and undo keeps the link control in step with the saved spacing.
+- Apply a slide's grid spacing to every grid slide in one undo step. Each slide keeps its own layout.
+- Photo frames moved or resized by hand stay where you put them when grid spacing changes. Choose **Re-attach Moved Slots** to return them to the grid and have them follow the spacing controls again.
+- Grid settings survive saving, reopening, and duplicating slides.
+
+[Changes since 0.5.5](https://github.com/HeyPortal/open-scrl/compare/macos-v0.5.5...macos-v0.5.6)
+
 ## 0.5.5 — 2026-10-08 (build 7)
 
 Smoother scrolling and zooming on the canvas.

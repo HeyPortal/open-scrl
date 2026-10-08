@@ -234,9 +234,29 @@ struct SeamBlendChecks {
         expect(scaledPair.image!.seamBlend!.width == blended.slides[0].layers[1].image!.seamBlend!.width * 2, "Group resizing scales the seam width")
         scaledPair.image?.mask = .ellipse
         expect(SeamSource(scaledPair).mask == .ellipse, "Matching snapshots include the new mask geometry")
-        controller.selectLayer("blue")
+        document.perform("Replacement fixture", undoManager: nil) { p in
+            p.updateLayer("blue") {
+                $0.image?.cropOffsetX = 8; $0.image?.cropOffsetY = -4; $0.image?.cropScale = 2
+                $0.image?.seamBlend?.analysis = match
+            }
+        }
+        controller.enterGroup("blue")
+        let beforeReplacement = document.project
+        let previousPhoto = beforeReplacement.layer("blue")!
+        var retainedJoin = previousPhoto.image!.seamBlend!
+        retainedJoin.analysis = nil
         undo.beginUndoGrouping(); controller.useAsset(asset("reference")); undo.endUndoGrouping()
-        expect(controller.selectedLayer?.image?.seamBlend == nil && controller.selectedLayer?.image?.cropScale == 1, "Selecting a new photo resets seam and crop settings")
+        let replacedPhoto = document.project.layer("blue")!
+        expect(replacedPhoto.image?.assetID == "reference", "Choosing media for an individual blend member replaces its photo")
+        expect(replacedPhoto.frame == previousPhoto.frame && replacedPhoto.rotation == previousPhoto.rotation && replacedPhoto.locked == previousPhoto.locked,
+               "Replacing a blend member preserves its frame")
+        expect(replacedPhoto.groupID == previousPhoto.groupID && replacedPhoto.groupKind == .blend, "Replacing a blend member keeps it in the group")
+        expect(replacedPhoto.image?.seamBlend == retainedJoin, "Replacing a blend member preserves join settings and clears the old match")
+        expect(replacedPhoto.image?.cropScale == 1 && replacedPhoto.image?.cropOffsetX == 0 && replacedPhoto.image?.cropOffsetY == 0,
+               "Replacing a blend member resets its crop")
+        let afterReplacement = document.project
+        undo.undo(); expect(document.project.hasSameContent(as: beforeReplacement), "One undo restores the photo, crop, and join analysis")
+        undo.redo(); expect(document.project.hasSameContent(as: afterReplacement), "Redo restores the blend-member replacement")
         print("PASS: auto overlap, aspect ratio, undo/redo, project compatibility, copied slides, and deletion")
 
         let pairDocument = ProjectDocument(format: project.format)
