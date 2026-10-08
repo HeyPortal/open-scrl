@@ -38,7 +38,7 @@ import { ImageFrameSection, ShadowSection, TextFillSection, TextHighlightSection
 import { alignSelection, isMac } from '@/app/actions';
 import { ALIGN_BUTTONS, SelectionInspector } from './inspector/SelectionInspector';
 import { groupMemberIds } from '@/core/document/selectors';
-import { getLiveGrid } from '@/core/document/grid';
+import { getLiveGrid, hasLinkedSpacing } from '@/core/document/grid';
 import { linkedMax, maxGapFor, maxMargin } from '@/lib/grids';
 
 const KIND_META = {
@@ -442,7 +442,7 @@ function GridSection({ slideId }: { slideId: string }) {
   const setGridSpacingForAllSlides = useEditor((s) => s.setGridSpacingForAllSlides);
   const reattachGridSlots = useEditor((s) => s.reattachGridSlots);
   const linkGridSpacing = useEditor((s) => s.linkGridSpacing);
-  const linked = useEditorSession((s) => s.gridLinked);
+  const linkOn = useEditorSession((s) => s.gridLinked);
   const setGridLinked = useEditorSession((s) => s.setGridLinked);
   const gesture = useEditGesture('Adjust grid', `gesture:grid:${slideId}`);
   const live = useMemo(() => getLiveGrid(doc, slideId), [doc, slideId]);
@@ -450,6 +450,8 @@ function GridSection({ slideId }: { slideId: string }) {
   if (!live) return null;
   const { grid, template, movedSlots } = live;
   const shared = linkedMax(template, doc.format);
+  // The toggle only shows linked while this slide's stored spacing is linked; otherwise the sliders show the real values.
+  const linked = linkOn && hasLinkedSpacing(live, doc.format);
   const marginMax = linked ? shared : maxMargin(doc.format.width, doc.format.height);
   const margin = Math.min(grid.margin, marginMax);
   const gapMax = linked ? shared : maxGapFor(template, doc.format, margin);
@@ -478,7 +480,7 @@ function GridSection({ slideId }: { slideId: string }) {
         </>
       )}
       {gridSlides > 1 && (
-        <button className="btn btn-secondary btn-sm w-full" aria-label={`Apply grid spacing to all ${gridSlides} slides`} onClick={() => setGridSpacingForAllSlides(slideId)}>
+        <button className="btn btn-secondary btn-sm w-full" aria-label={`Apply grid spacing to all ${gridSlides} slides`} onClick={() => setGridSpacingForAllSlides(slideId, linked)}>
           Apply to all {gridSlides} slides
         </button>
       )}

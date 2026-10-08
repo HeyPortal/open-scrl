@@ -1,5 +1,5 @@
 import type { Draft } from 'immer';
-import { GRID_TEMPLATES, layoutGrid, type GridCell, type GridTemplate } from '@/lib/grids';
+import { GRID_TEMPLATES, layoutGrid, linkedMax, type GridCell, type GridTemplate } from '@/lib/grids';
 import type { Layer, ProjectDocumentV2, SlideGrid } from '@/types';
 
 export const SLOT_EPSILON = 0.5;
@@ -39,6 +39,14 @@ export function getLiveGrid(doc: ProjectDocumentV2, slideId: string): LiveGrid |
     if (detached.has(id) || !slotMatchesCell(layer, cells[i])) movedSlots++;
   });
   return liveSlots > 0 ? { grid, template, liveSlots, movedSlots } : null;
+}
+
+/**
+ * True when gap and margin are equal and fit the template's linked limit, so linked sliders show exactly what is stored.
+ * Linking is UI-only, so undo, "Apply to all" or opening another project can leave a slide's spacing unlinked.
+ */
+export function hasLinkedSpacing(live: LiveGrid, format: { width: number; height: number }): boolean {
+  return live.grid.gap === live.grid.margin && live.grid.gap <= linkedMax(live.template, format);
 }
 
 /** Snaps every slot that is free or off its cell back onto its cell and lets it follow the grid again. */

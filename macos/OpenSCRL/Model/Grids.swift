@@ -168,6 +168,12 @@ struct LiveGrid {
     var grid: SlideGrid
     var template: GridTemplate
     var movedSlots: Int
+
+    /// True when gap and margin are equal and fit the template's linked limit, so linked sliders show exactly what is stored.
+    /// Linking is UI-only, so undo or "Apply to All" can leave a slide's spacing unlinked.
+    func hasLinkedSpacing(format: CanvasFormat) -> Bool {
+        grid.gap == grid.margin && grid.gap <= template.linkedMax(format: format)
+    }
 }
 
 extension Project {

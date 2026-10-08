@@ -66,6 +66,44 @@ test('linking gap and outer margin snaps the margin to the gap and moves both to
   expect(await grid()).toMatchObject({ gap: 40, margin: 20 });
 });
 
+test('undoing a link shows the toggle unlinked with the restored values', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: /create|start/i }).first().click();
+  await page.getByRole('navigation', { name: 'Tools' }).getByRole('button', { name: 'Grids', exact: true }).click();
+  await page.getByTitle('Apply “2 × 2” grid').click();
+
+  const grid = () => page.evaluate(async () => {
+    const path = '/src/editor/documentStore.ts';
+    const { useDocumentStore } = await import(path) as typeof import('../src/editor/documentStore');
+    const { doc } = useDocumentStore.getState();
+    const g = doc.slides[doc.slideOrder[0]].grid!;
+    return { gap: g.gap, margin: g.margin };
+  });
+
+  const inspector = page.getByRole('tabpanel');
+  const link = inspector.getByRole('button', { name: 'Link gap and outer margin' });
+  const gap = inspector.getByRole('slider', { name: 'Gap', exact: true });
+  const margin = inspector.getByRole('slider', { name: 'Outer margin', exact: true });
+  await gap.fill('30');
+  await margin.fill('10');
+  await link.click();
+  expect(await grid()).toMatchObject({ gap: 30, margin: 30 });
+
+  await page.keyboard.press('ControlOrMeta+z');
+  expect(await grid()).toMatchObject({ gap: 30, margin: 10 });
+  await expect(link).toHaveAttribute('aria-pressed', 'false');
+  // The Photo grids panel toggle shares the same flag, so it follows too.
+  for (const toggle of await page.getByRole('button', { name: 'Link gap and outer margin' }).all()) {
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  }
+  await expect(gap).toHaveValue('30');
+  await expect(margin).toHaveValue('10');
+
+  await link.click();
+  await expect(link).toHaveAttribute('aria-pressed', 'true');
+  expect(await grid()).toMatchObject({ gap: 30, margin: 30 });
+});
+
 test('apply to all slides copies the gap and outer margin to every slide with a grid', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: /create|start/i }).first().click();

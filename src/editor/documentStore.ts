@@ -5,7 +5,7 @@ import { id } from '@/lib/nano';
 import { DEFAULT_FORMAT } from '@/lib/format';
 import { layoutGrid, linkedMax, type GridTemplate } from '@/lib/grids';
 import { migrateDocument } from '@/core/document/migrations';
-import { getLiveGrid, reattachSlideGrid, relayoutSlideGrid } from '@/core/document/grid';
+import { getLiveGrid, hasLinkedSpacing, reattachSlideGrid, relayoutSlideGrid } from '@/core/document/grid';
 import { command, type EditorCommand } from '@/core/document/commands';
 import { getSlideLayers, materializeSlide, expandToGroups, groupMemberIds, selectionUnits } from '@/core/document/selectors';
 import { scaleLayer, slideSpanFor, unionBounds, type AlignEdge, type DistributeAxis } from '@/core/document/geometry';
@@ -16,6 +16,14 @@ import { assetRepository } from '@/assets/indexeddb/IndexedDbAssetRepository';
 import { useEditorSession } from './sessionStore';
 
 enablePatches();
+
+/** Undo and redo can restore spacing that isn't linked; the link toggle is UI-only, so switch it off to match the selected slide. */
+function syncGridLinked(doc: ProjectDocumentV2) {
+  const session = useEditorSession.getState();
+  if (!session.gridLinked) return;
+  const live = getLiveGrid(doc, session.selectedSlideId);
+  if (live && !hasLinkedSpacing(live, doc.format)) session.setGridLinked(false);
+}
 
 const HISTORY_LIMIT = 80;
 const HISTORY_BYTE_LIMIT = 32 * 1024 * 1024;
@@ -90,7 +98,7 @@ export interface EditorState {
   addShapeLayer(shape: 'rect' | 'ellipse'): void;
   applyGrid(template: GridTemplate, gap: number, margin?: number): void;
   setSlideGrid(slideId: string, patch: { gap?: number; margin?: number }): void;
-  setGridSpacingForAllSlides(fromSlideId: string): void;
+  setGridSpacingForAllSlides(fromSlideId: string, linked?: boolean): void;
   reattachGridSlots(slideId: string): void;
   linkGridSpacing(): void;
   updateLayer(id: string, patch: Partial<Layer>): void;
@@ -479,11 +487,14 @@ export const useDocumentStore = create<EditorState>((set, get) => ({
     const gap=patch.gap??live.grid.gap;const margin=patch.margin??live.grid.margin;if(gap===live.grid.gap&&margin===live.grid.margin)return;
     get().execute(command('Adjust grid',(d)=>relayoutSlideGrid(d,slideId,live,s.doc.format,gap,margin),`grid:${slideId}`));
   },
-  setGridSpacingForAllSlides: (fromSlideId) => { const s=get();const source=getLiveGrid(s.doc,fromSlideId);if(!source)return;
-    const {gap,margin}=source.grid;
-    const targets=s.doc.slideOrder.filter((sid)=>sid!==fromSlideId).flatMap((sid)=>{const live=getLiveGrid(s.doc,sid);return live&&(live.grid.gap!==gap||live.grid.margin!==margin)?[{sid,live}]:[];});
+  setGridSpacingForAllSlides: (fromSlideId,linked=false) => { const s=get();const source=getLiveGrid(s.doc,fromSlideId);if(!source)return;
+    // Linked spacing is capped at each target template's limit so every slide stays linked; otherwise values are copied as they are.
+    const keepLinked=linked&&hasLinkedSpacing(source,s.doc.format);
+    const targets=s.doc.slideOrder.filter((sid)=>sid!==fromSlideId).flatMap((sid)=>{const live=getLiveGrid(s.doc,sid);if(!live)return[];
+      const gap=keepLinked?Math.min(source.grid.gap,linkedMax(live.template,s.doc.format)):source.grid.gap;const margin=keepLinked?gap:source.grid.margin;
+      return live.grid.gap!==gap||live.grid.margin!==margin?[{sid,live,gap,margin}]:[];});
     if(!targets.length)return;
-    get().execute(command('Apply grid spacing to all slides',(d)=>{for(const t of targets)relayoutSlideGrid(d,t.sid,t.live,s.doc.format,gap,margin);}));
+    get().execute(command('Apply grid spacing to all slides',(d)=>{for(const t of targets)relayoutSlideGrid(d,t.sid,t.live,s.doc.format,t.gap,t.margin);}));
   },
   reattachGridSlots: (slideId) => { const s=get();const live=getLiveGrid(s.doc,slideId);if(!live||live.movedSlots===0)return;
     get().execute(command('Re-attach grid slots',(d)=>reattachSlideGrid(d,slideId,live,s.doc.format)));
@@ -697,8 +708,8 @@ export const useDocumentStore = create<EditorState>((set, get) => ({
   renameLayer: (layerId,name) => get().execute(command('Rename layer',(d)=>{if(d.layers[layerId])d.layers[layerId].name=name;},`layer:${layerId}:name`)),
   setBackground: (background) => {const sid=useEditorSession.getState().selectedSlideId;get().execute(command('Change background',(d)=>{if(d.slides[sid])d.slides[sid].background=background;}));},
   setBackgroundForAllSlides: (background) => get().execute(command('Change all backgrounds',(d)=>{for(const sid of d.slideOrder)d.slides[sid].background={...background};})),
-  undo: () => set((s)=>{const entry=s.past.at(-1);if(!entry)return{};const doc=produce(applyPatches(s.doc,entry.inverse),(d)=>{d.revision+=1;d.updatedAt=Date.now();});return{doc,past:s.past.slice(0,-1),future:[entry,...s.future].slice(0,HISTORY_LIMIT)};}),
-  redo: () => set((s)=>{const entry=s.future[0];if(!entry)return{};const doc=produce(applyPatches(s.doc,entry.patches),(d)=>{d.revision+=1;d.updatedAt=Date.now();});return{doc,past:trimHistory([...s.past,entry]),future:s.future.slice(1)};}),
+  undo: () => { set((s)=>{const entry=s.past.at(-1);if(!entry)return{};const doc=produce(applyPatches(s.doc,entry.inverse),(d)=>{d.revision+=1;d.updatedAt=Date.now();});return{doc,past:s.past.slice(0,-1),future:[entry,...s.future].slice(0,HISTORY_LIMIT)};}); syncGridLinked(get().doc); },
+  redo: () => { set((s)=>{const entry=s.future[0];if(!entry)return{};const doc=produce(applyPatches(s.doc,entry.patches),(d)=>{d.revision+=1;d.updatedAt=Date.now();});return{doc,past:trimHistory([...s.past,entry]),future:s.future.slice(1)};}); syncGridLinked(get().doc); },
 }));
 
 // The session owns selection, including direct calls from canvas and panels.

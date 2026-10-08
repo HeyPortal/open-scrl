@@ -319,6 +319,34 @@ import Darwin
     lc.linkGridSpacing()
     check(lc.project == linkedState, "linking again changes nothing")
 
+    // Linking is UI-only: undo can restore unequal spacing, and Apply to All must keep every slide linked.
+    let uDoc = ProjectDocument(format: CanvasFormat(name: "Landscape", width: 1080, height: 566))
+    uDoc.perform("Fixture", undoManager: nil) { p in p.slides = [Slide(id: "u1", background: .solid("#ffffff"), layers: []), Slide(id: "u2", background: .solid("#ffffff"), layers: [])] }
+    let uc = EditorController(document: uDoc)
+    let uUndo = UndoManager(); uUndo.groupsByEvent = false; uc.undoManager = uUndo
+    func step(_ body: () -> Void) { uUndo.beginUndoGrouping(); body(); uUndo.endUndoGrouping() }
+    step { uc.selectedSlideID = "u1"; uc.applyGrid(fourStack, gap: 120, margin: 0) }
+    step { uc.linkGridSpacing() }; uc.gridLinked = true
+    check(uc.project.liveGrid(slide: 0)!.hasLinkedSpacing(format: uc.project.format), "linking leaves the slide's spacing linked")
+    uUndo.undo()
+    check(uc.project.slides[0].grid!.gap == 120 && !uc.project.liveGrid(slide: 0)!.hasLinkedSpacing(format: uc.project.format), "undoing the link shows the slide as unlinked")
+    check(!uc.gridLinked, "undoing the link switches the link toggle off")
+    uc.gridLinked = true
+    uUndo.redo()
+    check(uc.gridLinked && uc.project.liveGrid(slide: 0)!.hasLinkedSpacing(format: uc.project.format), "redoing the link keeps the toggle on")
+    uc.gridLinked = true
+    uUndo.undo()
+    check(!uc.gridLinked, "undo switches the toggle off again for 120/0")
+    uc.gridLinked = true
+    step { uc.selectedSlideID = "u2"; uc.applyGrid(fourGrid, gap: 120, margin: 120) }
+    step { uc.applyGridSpacingToAllSlides() }
+    let capped = uc.project.slides[0].grid!
+    check(capped.gap == 100 && capped.margin == 100, "linked Apply to All caps each slide at what its template fits")
+    check(uc.project.slides[0].layers.first { $0.id == capped.slotIds[0] }!.matches(fourStack.layout(format: uc.project.format, gap: 100, margin: 100)[0]), "linked Apply to All relays out the slots")
+    uc.gridLinked = false
+    step { uc.applyGridSpacingToAllSlides() }
+    check(uc.project.slides[0].grid!.gap == 120 && uc.project.slides[0].grid!.margin == 120, "unlinked Apply to All copies the values as they are")
+
     print("ALL \(checks) UI CHECKS PASSED")
 }
 setbuf(stdout, nil)

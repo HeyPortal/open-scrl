@@ -227,6 +227,54 @@ describe('linkGridSpacing', () => {
   });
 });
 
+describe('undo and redo with linking on', () => {
+  const fourStack = GRID_TEMPLATES.find((t) => t.id === 'four-stack')!;
+  const landscape = { width: 1080, height: 566 };
+
+  function linkedFourStack() {
+    useDocumentStore.setState((s) => ({ doc: { ...s.doc, format: { ...s.doc.format, ...landscape } } }));
+    useEditorSession.setState({ selectedSlideId: sid(), gridLinked: false });
+    store().applyGrid(fourStack, 120, 0);
+    store().linkGridSpacing();
+    useEditorSession.getState().setGridLinked(true);
+  }
+
+  it('switches linking off when undo restores unequal spacing', () => {
+    linkedFourStack();
+    expect(store().doc.slides[sid()].grid).toMatchObject({ gap: 100, margin: 100 });
+
+    store().undo();
+
+    expect(store().doc.slides[sid()].grid).toMatchObject({ gap: 120, margin: 0 });
+    expect(useEditorSession.getState().gridLinked).toBe(false);
+  });
+
+  it('leaves linking on when undo keeps the spacing linked', () => {
+    linkedFourStack();
+    store().setSlideGrid(sid(), { gap: 60, margin: 60 });
+
+    store().undo();
+
+    expect(store().doc.slides[sid()].grid).toMatchObject({ gap: 100, margin: 100 });
+    expect(useEditorSession.getState().gridLinked).toBe(true);
+  });
+
+  it('switches linking off when redo leaves unequal spacing', () => {
+    linkedFourStack();
+    store().setSlideGrid(sid(), { gap: 40, margin: 40 });
+    store().undo();
+    useEditorSession.getState().setGridLinked(true);
+    store().setSlideGrid(sid(), { gap: 30, margin: 10 });
+    store().undo();
+    useEditorSession.getState().setGridLinked(true);
+
+    store().redo();
+
+    expect(store().doc.slides[sid()].grid).toMatchObject({ gap: 30, margin: 10 });
+    expect(useEditorSession.getState().gridLinked).toBe(false);
+  });
+});
+
 describe('duplicateSlide with a grid', () => {
   it('re-ids the copied slots so adjusting the copy does not move the original', () => {
     store().applyGrid(four, 0, 0);
@@ -314,6 +362,32 @@ describe('setGridSpacingForAllSlides', () => {
     const flush = layoutGrid(onePlusTwo, store().doc.format, 0, 0);
     slotIds(b).forEach((id, i) => expect(frame(id)).toEqual(flush[i]));
     expect(store().doc.slides[a].grid).toMatchObject({ gap: 30, margin: 20 });
+  });
+
+  it('while linked, caps each slide at what its template fits so every slide stays linked', () => {
+    const fourStack = GRID_TEMPLATES.find((t) => t.id === 'four-stack')!;
+    const landscape = { width: 1080, height: 566 };
+    useDocumentStore.setState((s) => ({ doc: { ...s.doc, format: { ...s.doc.format, ...landscape } } }));
+    store().applyGrid(fourStack, 0, 0);
+    store().addSlide();
+    store().applyGrid(four, 120, 120);
+    const [a, b] = store().doc.slideOrder;
+
+    store().setGridSpacingForAllSlides(b, true);
+
+    // 120 px of gap and margin does not fit four stacked rows on a 566 px tall slide; 100 does.
+    expect(store().doc.slides[a].grid).toMatchObject({ gap: 100, margin: 100 });
+    const cells = layoutGrid(fourStack, landscape, 100, 100);
+    slotIds(a).forEach((id, i) => expect(frame(id)).toEqual(cells[i]));
+  });
+
+  it('copies unequal spacing as it is even when linking is on', () => {
+    const { a, b } = threeSlides();
+    store().setSlideGrid(a, { gap: 30, margin: 20 });
+
+    store().setGridSpacingForAllSlides(a, true);
+
+    expect(store().doc.slides[b].grid).toMatchObject({ gap: 30, margin: 20 });
   });
 
   it('does nothing when the source has no grid, no other slide has one, or the spacing already matches', () => {

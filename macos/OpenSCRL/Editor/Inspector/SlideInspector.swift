@@ -45,7 +45,8 @@ struct SlideInspector: View {
             }
 
             if let live = project.liveGrid(slide: index) {
-                let linked = controller.gridLinked
+                // The toggle only shows linked while this slide's stored spacing is linked; otherwise the sliders show the real values.
+                let linked = controller.gridLinked && live.hasLinkedSpacing(format: project.format)
                 let shared = live.template.linkedMax(format: project.format)
                 let marginMax = linked ? shared : GridTemplate.maxMargin(width: project.format.width, height: project.format.height)
                 let margin = min(live.grid.margin, marginMax)

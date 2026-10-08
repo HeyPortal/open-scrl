@@ -117,6 +117,7 @@ final class EditorController {
     init(document: ProjectDocument) {
         self.document = document
         selectedSlideID = document.project.slides.first?.id ?? ""
+        document.onHistoryStep = { [weak self] in self?.syncGridLinked() }
     }
 
     var project: Project { document.project }
@@ -456,6 +457,12 @@ final class EditorController {
         }
     }
 
+    /// Undo and redo can restore spacing that isn't linked; the toggle is UI-only, so switch it off to match the selected slide.
+    private func syncGridLinked() {
+        guard gridLinked, let live = project.liveGrid(slide: selectedSlideIndex) else { return }
+        if !live.hasLinkedSpacing(format: project.format) { gridLinked = false }
+    }
+
     /// Makes gap and margin equal on every slide with a grid, capped at what each template fits, so the inspector
     /// never shows a value that isn't stored. Slots moved by hand are left alone.
     func linkGridSpacing() {
@@ -478,18 +485,21 @@ final class EditorController {
     }
 
     /// Copies the selected slide's gap and margin to every other slide that has a grid. Each slide keeps its
-    /// own template; slots moved by hand and slides without a grid are left alone.
+    /// own template; slots moved by hand and slides without a grid are left alone. Linked spacing is capped at
+    /// each target template's limit so every slide stays linked.
     func applyGridSpacingToAllSlides() {
         let sourceIndex = selectedSlideIndex
         guard let source = project.liveGrid(slide: sourceIndex) else { return }
-        let gap = source.grid.gap, margin = source.grid.margin
-        let targets: [(index: Int, live: LiveGrid)] = project.slides.indices.compactMap { i in
-            guard i != sourceIndex, let live = project.liveGrid(slide: i), live.grid.gap != gap || live.grid.margin != margin else { return nil }
-            return (i, live)
+        let keepLinked = gridLinked && source.hasLinkedSpacing(format: project.format)
+        let targets: [(index: Int, live: LiveGrid, gap: Double, margin: Double)] = project.slides.indices.compactMap { i in
+            guard i != sourceIndex, let live = project.liveGrid(slide: i) else { return nil }
+            let gap = keepLinked ? min(source.grid.gap, live.template.linkedMax(format: project.format)) : source.grid.gap
+            let margin = keepLinked ? gap : source.grid.margin
+            return live.grid.gap == gap && live.grid.margin == margin ? nil : (i, live, gap, margin)
         }
         guard !targets.isEmpty else { return }
         perform("Apply Grid Spacing to All Slides") { p in
-            for target in targets { p.relayoutGrid(slide: target.index, live: target.live, gap: gap, margin: margin) }
+            for t in targets { p.relayoutGrid(slide: t.index, live: t.live, gap: t.gap, margin: t.margin) }
         }
         show("Grid spacing applied to all \(project.gridSlideCount) grid slides.", style: .success)
     }

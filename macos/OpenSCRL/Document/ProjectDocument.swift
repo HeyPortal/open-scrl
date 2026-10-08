@@ -48,6 +48,8 @@ final class ProjectDocument: Document {
     @ObservationIgnored private var gesturePreview: Project?
     @ObservationIgnored private var coalesceKey: String?
     @ObservationIgnored private var coalesceTime: TimeInterval = 0
+    /// Called after undo or redo replaces the project, so UI-only state can follow it.
+    @ObservationIgnored var onHistoryStep: (() -> Void)?
 
     convenience init(format: CanvasFormat, media: [URL]) {
         self.init(format: format)
@@ -217,6 +219,7 @@ final class ProjectDocument: Document {
                 document.project = old
                 document.coalesceKey = nil
                 document.registerUndo(restoring: current, actionName: actionName, undoManager: undoManager)
+                document.onHistoryStep?()
             }
         }
         undoManager.setActionName(actionName)
