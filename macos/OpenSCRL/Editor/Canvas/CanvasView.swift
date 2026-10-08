@@ -90,6 +90,7 @@ final class CanvasView: NSView {
                     self?.needsDisplay = true
                 }
             }
+            surface.onReady = { [weak self] in self?.needsDisplay = true }
             metalSurface = surface
             addSubview(surface)
             chromeOverlay.drawChrome = { [weak self] cg in
@@ -297,6 +298,24 @@ final class CanvasView: NSView {
 
     private var isDark: Bool { effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua }
 
+    /// Core Graphics shadow parameters, in points. A flipped view's shadow offset is not
+    /// flipped, so the shadow falls toward the top of the deck.
+    static let deckShadowOffset: CGFloat = 10
+    static let deckShadowBlur: CGFloat = 30
+    private var deckShadowColor: CGColor { CGColor(gray: 0, alpha: isDark ? 0.6 : 0.22) }
+
+    /// What the GPU frame paints around and beneath the slides.
+    struct Backdrop {
+        var workspace: CGColor
+        var shadow: CGColor
+        /// Output pixels per view point, for the shadow's offset and blur.
+        var pixelsPerPoint: CGFloat
+    }
+
+    private func backdrop(pixelsPerPoint: CGFloat) -> Backdrop {
+        Backdrop(workspace: workspaceColor, shadow: deckShadowColor, pixelsPerPoint: pixelsPerPoint)
+    }
+
     private func render(_ cg: CGContext, controller: EditorController) {
         let project = controller.project
         let document = controller.document
@@ -314,30 +333,36 @@ final class CanvasView: NSView {
         let deckRect = CGRect(origin: origin, size: deckSize(project))
         let visibleModel = CGRect(x: (bounds.minX - origin.x) / z, y: (bounds.minY - origin.y) / z, width: bounds.width / z, height: bounds.height / z)
 
-        // Deck shadow
-        cg.saveGState()
-        cg.setShadow(offset: CGSize(width: 0, height: 10), blur: 30, color: CGColor(gray: 0, alpha: isDark ? 0.6 : 0.22))
-        cg.setFillColor(.white)
-        cg.fill(deckRect)
-        cg.restoreGState()
-
         let options = renderOptions(controller, accent: accent)
         let assets = project.assetsByID
         let images = document.images
 
         // Real windows present the viewport through Metal. Snapshot/printing contexts draw
         // synchronously with Core Graphics, so native offscreen checks remain meaningful.
+        // The GPU frame includes the workspace and deck shadow: nothing beneath it moves, so
+        // a frame still in flight can't uncover the deck at a newer position.
         if NSGraphicsContext.current?.isDrawingToScreen == true,
            let surface = metalSurface, surface.canPresent,
-           let composition = metalComposition(project, viewport: visibleModel, images: images,
-                                              options: options, scale: z * surface.pixelsPerPoint) {
-            surface.update(composition)
-            chromeOverlay.isHidden = false
-            chromeOverlay.needsDisplay = true
-            return
+           let composition = metalComposition(project, viewport: visibleModel, images: images, options: options,
+                                              scale: z * surface.pixelsPerPoint, backdrop: backdrop(pixelsPerPoint: surface.pixelsPerPoint)) {
+            // The chrome only changes in the transaction that shows the matching photos.
+            if surface.present(composition) {
+                chromeOverlay.isHidden = false
+                chromeOverlay.needsDisplay = true
+                return
+            }
+            // A busy GPU keeps the previous frame until it calls back; a failure draws below.
+            if surface.canPresent { return }
         }
         metalSurface?.clear()
         chromeOverlay.isHidden = true
+
+        // Deck shadow
+        cg.saveGState()
+        cg.setShadow(offset: CGSize(width: 0, height: Self.deckShadowOffset), blur: Self.deckShadowBlur, color: deckShadowColor)
+        cg.setFillColor(.white)
+        cg.fill(deckRect)
+        cg.restoreGState()
 
         // Content that hangs off the deck is shown faintly so it can still be found and grabbed.
         drawOverflow(cg, project: project, deckRect: deckRect, assets: assets, images: images, options: options)
@@ -385,8 +410,10 @@ final class CanvasView: NSView {
 
     /// CI coordinates run upward. The logical viewport is the portion of the deck beneath
     /// this view, keeping allocations constant as the user zooms or adds more slides.
+    /// With a `backdrop` the result is opaque: the workspace, the deck's shadow and the white
+    /// deck are painted as the Core Graphics canvas paints them.
     func metalComposition(_ project: Project, viewport: CGRect, images: ImageProviding,
-                          options: RenderOptions, scale: CGFloat) -> CIImage? {
+                          options: RenderOptions, scale: CGFloat, backdrop: Backdrop? = nil) -> CIImage? {
         guard let renderer = GPUSceneRenderer.shared, scale.isFinite, scale > 0 else { return nil }
         let target = CGRect(x: 0, y: 0, width: viewport.width * scale, height: viewport.height * scale)
         let assets = project.assetsByID
@@ -396,14 +423,35 @@ final class CanvasView: NSView {
                    width: logical.width * scale, height: logical.height * scale)
         }
         let deckModel = CGRect(origin: .zero, size: project.deckSize)
-        let deck = outputRect(deckModel).intersection(target)
-        var result = CIImage(color: .clear).cropped(to: target)
+        // An opaque frame covers every drawable pixel, including a fractional last row and
+        // column; a partly covered edge pixel would show as a dark line on an opaque layer.
+        let frame = backdrop == nil ? target : target.integral
+        let deck = outputRect(deckModel).intersection(frame)
+        let hasDeck = !deck.isNull && !deck.isEmpty
+        // The parts of the frame around the visible deck.
+        let outside = hasDeck ? [CGRect(x: 0, y: 0, width: frame.width, height: deck.minY),
+                                 CGRect(x: 0, y: deck.maxY, width: frame.width, height: frame.maxY - deck.maxY),
+                                 CGRect(x: 0, y: deck.minY, width: deck.minX, height: deck.height),
+                                 CGRect(x: deck.maxX, y: deck.minY, width: frame.maxX - deck.maxX, height: deck.height)]
+            .filter { $0.width > 0 && $0.height > 0 } : [frame]
+        var result = CIImage(color: .clear).cropped(to: frame)
+        if let backdrop {
+            result = CIImage(color: CIColor(cgColor: backdrop.workspace)).cropped(to: frame)
+            // Only blur where the shadow can show: the opaque deck covers the rest.
+            let points = backdrop.pixelsPerPoint
+            let shadow = CIImage(color: CIColor(cgColor: backdrop.shadow))
+                .cropped(to: outputRect(deckModel).offsetBy(dx: 0, dy: Self.deckShadowOffset * points))
+                .applyingGaussianBlur(sigma: Self.deckShadowBlur / 2 * points)
+            for rect in outside { result = shadow.cropped(to: rect).composited(over: result) }
+            // Translucent slide backgrounds show white beneath them, as on the Core Graphics canvas.
+            if hasDeck { result = CIImage(color: .white).cropped(to: deck).composited(over: result) }
+        }
         let first = max(0, Int(floor(viewport.minX / project.format.width)))
         let last = min(project.slides.count - 1, Int(floor(viewport.maxX / project.format.width)))
         if first <= last {
             for index in first...last {
                 let rect = outputRect(project.viewport(ofSlide: index))
-                let visible = rect.intersection(target)
+                let visible = rect.intersection(frame)
                 guard !visible.isNull, !visible.isEmpty else { continue }
                 guard let background = renderer.background(project.slides[index].background, in: rect,
                                                            assets: assets, images: images, options: options, scale: Double(scale)) else { return nil }
@@ -415,7 +463,7 @@ final class CanvasView: NSView {
         let items = CanvasSceneVisibility.items(in: project, intersecting: viewport, options: options, scale: scale)
         guard let content = renderer.scene(items, viewport: viewport, assets: assets, images: images,
                                            options: options, scale: Double(scale)) else { return nil }
-        if !deck.isNull, !deck.isEmpty { result = content.cropped(to: deck).composited(over: result) }
+        if hasDeck { result = content.cropped(to: deck).composited(over: result) }
 
         // Keep the same faint off-deck preview as the original canvas. Only overflowing
         // layers enter this scene; clipping excludes the already-composited deck interior.
@@ -426,19 +474,9 @@ final class CanvasView: NSView {
             guard let overflow = renderer.scene(overflowing, viewport: viewport, assets: assets, images: images,
                                                 options: options, scale: Double(scale)) else { return nil }
             let faint = overflow.applyingFilter("CIColorMatrix", parameters: ["inputAVector": CIVector(x: 0, y: 0, z: 0, w: 0.28)])
-            if deck.isNull || deck.isEmpty {
-                result = faint.composited(over: result)
-            } else {
-                let outside = [CGRect(x: 0, y: 0, width: target.width, height: deck.minY),
-                               CGRect(x: 0, y: deck.maxY, width: target.width, height: target.maxY - deck.maxY),
-                               CGRect(x: 0, y: deck.minY, width: deck.minX, height: deck.height),
-                               CGRect(x: deck.maxX, y: deck.minY, width: target.maxX - deck.maxX, height: deck.height)]
-                for rect in outside where rect.width > 0 && rect.height > 0 {
-                    result = faint.cropped(to: rect).composited(over: result)
-                }
-            }
+            for rect in outside { result = faint.cropped(to: rect).composited(over: result) }
         }
-        return result.cropped(to: target)
+        return result.cropped(to: frame)
     }
 
     var isInteracting: Bool {
