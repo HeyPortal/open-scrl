@@ -44,6 +44,41 @@ struct SlideInspector: View {
                 }
             }
 
+            if let live = project.liveGrid(slide: index) {
+                // The toggle only shows linked while this slide's stored spacing is linked; otherwise the sliders show the real values.
+                let linked = controller.gridLinked && live.hasLinkedSpacing(format: project.format)
+                let shared = live.template.linkedMax(format: project.format)
+                let marginMax = linked ? shared : GridTemplate.maxMargin(width: project.format.width, height: project.format.height)
+                let margin = min(live.grid.margin, marginMax)
+                let gapMax = max(1, linked ? shared : live.template.maxGap(format: project.format, margin: margin))
+                let gap = min(live.grid.gap, gapMax)
+                Section {
+                    // Linked: either slider sets both, so the spacing stays equal.
+                    LinkedSliders(linked: Binding(get: { linked }, set: { on in
+                        if on { controller.linkGridSpacing() }
+                        controller.gridLinked = on
+                    })) {
+                        GestureSlider(title: "Gap", value: Binding(get: { gap }, set: { let v = $0.rounded(); controller.setSlideGrid(gap: v, margin: linked ? v : nil) }),
+                                      range: 0...gapMax, display: "\(Int(gap)) px", controller: controller, undoName: "Adjust Grid")
+                    } bottom: {
+                        GestureSlider(title: "Outer Margin", value: Binding(get: { margin }, set: { let v = $0.rounded(); controller.setSlideGrid(gap: linked ? v : nil, margin: v) }),
+                                      range: 0...max(1, marginMax), display: "\(Int(margin)) px", controller: controller, undoName: "Adjust Grid")
+                    }
+                    if live.movedSlots > 0 {
+                        Text("\(live.movedSlots) slot\(live.movedSlots == 1 ? " was" : "s were") moved by hand and won’t follow these sliders.")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Button("Re-attach Moved Slots") { controller.reattachGridSlots() }
+                    }
+                    let gridSlides = project.gridSlideCount
+                    if gridSlides > 1 {
+                        Button("Apply to All \(gridSlides) Slides") { controller.applyGridSpacingToAllSlides() }
+                            .accessibilityLabel("Apply grid spacing to all \(gridSlides) slides")
+                    }
+                } header: {
+                    HStack { Text("Photo Grid"); Spacer(); Text(live.template.name).foregroundStyle(.secondary) }
+                }
+            }
+
             Section {
                 HStack(spacing: 6) {
                     ForEach(Array(Swatches.quick.enumerated()), id: \.offset) { _, bg in

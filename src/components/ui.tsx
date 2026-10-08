@@ -1,4 +1,5 @@
 import { useRef, type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
+import { Link2, Link2Off } from 'lucide-react';
 import { round } from '@/lib/nano';
 
 /** Title row at the top of a sidebar panel. */
@@ -24,6 +25,38 @@ export function Section({ title, action, children }: { title: string; action?: R
       </div>
       <div className="space-y-2.5">{children}</div>
     </section>
+  );
+}
+
+/**
+ * Two stacked sliders joined by a bracket on their right edge, with a link toggle at the bracket's midpoint.
+ * The bracket runs from the middle of the top track to the middle of the bottom track and is accent-colored
+ * while linked, faded otherwise. The offsets below assume `Slider`'s label row plus its 16px input.
+ */
+export function LinkedSliders({ linked, onToggle, top, bottom }: { linked: boolean; onToggle: () => void; top: ReactNode; bottom: ReactNode }) {
+  const Icon = linked ? Link2 : Link2Off;
+  const border = linked ? 'border-accent' : 'border-line-strong';
+  const fill = linked ? 'bg-accent' : 'bg-line-strong';
+  return (
+    <div className="flex items-stretch gap-2.5">
+      <div className="min-w-0 flex-1 space-y-0.5">{top}{bottom}</div>
+      <div className="mb-3.5 mt-[26px] flex shrink-0 items-stretch">
+        <div className={`w-2 rounded-r-[3px] border-y border-r ${border}`} aria-hidden />
+        <div className="flex items-center">
+          <span className={`h-px w-1.5 ${fill}`} aria-hidden />
+          <button
+            type="button"
+            className={`icon-btn ml-1 ${linked ? 'icon-btn-active' : ''}`}
+            title={linked ? 'Unlink gap and outer margin' : 'Link gap and outer margin'}
+            aria-label="Link gap and outer margin"
+            aria-pressed={linked}
+            onClick={onToggle}
+          >
+            <Icon size={14} aria-hidden />
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

@@ -330,3 +330,59 @@ struct GestureSlider: View {
         if editing { controller.beginGesture() } else { controller.endGesture(undoName) }
     }
 }
+
+/// Two stacked sliders joined by a bracket on their right edge, with a link toggle at the bracket's midpoint.
+/// The bracket runs from the middle of the top track to the middle of the bottom track and is tinted while
+/// linked, faded otherwise. The insets assume a title row plus a small slider, as in `GestureSlider`.
+struct LinkedSliders<Top: View, Bottom: View>: View {
+    @Binding var linked: Bool
+    private let top: Top
+    private let bottom: Bottom
+
+    /// Space for the bracket column; anything the bracket, connector and button don't use becomes the gap beside the sliders.
+    private let columnWidth: CGFloat = 60
+
+    init(linked: Binding<Bool>, @ViewBuilder top: () -> Top, @ViewBuilder bottom: () -> Bottom) {
+        _linked = linked
+        self.top = top()
+        self.bottom = bottom()
+    }
+
+    var body: some View {
+        let line: Color = linked ? .accentColor : .secondary.opacity(0.35)
+        VStack(spacing: 2) {
+            top
+            bottom
+        }
+        .padding(.trailing, columnWidth)
+        .overlay(alignment: .trailing) {
+            HStack(spacing: 0) {
+                LinkBracket().stroke(line, lineWidth: 1).frame(width: 7)
+                Rectangle().fill(line).frame(width: 5, height: 1)
+                Toggle(isOn: $linked) {
+                    Label("Link gap and outer margin", systemImage: "link")
+                }
+                .toggleStyle(.button)
+                .labelStyle(.iconOnly)
+                .controlSize(.small)
+                .help(linked ? "Unlink gap and outer margin" : "Link gap and outer margin")
+                .padding(.leading, 4)
+            }
+            .frame(width: columnWidth, alignment: .trailing)
+            .padding(.top, 25)
+            .padding(.bottom, 8)
+        }
+    }
+}
+
+/// A `]` shape: top edge, right edge, bottom edge.
+private struct LinkBracket: Shape {
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        p.move(to: CGPoint(x: rect.minX, y: rect.minY))
+        p.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        p.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        p.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        return p
+    }
+}

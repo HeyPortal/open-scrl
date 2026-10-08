@@ -52,7 +52,9 @@ even on large projects with Blend Groups. Exports are unchanged. See the
 - **Flexible canvas tools** — combine images, animated GIFs, videos, text, rectangles, and
   ellipses with crop, zoom, positioning, and stacking controls.
 - **Fast photo grids** — choose from layouts such as 1×1, 2×2, 3×3, L-shape, 1+4, and more;
-  adjust the gap, select a photo slot, and choose imported media to fill it.
+  set the gap between photos and the outer margin around the grid, then keep adjusting both
+  from the slide inspector after the grid is placed. Select a photo slot and choose imported
+  media to fill it.
 - **Precise editing** — use smart alignment guides, layer locking, visibility controls,
   multi-selection, groups, align/distribute, duplication, renaming, drag-to-reorder,
   and transactional undo/redo.

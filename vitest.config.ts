@@ -3,5 +3,5 @@ import path from 'node:path';
 
 export default defineConfig({
   resolve: { alias: { '@': path.resolve(__dirname, './src') } },
-  test: { environment: 'jsdom', exclude: ['e2e/**', 'node_modules/**'], setupFiles: ['./src/test/setup.ts'], coverage: { reporter: ['text', 'html'], include: ['src/core/**/*.ts', 'src/editor/**/*.ts'] } },
+  test: { environment: 'jsdom', exclude: ['e2e/**', 'node_modules/**', '.claude/**'], setupFiles: ['./src/test/setup.ts'], coverage: { reporter: ['text', 'html'], include: ['src/core/**/*.ts', 'src/editor/**/*.ts'] } },
 });

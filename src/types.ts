@@ -163,10 +163,20 @@ export interface ProjectDocumentV2 {
   updatedAt: number;
 }
 
+export interface SlideGrid {
+  templateId: string;
+  gap: number;
+  margin: number;
+  slotIds: string[];
+  /** Slots a relayout found off their computed cell; they stay free even if a later spacing lines up with them again. */
+  detachedSlotIds?: string[];
+}
+
 export interface SlideRecord {
   id: string;
   background: Background;
   layerOrder: string[];
+  grid?: SlideGrid;
 }
 
 export type PersistedDocument = Document | ProjectDocumentV2;

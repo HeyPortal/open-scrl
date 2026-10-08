@@ -19,6 +19,8 @@ interface SessionState {
   overlay: Overlay;
   /** Incremented to ask the media panel to open its file picker. */
   importRequest: number;
+  /** Photo-grid gap and outer margin move together. UI-only; not saved in the project. */
+  gridLinked: boolean;
   selectSlide: (id: string) => void;
   focusSlide: (id: string) => void;
   selectLayer: (id: string | null) => void;
@@ -32,6 +34,7 @@ interface SessionState {
   setSaveStatus: (status: SaveStatus) => void;
   setOverlay: (overlay: Overlay) => void;
   requestImport: () => void;
+  setGridLinked: (linked: boolean) => void;
 }
 
 export const MIN_ZOOM = 0.05;
@@ -51,6 +54,7 @@ export const useEditorSession = create<SessionState>((set) => ({
   saveStatus: 'saved',
   overlay: null,
   importRequest: 0,
+  gridLinked: false,
   selectSlide: (selectedSlideId) => set({ selectedSlideId, selectedLayerId: null, selectedLayerIds: [] }),
   focusSlide: (selectedSlideId) => set((state) => ({
     selectedSlideId,
@@ -73,4 +77,5 @@ export const useEditorSession = create<SessionState>((set) => ({
   setSaveStatus: (saveStatus) => set({ saveStatus }),
   setOverlay: (overlay) => set({ overlay }),
   requestImport: () => set((state) => ({ leftPanel: 'photos', leftPanelOpen: true, importRequest: state.importRequest + 1 })),
+  setGridLinked: (gridLinked) => set({ gridLinked }),
 }));

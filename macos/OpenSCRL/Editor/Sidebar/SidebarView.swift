@@ -74,23 +74,51 @@ struct GridsPanel: View {
     private let columns = [GridItem(.adaptive(minimum: 68, maximum: 110), spacing: 8)]
 
     var body: some View {
+        let format = controller.project.format
+        let marginMax = GridTemplate.maxMargin(width: format.width, height: format.height)
+        // No template is chosen yet, so the shared limit is just the slider range; each template clamps its own layout.
+        let sharedMax = min(GridTemplate.maxInset, marginMax)
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 PanelHeader(title: "Photo Grids", subtitle: "Replaces the current slide’s layers with empty photo slots. Undo with ⌘Z.")
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack {
-                        Text("Gap between photos").foregroundStyle(.secondary)
-                        Spacer()
-                        Text("\(Int(controller.gridGap)) px").monospacedDigit().foregroundStyle(.secondary)
+                LinkedSliders(linked: Binding(get: { controller.gridLinked }, set: { on in
+                    if on { controller.gridGap = min(controller.gridGap, sharedMax); controller.gridMargin = controller.gridGap; controller.linkGridSpacing() }
+                    controller.gridLinked = on
+                })) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack {
+                            Text("Gap between photos").foregroundStyle(.secondary)
+                            Spacer()
+                            Text("\(Int(controller.gridGap)) px").monospacedDigit().foregroundStyle(.secondary)
+                        }
+                        .font(.callout)
+                        Slider(value: Binding(get: { min(controller.gridGap, controller.gridLinked ? sharedMax : 120) },
+                                              set: { controller.gridGap = $0.rounded(); if controller.gridLinked { controller.gridMargin = controller.gridGap } }),
+                               in: 0...(controller.gridLinked ? sharedMax : 120))
+                            .controlSize(.small).labelsHidden()
                     }
-                    .font(.callout)
-                    Slider(value: Binding(get: { controller.gridGap }, set: { controller.gridGap = $0.rounded() }), in: 0...120).controlSize(.small).labelsHidden()
+                } bottom: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack {
+                            Text("Outer margin").foregroundStyle(.secondary)
+                            Spacer()
+                            Text("\(Int(controller.gridMargin)) px").monospacedDigit().foregroundStyle(.secondary)
+                        }
+                        .font(.callout)
+                        Slider(value: Binding(get: { controller.gridMargin },
+                                              set: { controller.gridMargin = $0.rounded(); if controller.gridLinked { controller.gridGap = controller.gridMargin } }),
+                               in: 0...marginMax)
+                            .controlSize(.small).labelsHidden()
+                            .accessibilityLabel("Outer margin")
+                    }
                 }
                 LazyVGrid(columns: columns, spacing: 8) {
                     ForEach(GridTemplate.all) { template in
                         Button { controller.applyGrid(template) } label: {
                             VStack(spacing: 6) {
-                                GridPreview(template: template, ratio: controller.project.format.aspectRatio, gap: controller.gridGap)
+                                GridPreview(template: template, ratio: controller.project.format.aspectRatio,
+                                            gap: controller.gridLinked ? min(controller.gridGap, template.linkedMax(format: controller.project.format)) : controller.gridGap,
+                                            margin: controller.gridLinked ? min(controller.gridGap, template.linkedMax(format: controller.project.format)) : controller.gridMargin)
                                     .frame(height: 64)
                                 Text(template.name).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                             }
@@ -110,15 +138,17 @@ struct GridPreview: View {
     var template: GridTemplate
     var ratio: Double
     var gap: Double
+    var margin: Double
 
     var body: some View {
         Canvas { context, size in
             let h = size.height, w = min(size.width, h * ratio)
             let originX = (size.width - w) / 2
             let previewGap = max(2, gap / 120 * 6)
+            let previewMargin = margin / 120 * 6
             context.fill(Path(roundedRect: CGRect(x: originX, y: 0, width: w, height: h), cornerRadius: 3), with: .color(.secondary.opacity(0.15)))
-            for cell in template.cells(w, h, previewGap) {
-                let r = CGRect(x: originX + cell.minX, y: cell.minY, width: cell.width, height: cell.height)
+            for cell in template.cells(w - 2 * previewMargin, h - 2 * previewMargin, previewGap) {
+                let r = CGRect(x: originX + previewMargin + cell.minX, y: previewMargin + cell.minY, width: cell.width, height: cell.height)
                 context.fill(Path(roundedRect: r, cornerRadius: 2), with: .style(.tint.opacity(0.75)))
             }
         }

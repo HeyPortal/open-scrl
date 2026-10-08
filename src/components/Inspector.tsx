@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   AlignCenter,
   AlignLeft,
@@ -29,8 +29,8 @@ import { useEditorSession } from '@/editor/sessionStore';
 import type { ImageLayer, Layer, ShapeLayer, TextLayer } from '@/types';
 import { GRADIENT_SWATCHES, SOLID_SWATCHES, backgroundCss, backgroundLabel, sameBackground } from '@/lib/palette';
 import { RotationDial } from './RotationDial';
-import { ColorField, NumberField, Section, Slider } from './ui';
-import { useLayerGesture } from './inspector/useLayerGesture';
+import { ColorField, LinkedSliders, NumberField, Section, Slider } from './ui';
+import { useEditGesture, useLayerGesture } from './inspector/useLayerGesture';
 import { Switch } from './inspector/controls';
 import { PhotoSwapSection } from './inspector/PhotoSwapSection';
 import { SlidePhotoActions } from './inspector/SlidePhotoActions';
@@ -38,6 +38,8 @@ import { ImageFrameSection, ShadowSection, TextFillSection, TextHighlightSection
 import { alignSelection, isMac } from '@/app/actions';
 import { ALIGN_BUTTONS, SelectionInspector } from './inspector/SelectionInspector';
 import { groupMemberIds } from '@/core/document/selectors';
+import { getLiveGrid, hasLinkedSpacing } from '@/core/document/grid';
+import { linkedMax, maxGapFor, maxMargin } from '@/lib/grids';
 
 const KIND_META = {
   image: { label: 'Photo', Icon: ImageIcon },
@@ -434,6 +436,58 @@ function ShapeInspector({ layer }: { layer: ShapeLayer }) {
   );
 }
 
+function GridSection({ slideId }: { slideId: string }) {
+  const doc = useEditor((s) => s.doc);
+  const setSlideGrid = useEditor((s) => s.setSlideGrid);
+  const setGridSpacingForAllSlides = useEditor((s) => s.setGridSpacingForAllSlides);
+  const reattachGridSlots = useEditor((s) => s.reattachGridSlots);
+  const linkGridSpacing = useEditor((s) => s.linkGridSpacing);
+  const linkOn = useEditorSession((s) => s.gridLinked);
+  const setGridLinked = useEditorSession((s) => s.setGridLinked);
+  const gesture = useEditGesture('Adjust grid', `gesture:grid:${slideId}`);
+  const live = useMemo(() => getLiveGrid(doc, slideId), [doc, slideId]);
+  const gridSlides = useMemo(() => doc.slideOrder.filter((id) => getLiveGrid(doc, id)).length, [doc]);
+  if (!live) return null;
+  const { grid, template, movedSlots } = live;
+  const shared = linkedMax(template, doc.format);
+  // The toggle only shows linked while this slide's stored spacing is linked; otherwise the sliders show the real values.
+  const linked = linkOn && hasLinkedSpacing(live, doc.format);
+  const marginMax = linked ? shared : maxMargin(doc.format.width, doc.format.height);
+  const margin = Math.min(grid.margin, marginMax);
+  const gapMax = linked ? shared : maxGapFor(template, doc.format, margin);
+  const gap = Math.min(grid.gap, gapMax);
+  // Linked: either slider sets both, so the spacing stays equal.
+  const setGap = (v: number) => setSlideGrid(slideId, linked ? { gap: v, margin: v } : { gap: v });
+  const setMargin = (v: number) => setSlideGrid(slideId, linked ? { gap: v, margin: v } : { margin: v });
+  const toggleLinked = () => {
+    if (!linked) linkGridSpacing();
+    setGridLinked(!linked);
+  };
+  return (
+    <Section title="Photo grid" action={<span className="text-[11px] text-ink-faint">{template.name}</span>}>
+      <LinkedSliders
+        linked={linked}
+        onToggle={toggleLinked}
+        top={<Slider ariaLabel="Gap" label="Gap" display={`${Math.round(gap)} px`} min={0} max={gapMax} value={gap} onChange={setGap} gesture={gesture} valueText={`${Math.round(gap)} pixels`} />}
+        bottom={<Slider ariaLabel="Outer margin" label="Outer margin" display={`${Math.round(margin)} px`} min={0} max={marginMax} value={margin} onChange={setMargin} gesture={gesture} valueText={`${Math.round(margin)} pixels`} />}
+      />
+      {movedSlots > 0 && (
+        <>
+          <p className="text-[11px] leading-relaxed text-ink-faint">{movedSlots} slot{movedSlots === 1 ? ' was' : 's were'} moved by hand and won’t follow these sliders.</p>
+          <button className="btn btn-secondary btn-sm w-full" onClick={() => reattachGridSlots(slideId)}>
+            Re-attach moved slots
+          </button>
+        </>
+      )}
+      {gridSlides > 1 && (
+        <button className="btn btn-secondary btn-sm w-full" aria-label={`Apply grid spacing to all ${gridSlides} slides`} onClick={() => setGridSpacingForAllSlides(slideId, linked)}>
+          Apply to all {gridSlides} slides
+        </button>
+      )}
+    </Section>
+  );
+}
+
 /** Shown when no layer is selected: settings for the current slide. */
 function SlideInspector({ onShowLayers }: { onShowLayers: () => void }) {
   const selectedSlideId = useEditorSession((s) => s.selectedSlideId);
@@ -485,6 +539,7 @@ function SlideInspector({ onShowLayers }: { onShowLayers: () => void }) {
           </div>
         </Section>
       )}
+      <GridSection slideId={slideId} />
       <Section title="Background" action={<button className="text-[11px] font-medium text-accent hover:text-accent-hover" onClick={() => setLeftPanel('background')}>More</button>}>
         <div className="grid grid-cols-8 gap-1.5">
           {quick.map((bg) => {

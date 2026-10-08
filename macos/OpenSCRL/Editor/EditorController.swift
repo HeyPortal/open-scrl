@@ -100,6 +100,9 @@ final class EditorController {
     var showsFileImporter = false
     @ObservationIgnored var fileImporterPlacement: MediaPlacement = .libraryOnly
     var gridGap: Double = 0
+    var gridMargin: Double = 0
+    /// Gap and outer margin move together. UI-only; not saved in the project.
+    var gridLinked = false
     var exportState: ExportState?
     /// Layer whose name field the inspector should focus.
     var renameRequest: String?
@@ -114,6 +117,7 @@ final class EditorController {
     init(document: ProjectDocument) {
         self.document = document
         selectedSlideID = document.project.slides.first?.id ?? ""
+        document.onHistoryStep = { [weak self] in self?.syncGridLinked() }
     }
 
     var project: Project { document.project }
@@ -278,7 +282,14 @@ final class EditorController {
 
     func duplicateSlide(_ id: String) {
         guard let index = project.slideIndex(of: id) else { return }
-        let copy = project.slides[index].duplicated()
+        var copy = project.slides[index].duplicated()
+        // slotIds stay index-aligned with the template cells; a deleted slot gets a fresh unused id rather than being dropped.
+        if var grid = copy.grid {
+            let idMap = Dictionary(uniqueKeysWithValues: zip(project.slides[index].layers.map(\.id), copy.layers.map(\.id)))
+            grid.slotIds = grid.slotIds.map { idMap[$0] ?? UID.make() }
+            grid.detachedSlotIds = grid.detachedSlotIds?.compactMap { idMap[$0] }
+            copy.grid = grid
+        }
         perform("Duplicate Slide") { $0.slides.insert(copy, at: index + 1) }
         focusSlide(copy.id)
     }
@@ -415,20 +426,82 @@ final class EditorController {
         PhotoFrames.setPhoto(asset.id, in: &layer)
     }
 
-    func applyGrid(_ template: GridTemplate, gap: Double? = nil) {
+    func applyGrid(_ template: GridTemplate, gap: Double? = nil, margin: Double? = nil) {
         let index = selectedSlideIndex
-        let cells = template.cells(project.format.width, project.format.height, gap ?? gridGap)
+        var (gap, margin) = (gap ?? gridGap, margin ?? gridMargin)
+        if gridLinked { gap = min(gap, template.linkedMax(format: project.format)); margin = gap }
+        let cells = template.layout(format: project.format, gap: gap, margin: margin)
         let layers = cells.enumerated().map { i, cell in
             Layer(id: UID.make(), name: "Photo \(i + 1)", x: cell.minX, y: cell.minY, width: cell.width, height: cell.height,
                   locked: true, content: .image(ImageProperties()))
         }
+        let grid = SlideGrid(templateId: template.id, gap: gap, margin: margin, slotIds: layers.map(\.id))
         perform("Apply \(template.name) Grid") { p in
             guard p.slides.indices.contains(index) else { return }
             p.slides[index].layers = layers
+            p.slides[index].grid = grid
         }
         selectLayer(nil)
         selectedSlideID = project.slides[index].id
         show("Applied the \(template.name) grid. Click a slot, then a photo in Media to fill it.")
+    }
+
+    /// Re-lays out the selected slide's grid. Only slots still on their old cell follow; hand-moved slots and other layers are untouched.
+    func setSlideGrid(gap: Double? = nil, margin: Double? = nil) {
+        let index = selectedSlideIndex
+        guard let live = project.liveGrid(slide: index) else { return }
+        let newGap = gap ?? live.grid.gap, newMargin = margin ?? live.grid.margin
+        guard newGap != live.grid.gap || newMargin != live.grid.margin else { return }
+        perform("Adjust Grid", coalesce: "grid:\(selectedSlideID)") { p in
+            p.relayoutGrid(slide: index, live: live, gap: newGap, margin: newMargin)
+        }
+    }
+
+    /// Undo and redo can restore spacing that isn't linked; the toggle is UI-only, so switch it off to match the selected slide.
+    private func syncGridLinked() {
+        guard gridLinked, let live = project.liveGrid(slide: selectedSlideIndex) else { return }
+        if !live.hasLinkedSpacing(format: project.format) { gridLinked = false }
+    }
+
+    /// Makes gap and margin equal on every slide with a grid, capped at what each template fits, so the inspector
+    /// never shows a value that isn't stored. Slots moved by hand are left alone.
+    func linkGridSpacing() {
+        let targets: [(index: Int, live: LiveGrid, value: Double)] = project.slides.indices.compactMap { i in
+            guard let live = project.liveGrid(slide: i) else { return nil }
+            let v = min(live.grid.gap, live.template.linkedMax(format: project.format))
+            return live.grid.gap == v && live.grid.margin == v ? nil : (i, live, v)
+        }
+        guard !targets.isEmpty else { return }
+        perform("Link Grid Spacing") { p in
+            for t in targets { p.relayoutGrid(slide: t.index, live: t.live, gap: t.value, margin: t.value) }
+        }
+    }
+
+    /// Snaps the selected slide's moved or free grid slots back onto their cells so they follow the sliders again.
+    func reattachGridSlots() {
+        let index = selectedSlideIndex
+        guard let live = project.liveGrid(slide: index), live.movedSlots > 0 else { return }
+        perform("Re-attach Grid Slots") { p in p.reattachGridSlots(slide: index, live: live) }
+    }
+
+    /// Copies the selected slide's gap and margin to every other slide that has a grid. Each slide keeps its
+    /// own template; slots moved by hand and slides without a grid are left alone. Linked spacing is capped at
+    /// each target template's limit so every slide stays linked.
+    func applyGridSpacingToAllSlides() {
+        let sourceIndex = selectedSlideIndex
+        guard let source = project.liveGrid(slide: sourceIndex) else { return }
+        let keepLinked = gridLinked && source.hasLinkedSpacing(format: project.format)
+        let targets: [(index: Int, live: LiveGrid, gap: Double, margin: Double)] = project.slides.indices.compactMap { i in
+            guard i != sourceIndex, let live = project.liveGrid(slide: i) else { return nil }
+            let gap = keepLinked ? min(source.grid.gap, live.template.linkedMax(format: project.format)) : source.grid.gap
+            let margin = keepLinked ? gap : source.grid.margin
+            return live.grid.gap == gap && live.grid.margin == margin ? nil : (i, live, gap, margin)
+        }
+        guard !targets.isEmpty else { return }
+        perform("Apply Grid Spacing to All Slides") { p in
+            for t in targets { p.relayoutGrid(slide: t.index, live: t.live, gap: t.gap, margin: t.margin) }
+        }
+        show("Grid spacing applied to all \(project.gridSlideCount) grid slides.", style: .success)
     }
 
     // MARK: - Editing layers

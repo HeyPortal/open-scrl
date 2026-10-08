@@ -102,3 +102,131 @@ extension GridTemplate {
         GridTemplate(id: "sixteen-grid", name: "4 × 4", count: 16, cells: uniform(4, 4)),
     ]
 }
+
+// MARK: - Margin-aware layout
+
+extension GridTemplate {
+    static let minCell = 16.0
+    static let maxInset = 120.0
+
+    static func maxMargin(width: Double, height: Double) -> Double {
+        min(maxInset, (min(width, height) / 4).rounded(.down))
+    }
+
+    private static func smallestSide(_ cells: [CGRect]) -> Double {
+        cells.map { min($0.size.width, $0.size.height) }.min() ?? 0
+    }
+
+    /// Largest gap <= `gap` (>= 0) for which every cell is at least `minCell` on both sides.
+    private func effectiveGap(width: Double, height: Double, gap: Double) -> Double {
+        let want = min(max(0, gap), Self.maxInset)
+        if Self.smallestSide(cells(width, height, want)) >= Self.minCell { return want }
+        var lo = 0.0, hi = want
+        for _ in 0..<24 {
+            let mid = (lo + hi) / 2
+            if Self.smallestSide(cells(width, height, mid)) >= Self.minCell { lo = mid } else { hi = mid }
+        }
+        return lo
+    }
+
+    /// Cells inside a `margin`-inset slide, with the gap clamped so no cell is tiny.
+    func layout(format: CanvasFormat, gap: Double, margin: Double) -> [CGRect] {
+        let m = min(max(0, margin), Self.maxMargin(width: format.width, height: format.height))
+        let w = format.width - 2 * m, h = format.height - 2 * m
+        let g = effectiveGap(width: w, height: h, gap: gap)
+        return cells(w, h, g).map { $0.offsetBy(dx: m, dy: m) }
+    }
+
+    /// Slider maximum for the gap: 120, or less when the template would drop below `minCell`.
+    func maxGap(format: CanvasFormat, margin: Double) -> Double {
+        let m = min(max(0, margin), Self.maxMargin(width: format.width, height: format.height))
+        return effectiveGap(width: format.width - 2 * m, height: format.height - 2 * m, gap: Self.maxInset).rounded(.down)
+    }
+
+    /// Slider maximum when gap and margin are linked: the largest whole value both can take at once.
+    func linkedMax(format: CanvasFormat) -> Double {
+        var lo = 0.0, hi = min(Self.maxInset, Self.maxMargin(width: format.width, height: format.height))
+        // Feasibility is monotone: if v works then so does anything smaller.
+        while lo < hi {
+            let mid = ((lo + hi) / 2).rounded(.up)
+            if maxGap(format: format, margin: mid) >= mid { lo = mid } else { hi = mid - 1 }
+        }
+        return lo
+    }
+
+    static func template(id: String) -> GridTemplate? { all.first { $0.id == id } }
+}
+
+extension Layer {
+    /// True while the layer still sits on `cell` (within half a point), i.e. nobody moved it by hand.
+    func matches(_ cell: CGRect) -> Bool {
+        abs(x - cell.minX) <= 0.5 && abs(y - cell.minY) <= 0.5 && abs(width - cell.width) <= 0.5 && abs(height - cell.height) <= 0.5
+    }
+}
+
+struct LiveGrid {
+    var grid: SlideGrid
+    var template: GridTemplate
+    var movedSlots: Int
+
+    /// True when gap and margin are equal and fit the template's linked limit, so linked sliders show exactly what is stored.
+    /// Linking is UI-only, so undo or "Apply to All" can leave a slide's spacing unlinked.
+    func hasLinkedSpacing(format: CanvasFormat) -> Bool {
+        grid.gap == grid.margin && grid.gap <= template.linkedMax(format: format)
+    }
+}
+
+extension Project {
+    /// The slide's grid if it is still meaningful: known template and at least one slot still on the slide.
+    func liveGrid(slide index: Int) -> LiveGrid? {
+        guard slides.indices.contains(index), let grid = slides[index].grid, let template = GridTemplate.template(id: grid.templateId) else { return nil }
+        let cells = template.layout(format: format, gap: grid.gap, margin: grid.margin)
+        let detached = Set(grid.detachedSlotIds ?? [])
+        var live = 0, moved = 0
+        for (i, id) in grid.slotIds.enumerated() where i < cells.count {
+            guard let layer = slides[index].layers.first(where: { $0.id == id }) else { continue }
+            live += 1
+            if detached.contains(id) || !layer.matches(cells[i]) { moved += 1 }
+        }
+        return live > 0 ? LiveGrid(grid: grid, template: template, movedSlots: moved) : nil
+    }
+
+    /// Number of slides that currently have a live grid (the N in "Apply to all N slides").
+    var gridSlideCount: Int { slides.indices.filter { liveGrid(slide: $0) != nil }.count }
+
+    /// Snaps every slot that is free or off its cell back onto its cell and lets it follow the grid again.
+    mutating func reattachGridSlots(slide index: Int, live: LiveGrid) {
+        guard slides.indices.contains(index), var grid = slides[index].grid else { return }
+        let cells = live.template.layout(format: format, gap: grid.gap, margin: grid.margin)
+        for (i, id) in grid.slotIds.enumerated() where i < cells.count {
+            guard let li = slides[index].layers.firstIndex(where: { $0.id == id }) else { continue }
+            slides[index].layers[li].x = cells[i].minX
+            slides[index].layers[li].y = cells[i].minY
+            slides[index].layers[li].width = cells[i].width
+            slides[index].layers[li].height = cells[i].height
+        }
+        grid.detachedSlotIds = nil
+        slides[index].grid = grid
+    }
+
+    /// Re-lays out one slide's grid. Only slots still on their old computed cell move; hand-moved slots and
+    /// every other layer are left alone. `live` must come from this project before the change.
+    mutating func relayoutGrid(slide index: Int, live: LiveGrid, gap: Double, margin: Double) {
+        guard slides.indices.contains(index), var grid = slides[index].grid else { return }
+        let oldCells = live.template.layout(format: format, gap: live.grid.gap, margin: live.grid.margin)
+        let newCells = live.template.layout(format: format, gap: gap, margin: margin)
+        var detached = Set(grid.detachedSlotIds ?? [])
+        for (i, id) in grid.slotIds.enumerated() where i < oldCells.count && i < newCells.count {
+            guard !detached.contains(id), let li = slides[index].layers.firstIndex(where: { $0.id == id }) else { continue }
+            guard slides[index].layers[li].matches(oldCells[i]) else { detached.insert(id); continue }
+            slides[index].layers[li].x = newCells[i].minX
+            slides[index].layers[li].y = newCells[i].minY
+            slides[index].layers[li].width = newCells[i].width
+            slides[index].layers[li].height = newCells[i].height
+        }
+        if !detached.isEmpty { grid.detachedSlotIds = grid.slotIds.filter { detached.contains($0) } }
+        grid.gap = gap
+        grid.margin = margin
+        slides[index].grid = grid
+    }
+}

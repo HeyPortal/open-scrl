@@ -259,6 +259,94 @@ import Darwin
     let received = NSBitmapImageRep(data: try Data(contentsOf: delivery.get()))!
     check(received.pixelsWide == 80 && received.colorAt(x: 40, y: 80)!.alphaComponent < 0.01, "native provider delivers the complete transparent PNG")
 
+    // Photo grids: free slots stay free, linked spacing is clamped per template.
+    let gridDoc = ProjectDocument(format: CanvasFormat(name: "Landscape", width: 1080, height: 566))
+    gridDoc.perform("Fixture", undoManager: nil) { p in p.slides = [Slide(id: "g1", background: .solid("#ffffff"), layers: [])] }
+    let gc = EditorController(document: gridDoc)
+    gc.selectedSlideID = "g1"
+    let fourGrid = GridTemplate.template(id: "four-grid")!, fourStack = GridTemplate.template(id: "four-stack")!
+    gc.applyGrid(fourGrid, gap: 0, margin: 0)
+    let slots = gc.project.slides[0].grid!.slotIds
+    let target = fourGrid.layout(format: gc.project.format, gap: 40, margin: 0)[1]
+    gc.updateLayer(slots[1]) { $0.x = 123; $0.width = 200 }
+    gc.setSlideGrid(gap: 20)
+    gc.updateLayer(slots[1]) { $0.x = target.minX; $0.y = target.minY; $0.width = target.width; $0.height = target.height }
+    gc.setSlideGrid(gap: 40)
+    gc.setSlideGrid(gap: 60)
+    let kept = gc.project.slides[0].layers.first { $0.id == slots[1] }!
+    check(kept.matches(target), "a hand-resized slot stays put when a later spacing matches its frame")
+    check(gc.project.liveGrid(slide: 0)?.movedSlots == 1, "the free slot still counts as moved by hand")
+    gc.duplicateSlide("g1")
+    let copyGrid = gc.project.slides[1].grid!
+    check(copyGrid.detachedSlotIds?.count == 1 && copyGrid.detachedSlotIds?.first.map { !slots.contains($0) } == true, "duplicating a slide re-ids the free slots")
+    gc.selectedSlideID = "g1"
+    gc.gridLinked = true; gc.gridGap = 120; gc.gridMargin = 120
+    gc.applyGrid(fourStack)
+    let linkedLimit = fourStack.linkedMax(format: gc.project.format)
+    check(linkedLimit == 100 && gc.project.slides[0].grid!.gap == 100 && gc.project.slides[0].grid!.margin == 100, "linked spacing is clamped to what the template fits")
+
+    // Re-attach: a freed slot reset by hand stays free until re-attached, then follows again.
+    let rDoc = ProjectDocument(format: CanvasFormat(name: "P", width: 1080, height: 1350))
+    rDoc.perform("Fixture", undoManager: nil) { p in p.slides = [Slide(id: "r1", background: .solid("#ffffff"), layers: [])] }
+    let rc = EditorController(document: rDoc); rc.selectedSlideID = "r1"
+    rc.applyGrid(fourGrid, gap: 0, margin: 0)
+    let rs = rc.project.slides[0].grid!.slotIds
+    let flush = fourGrid.layout(format: rc.project.format, gap: 0, margin: 0)[1]
+    rc.updateLayer(rs[1]) { $0.width = 300 }
+    rc.setSlideGrid(gap: 20)
+    rc.setSlideGrid(gap: 0)
+    rc.updateLayer(rs[1]) { $0.x = flush.minX; $0.y = flush.minY; $0.width = flush.width; $0.height = flush.height }
+    rc.setSlideGrid(gap: 30)
+    check(rc.project.slides[0].layers.first { $0.id == rs[1] }!.matches(flush), "a reset slot stays free until re-attached")
+    rc.reattachGridSlots()
+    check(rc.project.liveGrid(slide: 0)?.movedSlots == 0 && rc.project.slides[0].grid!.detachedSlotIds == nil, "re-attach clears free slots")
+    rc.setSlideGrid(gap: 40)
+    check(rc.project.slides[0].layers.first { $0.id == rs[1] }!.matches(fourGrid.layout(format: rc.project.format, gap: 40, margin: 0)[1]), "a re-attached slot follows the grid again")
+
+    // Linking switched on after grids exist snaps every grid slide to equal, fitting values.
+    let lDoc = ProjectDocument(format: CanvasFormat(name: "Landscape", width: 1080, height: 566))
+    lDoc.perform("Fixture", undoManager: nil) { p in p.slides = [Slide(id: "l1", background: .solid("#ffffff"), layers: []), Slide(id: "l2", background: .solid("#ffffff"), layers: [])] }
+    let lc = EditorController(document: lDoc)
+    lc.selectedSlideID = "l1"; lc.applyGrid(fourStack, gap: 120, margin: 0)
+    lc.selectedSlideID = "l2"; lc.applyGrid(fourGrid, gap: 30, margin: 10)
+    lc.linkGridSpacing()
+    let g1 = lc.project.slides[0].grid!, g2 = lc.project.slides[1].grid!
+    check(g1.gap == 100 && g1.margin == 100, "linking caps an existing grid to what its template fits")
+    check(g2.gap == 30 && g2.margin == 30, "linking snaps another slide's margin to its gap")
+    let stackCells = fourStack.layout(format: lc.project.format, gap: 100, margin: 100)
+    check(lc.project.slides[0].layers.first { $0.id == g1.slotIds[0] }!.matches(stackCells[0]), "linking relays out the slots")
+    let linkedState = lc.project
+    lc.linkGridSpacing()
+    check(lc.project == linkedState, "linking again changes nothing")
+
+    // Linking is UI-only: undo can restore unequal spacing, and Apply to All must keep every slide linked.
+    let uDoc = ProjectDocument(format: CanvasFormat(name: "Landscape", width: 1080, height: 566))
+    uDoc.perform("Fixture", undoManager: nil) { p in p.slides = [Slide(id: "u1", background: .solid("#ffffff"), layers: []), Slide(id: "u2", background: .solid("#ffffff"), layers: [])] }
+    let uc = EditorController(document: uDoc)
+    let uUndo = UndoManager(); uUndo.groupsByEvent = false; uc.undoManager = uUndo
+    func step(_ body: () -> Void) { uUndo.beginUndoGrouping(); body(); uUndo.endUndoGrouping() }
+    step { uc.selectedSlideID = "u1"; uc.applyGrid(fourStack, gap: 120, margin: 0) }
+    step { uc.linkGridSpacing() }; uc.gridLinked = true
+    check(uc.project.liveGrid(slide: 0)!.hasLinkedSpacing(format: uc.project.format), "linking leaves the slide's spacing linked")
+    uUndo.undo()
+    check(uc.project.slides[0].grid!.gap == 120 && !uc.project.liveGrid(slide: 0)!.hasLinkedSpacing(format: uc.project.format), "undoing the link shows the slide as unlinked")
+    check(!uc.gridLinked, "undoing the link switches the link toggle off")
+    uc.gridLinked = true
+    uUndo.redo()
+    check(uc.gridLinked && uc.project.liveGrid(slide: 0)!.hasLinkedSpacing(format: uc.project.format), "redoing the link keeps the toggle on")
+    uc.gridLinked = true
+    uUndo.undo()
+    check(!uc.gridLinked, "undo switches the toggle off again for 120/0")
+    uc.gridLinked = true
+    step { uc.selectedSlideID = "u2"; uc.applyGrid(fourGrid, gap: 120, margin: 120) }
+    step { uc.applyGridSpacingToAllSlides() }
+    let capped = uc.project.slides[0].grid!
+    check(capped.gap == 100 && capped.margin == 100, "linked Apply to All caps each slide at what its template fits")
+    check(uc.project.slides[0].layers.first { $0.id == capped.slotIds[0] }!.matches(fourStack.layout(format: uc.project.format, gap: 100, margin: 100)[0]), "linked Apply to All relays out the slots")
+    uc.gridLinked = false
+    step { uc.applyGridSpacingToAllSlides() }
+    check(uc.project.slides[0].grid!.gap == 120 && uc.project.slides[0].grid!.margin == 120, "unlinked Apply to All copies the values as they are")
+
     print("ALL \(checks) UI CHECKS PASSED")
 }
 setbuf(stdout, nil)
