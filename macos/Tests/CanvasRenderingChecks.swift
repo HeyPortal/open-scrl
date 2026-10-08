@@ -96,6 +96,32 @@ import Observation
         print("PASS canvas visual bounds and source culling")
     }
 
+    /// The presented frame paints the workspace itself, so a frame still on the GPU can never
+    /// uncover a white deck drawn beneath it at a newer scroll position.
+    static func opaqueBackdrop() {
+        var project = Project(format: CanvasFormat(name: "Backdrop", width: 100, height: 100))
+        project.slides[0].background = .solid("#000000")
+        // A capped pixel scale can leave a fractional last row and column.
+        let viewport = CGRect(x: -50, y: -10.3, width: 200.3, height: 120.3)
+        let backdrop = CanvasView.Backdrop(workspace: CGColor(srgbRed: 0.2, green: 0.4, blue: 0.6, alpha: 1),
+                                           shadow: CGColor(gray: 0, alpha: 0.6), pixelsPerPoint: 1)
+        let canvas = CanvasView(frame: CGRect(x: 0, y: 0, width: 200, height: 120))
+        let image = canvas.metalComposition(project, viewport: viewport, images: Sources(),
+                                            options: RenderOptions(editor: true), scale: 1, backdrop: backdrop)!
+        expect(image.extent == CGRect(x: 0, y: 0, width: 201, height: 121), "Opaque frames cover every drawable pixel")
+        let cg = GPUSceneRenderer.shared!.canvasContext.createCGImage(image, from: image.extent, format: .RGBA8, colorSpace: HexColor.srgb)!
+        var pixels = [UInt8](repeating: 0, count: cg.width * cg.height * 4)
+        let bitmap = CGContext(data: &pixels, width: cg.width, height: cg.height, bitsPerComponent: 8, bytesPerRow: cg.width * 4,
+                               space: HexColor.srgb, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        bitmap.draw(cg, in: CGRect(x: 0, y: 0, width: cg.width, height: cg.height))
+        func pixel(_ x: Int, _ y: Int) -> [Int] { (0..<4).map { Int(pixels[(y * cg.width + x) * 4 + $0]) } }
+        expect(stride(from: 3, to: pixels.count, by: 4).allSatisfy { pixels[$0] == 255 }, "Every frame pixel is opaque, edges included")
+        let corner = pixel(0, cg.height - 1), deck = pixel(100, 60)
+        expect(abs(corner[0] - 51) <= 2 && abs(corner[1] - 102) <= 2 && abs(corner[2] - 153) <= 2, "The workspace surrounds the deck")
+        expect(deck[0] <= 1 && deck[1] <= 1 && deck[2] <= 1, "The slide background covers the white deck")
+        print("PASS opaque canvas backdrop")
+    }
+
     static func findCanvas(_ view: NSView) -> CanvasView? {
         if let canvas = view as? CanvasView { return canvas }
         return view.subviews.lazy.compactMap(findCanvas).first
@@ -204,6 +230,7 @@ import Observation
         NSApplication.shared.setActivationPolicy(.prohibited)
         precondition(GPUSceneRenderer.shared != nil, "Tests require the app's real GPU renderer")
         visibility()
+        opaqueBackdrop()
         try canvasTransactions()
         textLifecycle()
         print("PASS \(checks) canvas rendering assertions")

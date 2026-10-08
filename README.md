@@ -34,6 +34,17 @@ Web App and a [native Mac app](#mac-app). Your projects and original media stay 
 > Open-SCRL is in active development. The editor supports local projects, media imports,
 > and carousel exports; features and project formats may continue to evolve.
 
+## Latest release
+
+**Open-SCRL for Mac 0.5.5** · October 8, 2026 ·
+[Download](https://github.com/HeyPortal/open-scrl/releases/latest) ·
+[Changelog](./CHANGELOG.md)
+
+Smoother scrolling and zooming on the canvas. Slides no longer flash white at their edges,
+and photos stay in place under slide outlines and selection handles while the canvas moves,
+even on large projects with Blend Groups. Exports are unchanged. See the
+[changelog](./CHANGELOG.md) for every release.
+
 ## Highlights
 
 - **Built for social formats** — start with presets for Instagram, TikTok, and Pinterest,
@@ -144,6 +155,9 @@ and crop gestures keep a live preview for rendering and project snapshots, while
 inspector and filmstrip refresh on release. Each gesture remains one undo step.
 The canvas renders on changes,
 limits queued work, and caps viewport textures; exports retain full-resolution geometry.
+Each canvas frame also paints the workspace around the slides and is presented in the same
+Core Animation transaction as the selection chrome, so the two can't drift apart while you
+scroll or zoom. The canvas uses half-float intermediates; exports keep full precision.
 Core Graphics remains available when Metal is unavailable or rendering fails.
 
 Run `zsh macos/Scripts/test-gpu-rendering.sh` for rendering and MP4 parity checks, and
@@ -164,7 +178,7 @@ and GPU frames keep completing during each gesture; its loop timings include a f
 Download `Open-SCRL-<version>.dmg` from
 [Releases](https://github.com/HeyPortal/open-scrl/releases), open it, and drag **Open-SCRL**
 onto the **Applications** folder. It requires macOS 27 on a Mac with Apple silicon.
-See the [Mac changelog](./macos/CHANGELOG.md) for release changes.
+See the [changelog](./CHANGELOG.md) for what changed in each release.
 
 Preview builds are ad-hoc signed and not notarized, so macOS blocks the first launch. Open
 **System Settings ▸ Privacy & Security** and click **Open Anyway**, or remove the download

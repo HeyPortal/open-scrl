@@ -13,6 +13,12 @@ final class GPUSceneRenderer {
     let device: MTLDevice
     let queue: MTLCommandQueue
     let context: CIContext
+    /// Draws the editor canvas. Half-float intermediates and cached repeated subgraphs make
+    /// each scroll or zoom frame two to four times cheaper to encode and draw, within a level
+    /// or two of the 8-bit display. Exports keep the full-precision `context`. The canvas has
+    /// its own queue, so a running export never delays scheduling an interactive frame.
+    let canvasQueue: MTLCommandQueue
+    let canvasContext: CIContext
     private let opacityKernel: CIColorKernel
     private let tintKernel: CIColorKernel
     private let maskKernel: CIKernel
@@ -38,7 +44,8 @@ final class GPUSceneRenderer {
         var foreground: SeamSource; var target: SeamSource; var dx: Double; var dy: Double
         var opacity: Double; var width: Int; var height: Int; var imageID: ObjectIdentifier?
     }
-    private final class Bounds { let rect: CGRect; init(_ rect: CGRect) { self.rect = rect } }
+    /// A nil rect records that the partners only touch, so that isn't measured again each frame.
+    private final class Bounds { let rect: CGRect?; init(_ rect: CGRect?) { self.rect = rect } }
     private let masks = NSCache<Key<MaskKey>, Raster>()
     private let borders = NSCache<Key<BorderKey>, Raster>()
     private let content = NSCache<Key<ContentKey>, Raster>()
@@ -46,7 +53,8 @@ final class GPUSceneRenderer {
 
     private init?() {
         guard let device = MTLCreateSystemDefaultDevice(), device.supportsDynamicLibraries,
-              let queue = device.makeCommandQueue(), SeamGPU.shared != nil else { return nil }
+              let queue = device.makeCommandQueue(), let canvasQueue = device.makeCommandQueue(),
+              SeamGPU.shared != nil else { return nil }
         let override = ProcessInfo.processInfo.environment["OPENSCRL_METALLIB"].map { URL(fileURLWithPath: $0) }
         guard let url = override ?? Bundle.main.url(forResource: "default", withExtension: "metallib"),
               let data = try? Data(contentsOf: url),
@@ -56,12 +64,15 @@ final class GPUSceneRenderer {
               let outline = try? CIColorKernel(functionName: "sceneOutline", fromMetalLibraryData: data),
               let checker = try? CIKernel(functionName: "sceneChecker", fromMetalLibraryData: data),
               let gradient = try? CIKernel(functionName: "sceneGradient", fromMetalLibraryData: data) else { return nil }
-        self.device = device; self.queue = queue
+        self.device = device; self.queue = queue; self.canvasQueue = canvasQueue
         // The seam explicitly converts sRGB to linear light and back. Keeping the shared
         // working space sRGB preserves its numerical meaning for tagged stills and video alike.
         context = CIContext(mtlCommandQueue: queue, options: [.workingColorSpace: HexColor.srgb,
                            .outputColorSpace: HexColor.srgb, .workingFormat: CIFormat.RGBAf,
                            .cacheIntermediates: false])
+        canvasContext = CIContext(mtlCommandQueue: canvasQueue, options: [.workingColorSpace: HexColor.srgb,
+                                 .outputColorSpace: HexColor.srgb, .workingFormat: CIFormat.RGBAh,
+                                 .cacheIntermediates: true])
         opacityKernel = opacity; tintKernel = tint; maskKernel = mask; outlineKernel = outline
         checkerKernel = checker; gradientKernel = gradient
         masks.totalCostLimit = 128 * 1024 * 1024
@@ -349,29 +360,37 @@ final class GPUSceneRenderer {
     }
     private func overlap(foreground: SceneItem, target: SceneItem, targetAsset: MediaAsset,
                          assets: [String: MediaAsset], images: ImageProviding?, scale: Double, preview: Bool) -> CGRect? {
-        let geometryScale = preview ? min(scale, 2048 / max(foreground.layer.width, foreground.layer.height)) : scale
+        // The editor measures at the zoom rounded down to a power of two, so a pinch reuses the
+        // cached bounds until it crosses 2x, 4x... rather than re-measuring every step, and a
+        // drag never rasterizes more than the canvas draws.
+        let longest = max(foreground.layer.width, foreground.layer.height)
+        let drawnScale = preview ? min(scale, 2048 / longest) : scale
+        let geometryScale = preview ? min(drawnScale, pow(2, floor(log2(scale)))) : scale
         let w = max(1, Int(ceil(foreground.layer.width * geometryScale))), h = max(1, Int(ceil(foreground.layer.height * geometryScale)))
         // Still-image alpha affects the geometric seam center. Scan that coverage once and
         // cache it across slider changes; video coverage remains a live GPU graph with bounds
-        // derived from its outline, avoiding a GPU readback for each decoded frame.
-        let cgImage = targetAsset.mediaKind == .image ? images?.image(for: targetAsset, pixelEdge: CGFloat(max(w, h))) : nil
+        // derived from its outline, avoiding a GPU readback for each decoded frame. The partner
+        // is requested at the size being drawn, so measuring never decodes another tier.
+        let edge = CGFloat(ceil(longest * drawnScale))
+        let cgImage = targetAsset.mediaKind == .image ? images?.image(for: targetAsset, pixelEdge: edge) : nil
         let alpha = cgImage.flatMap { [.none, .noneSkipFirst, .noneSkipLast].contains($0.alphaInfo) ? nil : $0 }
         let key = Key(BoundsKey(foreground: SeamSource(foreground.layer), target: SeamSource(target.layer),
                                 dx: target.origin.x - foreground.origin.x, dy: target.origin.y - foreground.origin.y,
                                 opacity: target.layer.opacity, width: w, height: h, imageID: alpha.map(ObjectIdentifier.init)), image: alpha)
         if let cached = seamBounds.object(forKey: key) {
-            return cached.rect.applying(CGAffineTransform(scaleX: scale, y: scale))
+            return cached.rect?.applying(CGAffineTransform(scaleX: scale, y: scale))
         }
         guard let pixels = SeamRenderer.raster(target, relativeTo: foreground, width: w, height: h, assets: assets,
-                                              images: nil, coverageOnly: true, coverageImage: alpha),
-              let bounds = pixels.overlapBounds() else { return nil }
+                                              images: nil, coverageOnly: true, coverageImage: alpha) else { return nil }
         // Cache model coordinates, since the geometry raster resolution is capped and can
         // be reused by several distinct high zoom/export scales.
-        let rect = CGRect(x: bounds.minX * foreground.layer.width / Double(w),
-                          y: bounds.minY * foreground.layer.height / Double(h),
-                          width: bounds.width * foreground.layer.width / Double(w),
-                          height: bounds.height * foreground.layer.height / Double(h))
+        let rect = pixels.overlapBounds().map { bounds in
+            CGRect(x: bounds.minX * foreground.layer.width / Double(w),
+                   y: bounds.minY * foreground.layer.height / Double(h),
+                   width: bounds.width * foreground.layer.width / Double(w),
+                   height: bounds.height * foreground.layer.height / Double(h))
+        }
         seamBounds.setObject(Bounds(rect), forKey: key, cost: alpha.map { $0.bytesPerRow * $0.height } ?? 1)
-        return rect.applying(CGAffineTransform(scaleX: scale, y: scale))
+        return rect?.applying(CGAffineTransform(scaleX: scale, y: scale))
     }
 }
