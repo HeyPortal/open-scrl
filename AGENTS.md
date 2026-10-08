@@ -66,7 +66,9 @@ Web and Mac projects are stored separately and don't transfer between apps yet.
 
 ## Commits and pull requests
 
-Nothing goes straight to `main`. Every change lands through a PR that is merged with a merge commit (not squashed), so each commit on the branch ends up in history and should stand on its own.
+Code changes land through a PR that is merged with a merge commit (not squashed), so each commit on the branch ends up in history and should stand on its own.
+
+The exception is docs and repo presentation: the README, `docs/`, `AGENTS.md`, `CHANGELOG.md` wording, and README images or logos can be committed and pushed straight to `main` when a maintainer asks. Anything that touches `src/`, `macos/`, `e2e/`, `public/`, build config, or CI still goes through a PR.
 
 **Remotes.** `origin` is `HeyPortal/open-scrl`, the canonical repo. Maintainers push branches there. Contributors push to their fork (e.g. the `nelson-ens` remote) and open the PR against `HeyPortal/open-scrl:main`. CI on a fork PR waits until a maintainer approves the run.
 
