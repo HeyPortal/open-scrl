@@ -125,7 +125,7 @@ export function TopBar() {
   const goProjects = () => buildActions().find((a) => a.id === 'go-projects')?.run();
 
   return (
-    <header className="relative z-20 flex h-11 shrink-0 items-center gap-2 border-b border-line bg-bg-rail px-2">
+    <header className="editor-topbar relative z-20 flex h-11 shrink-0 items-center gap-2 border-b border-line bg-bg-rail px-2">
       <div className="flex min-w-0 flex-1 items-center gap-1">
         <DropdownMenu
           label="Main menu"
@@ -196,7 +196,7 @@ export function TopBar() {
       </div>
 
       <div className="flex flex-1 items-center justify-end gap-2">
-        <ZoomControl />
+        <div className="editor-zoom"><ZoomControl /></div>
         <div className="flex min-w-0 items-center px-1">
           {progress ? (
             <span className="inline-flex max-w-44 items-center gap-1.5 truncate text-[11px] text-ink-dim">

@@ -18,7 +18,7 @@ export function LeftRail() {
   const setOpen = useEditorSession((s) => s.setLeftPanelOpen);
   const setOverlay = useEditorSession((s) => s.setOverlay);
   return (
-    <nav className="flex w-12 shrink-0 flex-col items-center gap-1 border-r border-line bg-bg-rail py-2" aria-label="Tools">
+    <nav className="editor-tools flex w-12 shrink-0 flex-col items-center gap-1 border-r border-line bg-bg-rail py-2" aria-label="Tools">
       {TABS.map((t) => {
         const Icon = t.icon;
         const active = open && left === t.id;

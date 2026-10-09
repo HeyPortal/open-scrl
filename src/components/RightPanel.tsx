@@ -15,7 +15,7 @@ export function RightPanel() {
     { id: 'layers', label: 'Layers', badge: layerCount },
   ];
   return (
-    <aside className="flex w-60 shrink-0 flex-col border-l border-line bg-bg-panel xl:w-64">
+    <aside className="editor-right-panel flex w-60 shrink-0 flex-col border-l border-line bg-bg-panel xl:w-64">
       <div className="flex h-10 shrink-0 items-end gap-4 border-b border-line px-3" role="tablist" aria-label="Properties">
         {tabs.map((t) => (
           <button

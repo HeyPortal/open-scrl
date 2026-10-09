@@ -192,3 +192,30 @@
     box-shadow: 0 0 0 3px rgba(124, 92, 255, 0.6);
   }
 }
+
+.mobile-workspace-tabs { display: none; }
+@media (max-width: 767px) {
+  .editor-topbar { height: auto; min-height: 88px; flex-wrap: wrap; padding: 6px 8px; gap: 6px; }
+  .editor-topbar > div:first-child { flex-basis: 100%; }
+  .editor-topbar > div:nth-child(2) { flex: 1; justify-content: center; }
+  .editor-topbar > div:last-child { flex: 0; }
+  .editor-topbar .editor-zoom { display: none; }
+  .editor-topbar input { width: 110px; font-size: 16px; }
+  .editor-topbar select { max-width: 145px; font-size: 14px; }
+  .mobile-workspace-tabs { display: flex; padding: 4px 8px; gap: 4px; border-bottom: 1px solid #34343c; background: #18181d; }
+  .mobile-workspace-tabs button { flex: 1; padding: 9px 4px; border-radius: 5px; font-size: 14px; color: #bdbdc8; }
+  .mobile-workspace-tabs button[aria-pressed=true] { background: #2d234c; color: #b6a4ff; }
+  .editor-left-panel, .editor-right-panel { display: none; position: absolute; z-index: 15; top: 0; bottom: 0; right: 0; width: calc(100% - 48px); max-width: 390px; box-shadow: -8px 0 24px #0006; }
+  .editor-shell[data-mobile-pane=tools] .editor-left-panel { display: block; }
+  .editor-shell[data-mobile-pane=settings] .editor-right-panel { display: flex; }
+  .editor-shell .input { font-size: 16px; min-height: 34px; }
+  .editor-shell .icon-btn { min-height: 32px; min-width: 30px; }
+  .editor-shell .range { height: 28px; }
+  .editor-shell .btn { min-height: 34px; }
+  .editor-shell .menu-item { min-height: 36px; font-size: 14px; }
+}
+@media (min-width: 768px) and (max-width: 1050px) {
+  .editor-topbar { flex-wrap: wrap; height: auto; min-height: 80px; padding: 6px; }
+  .editor-topbar > div:first-child { flex-basis: 50%; }
+  .editor-topbar > div:nth-child(2) { order: 3; margin: auto; }
+}

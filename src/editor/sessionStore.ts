@@ -15,6 +15,8 @@ interface SessionState {
   scroll: { left: number; top: number };
   leftPanel: LeftPanel;
   leftPanelOpen: boolean;
+  mobilePane: 'canvas' | 'tools' | 'settings';
+  setMobilePane: (pane: 'canvas' | 'tools' | 'settings') => void;
   saveStatus: SaveStatus;
   overlay: Overlay;
   /** Incremented to ask the media panel to open its file picker. */
@@ -51,6 +53,8 @@ export const useEditorSession = create<SessionState>((set) => ({
   scroll: { left: 0, top: 0 },
   leftPanel: 'photos',
   leftPanelOpen: true,
+  mobilePane: 'canvas',
+  setMobilePane: (mobilePane) => set((state) => ({ mobilePane, leftPanelOpen: mobilePane === 'tools' ? true : state.leftPanelOpen })),
   saveStatus: 'saved',
   overlay: null,
   importRequest: 0,
@@ -72,10 +76,10 @@ export const useEditorSession = create<SessionState>((set) => ({
   setZoom: (zoom) => set({ zoom: clampZoom(zoom) }),
   setFitZoom: (fitZoom) => set({ fitZoom: clampZoom(fitZoom) }),
   setScroll: (scroll) => set({ scroll }),
-  setLeftPanel: (leftPanel) => set({ leftPanel, leftPanelOpen: true }),
+  setLeftPanel: (leftPanel) => set({ leftPanel, leftPanelOpen: true, mobilePane: 'tools' }),
   setLeftPanelOpen: (leftPanelOpen) => set({ leftPanelOpen }),
   setSaveStatus: (saveStatus) => set({ saveStatus }),
   setOverlay: (overlay) => set({ overlay }),
-  requestImport: () => set((state) => ({ leftPanel: 'photos', leftPanelOpen: true, importRequest: state.importRequest + 1 })),
+  requestImport: () => set((state) => ({ leftPanel: 'photos', leftPanelOpen: true, mobilePane: 'tools', importRequest: state.importRequest + 1 })),
   setGridLinked: (gridLinked) => set({ gridLinked }),
 }));
