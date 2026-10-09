@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import type { ProjectDocumentV2 } from '../src/types';
 import { runtimeArtwork } from './fixtures/runtimeArtwork';
 
@@ -18,6 +18,9 @@ async function state(page: Page) {
 async function setup(page: Page) {
   await page.goto('/');
   await page.getByRole('button', { name: /create.*open editor/i }).click();
+  const installedKonva = JSON.parse(await readFile(new URL('../node_modules/konva/package.json', import.meta.url), 'utf8')) as { version: string };
+  // A reused dev server can otherwise validate a stale optimized dependency after an upgrade.
+  await expect.poll(() => page.evaluate(() => (window as unknown as { Konva?: { version: string } }).Konva?.version)).toBe(installedKonva.version);
   const png = await page.evaluate(() => {
     const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 256;
     const ctx = canvas.getContext('2d')!;
@@ -54,8 +57,7 @@ async function setup(page: Page) {
   await page.evaluate(() => document.fonts.ready);
   // Wait for the bitmap lease to reach the live scene, without relying on a fixed delay.
   await expect.poll(() => page.evaluate(async () => {
-    const path = '/node_modules/.vite/deps/konva.js';
-    const { default: Konva } = await import(path) as typeof import('konva');
+    const Konva = (window as unknown as { Konva: typeof import('konva').default }).Konva;
     const photo = Konva.stages[0]?.findOne('#runtime-photo');
     return photo?.findOne<Konva.Shape>('Shape')?.perfectDrawEnabled();
   })).toBe(false);
@@ -64,8 +66,7 @@ async function setup(page: Page) {
 
 async function point(page: Page, selector: string, local?: { x: number; y: number }) {
   return page.evaluate(async ({ selector, local }) => {
-    const path = '/node_modules/.vite/deps/konva.js';
-    const { default: Konva } = await import(path) as typeof import('konva');
+    const Konva = (window as unknown as { Konva: typeof import('konva').default }).Konva;
     const stage = Konva.stages[0];
     const node = selector.startsWith('Transformer ')
       ? stage.findOne<Konva.Transformer>('Transformer')!.findOne(selector.split(' ')[1])!
@@ -162,9 +163,9 @@ test('native canvas gestures commit once and keep refs attached through undo and
 /** Compares Konva's custom scene with the independent export renderer at project resolution. */
 async function fidelity(page: Page) {
   return page.evaluate(async () => {
-    const konvaPath = '/node_modules/.vite/deps/konva.js', editorPath = '/src/editor/documentStore.ts';
+    const editorPath = '/src/editor/documentStore.ts';
     const rendererPath = '/src/export/canvas2d/render.ts', assetsPath = '/src/assets/indexeddb/IndexedDbAssetRepository.ts';
-    const { default: Konva } = await import(konvaPath) as typeof import('konva');
+    const Konva = (window as unknown as { Konva: typeof import('konva').default }).Konva;
     const { useDocumentStore } = await import(editorPath) as typeof import('../src/editor/documentStore');
     const { renderSlides } = await import(rendererPath) as typeof import('../src/export/canvas2d/render');
     const { assetRepository } = await import(assetsPath) as typeof import('../src/assets/indexeddb/IndexedDbAssetRepository');
@@ -189,7 +190,7 @@ async function fidelity(page: Page) {
       }
       difference += pixelDifference; if (pixelDifference > 16) changed++; samples++;
     }
-    return { meanChannelDifference: difference / (samples * 4), changedFraction: changed / samples, artworkHash: (hash >>> 0).toString(16), png: actualCanvas.toDataURL('image/png') };
+    return { konvaVersion: Konva.version, meanChannelDifference: difference / (samples * 4), changedFraction: changed / samples, artworkHash: (hash >>> 0).toString(16), png: actualCanvas.toDataURL('image/png') };
   });
 }
 
@@ -244,8 +245,7 @@ test('custom artwork, crop, text editing, phone preview and remount retain fidel
   await page.getByRole('button', { name: /Runtime artwork/ }).click();
   await expect.poll(async () => (await state(page)).doc.layers).toEqual(edited.doc.layers);
   await expect.poll(() => page.evaluate(async () => {
-    const path = '/node_modules/.vite/deps/konva.js';
-    const { default: Konva } = await import(path) as typeof import('konva');
+    const Konva = (window as unknown as { Konva: typeof import('konva').default }).Konva;
     return Konva.stages.length;
   })).toBe(1);
   expect(errors).toEqual([]);
@@ -264,8 +264,7 @@ test('native touch pan and pinch keep the stage and viewport in sync', async ({ 
   await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await expect.poll(async () => (await state(page)).zoom).toBeCloseTo(1.5, 1);
   await expect.poll(() => page.evaluate(async () => {
-    const path = '/node_modules/.vite/deps/konva.js';
-    const { default: Konva } = await import(path) as typeof import('konva');
+    const Konva = (window as unknown as { Konva: typeof import('konva').default }).Konva;
     return Konva.stages[0].getLayers()[0].getChildren()[0].scaleX();
   })).toBeCloseTo(1.5, 1);
   const scroll = page.getByTestId('canvas-scroll');
@@ -276,8 +275,7 @@ test('native touch pan and pinch keep the stage and viewport in sync', async ({ 
   await expect.poll(() => scroll.evaluate((element) => element.scrollLeft)).toBeGreaterThan(before);
   await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await expect.poll(() => page.evaluate(async () => {
-    const path = '/node_modules/.vite/deps/konva.js';
-    const { default: Konva } = await import(path) as typeof import('konva');
+    const Konva = (window as unknown as { Konva: typeof import('konva').default }).Konva;
     const scroll = document.querySelector<HTMLElement>('[data-testid="canvas-scroll"]')!;
     return Konva.stages[0].getLayers()[0].getChildren()[0].x() + scroll.scrollLeft;
   })).toBeCloseTo(32, 1);
