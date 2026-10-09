@@ -39,7 +39,7 @@ export function MobileTopBar({ onOpenProject, onOpenExport }: { onOpenProject: (
         aria-label={`Project settings: ${docName || 'Untitled'}`}
         onClick={onOpenProject}
       >
-        <span className="min-w-0 truncate text-[16px] font-semibold text-ink">{docName || 'Untitled'}</span>
+        <span className="heading-md min-w-0 truncate text-ink">{docName || 'Untitled'}</span>
         <SaveDot />
         <ChevronDown size={15} className="shrink-0 text-ink-faint" aria-hidden />
       </button>

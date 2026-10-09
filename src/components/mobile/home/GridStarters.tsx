@@ -56,7 +56,7 @@ export function GridStarters({ format, pendingId, busy, onPick }: GridStartersPr
   return (
     <section aria-labelledby="home-grids-title" className="mt-8">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 id="home-grids-title" className="text-[17px] font-semibold tracking-tight">
+        <h2 id="home-grids-title" className="heading-lg">
           Start from a grid
         </h2>
         <span className="truncate text-[12px] text-ink-faint">{format.name}</span>

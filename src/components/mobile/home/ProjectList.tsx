@@ -30,7 +30,7 @@ function EmptyState() {
           <Plus size={16} strokeWidth={2.5} />
         </span>
       </div>
-      <h3 className="text-[16px] font-semibold">No carousels yet</h3>
+      <h3 className="heading-md">No carousels yet</h3>
       <p className="mt-1 max-w-[260px] text-[13px] leading-snug text-ink-faint">Create your first one above and it will show up here.</p>
     </div>
   );
@@ -65,7 +65,7 @@ function ProjectRow({ project, last, isOpening, busy, now, onOpen }: ProjectRowP
           )}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[15px] font-semibold leading-tight text-ink">{project.name}</span>
+          <span className="heading-sm block truncate text-ink">{project.name}</span>
           <span className="mt-1 block truncate text-[13px] leading-tight text-ink-dim">
             {project.format.name} · {slideLabel(project.slideCount)}
           </span>
@@ -98,7 +98,7 @@ export function ProjectList({ projects, openingId, busy, onOpen }: ProjectListPr
   return (
     <section aria-labelledby="home-projects-title" className="mt-8">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 id="home-projects-title" className="text-[17px] font-semibold tracking-tight">
+        <h2 id="home-projects-title" className="heading-lg">
           Your projects
         </h2>
         {projects.length > 0 && <span className="text-[13px] tabular-nums text-ink-faint">{projects.length}</span>}

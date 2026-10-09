@@ -53,7 +53,7 @@ export function NewCarouselCard({ format, onFormatChange, name, onNameChange, cr
         if (!busy) onSubmit();
       }}
     >
-      <h2 id="home-new-title" className="text-[17px] font-semibold tracking-tight">
+      <h2 id="home-new-title" className="heading-lg">
         New carousel
       </h2>
       <p className="mt-0.5 text-[13px] text-ink-faint">Pick a canvas size. You can change it later.</p>

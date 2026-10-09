@@ -88,7 +88,7 @@ export default function MobileHome() {
           <span className="flex h-6 w-6 items-center justify-center rounded-md bg-accent text-white">
             <LayoutGrid size={13} strokeWidth={2.25} />
           </span>
-          <span className="text-[15px] font-semibold tracking-tight">Open-SCRL</span>
+          <span className="heading-md">Open-SCRL</span>
         </div>
       </div>
 
@@ -110,7 +110,7 @@ export default function MobileHome() {
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-accent text-white shadow-[0_8px_20px_-8px_rgba(124,92,255,0.9)]">
                 <LayoutGrid size={22} strokeWidth={2.25} aria-hidden />
               </span>
-              <h1 className="text-[28px] font-semibold leading-none tracking-[-0.02em]">Open-SCRL</h1>
+              <h1 className="heading-hero">Open-SCRL</h1>
             </div>
             <p className="mt-2.5 text-[15px] leading-snug text-ink-dim">Carousels &amp; photo grids, saved on this device</p>
           </header>

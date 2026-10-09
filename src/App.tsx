@@ -45,6 +45,7 @@ export default function App(){
   // Editor keyboard shortcuts live in EditorShell (see src/app/actions.ts).
   if (!ready) return <div className="flex h-full w-full flex-col items-center justify-center gap-4 text-ink-dim">
     <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-accent text-white"><LayoutGrid size={22} strokeWidth={2} aria-hidden /></div>
+    <p className="heading-lg -mt-1 text-ink">Open-SCRL</p>
     {loadError ? <><p role="alert" className="max-w-sm text-center text-sm text-ink">Your projects could not be loaded. Your saved data has not been changed.</p><button className="btn btn-primary" onClick={() => { setLoadError(false); setLoadAttempt((n) => n + 1); }}>Retry loading</button></> : <span className="flex items-center gap-2 text-sm"><Loader2 size={16} className="animate-spin" aria-hidden />Loading…</span>}
   </div>;
   const retrySave = async () => {

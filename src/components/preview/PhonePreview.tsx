@@ -331,7 +331,7 @@ export function PhonePreview() {
       {!fullscreen && (
         <div className={headerClass}>
           <div className={mobile ? 'flex min-w-0 items-center gap-2' : 'flex items-center gap-3'}>
-            <h2 className={`${mobile ? 'shrink-0 ' : ''}text-[13px] font-semibold text-ink`}>Preview</h2>
+            <h2 className={`${mobile ? 'shrink-0 ' : ''}heading-md text-ink`}>Preview</h2>
             <div className={mobile ? 'w-[150px] min-w-0 [&_.segmented-btn]:whitespace-nowrap [&_.segmented-btn]:px-1' : 'w-[190px]'}>
               <Segmented label="Preview" value={mode} onChange={setMode} options={[{ value: 'feed', label: story ? 'Story' : 'Feed' }, { value: 'grid', label: 'Profile grid' }]} />
             </div>

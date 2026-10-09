@@ -80,7 +80,7 @@ export function BottomSheet({ title, detent, onDetentChange, onClose, headerActi
           }}
         />
         <div className="flex h-11 w-full items-center gap-2 px-4">
-          <h2 className="min-w-0 flex-1 truncate text-[15px] font-semibold text-ink">{title}</h2>
+          <h2 className="heading-md min-w-0 flex-1 truncate text-ink">{title}</h2>
           {headerAction && <div className="flex items-center gap-2" onPointerDown={(event) => event.stopPropagation()}>{headerAction}</div>}
           <button
             type="button"

@@ -77,7 +77,7 @@ function ActionCard({
           {busy ? <Loader2 size={22} className="animate-spin motion-reduce:animate-none" aria-hidden /> : <Icon size={22} strokeWidth={1.8} aria-hidden />}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-[15px] font-semibold leading-tight">{title}</span>
+          <span className="heading-md block">{title}</span>
           <span className={`mt-1 block text-[13px] leading-snug ${primary ? 'text-white/80' : 'text-ink-dim'}`}>{description}</span>
         </span>
       </span>

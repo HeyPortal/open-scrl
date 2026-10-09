@@ -29,7 +29,11 @@ export default {
         },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+        // Fontsource registers the self-hosted Inter as 'Inter Variable'. Plain 'Inter' is deliberately
+        // not registered: text layers use it as their font name and must keep rendering as before.
+        sans: ['"Inter Variable"', 'Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+        // Serif for titles and headings only (see .heading-* in index.css).
+        display: ['"Fraunces Variable"', 'ui-serif', 'Georgia', '"Times New Roman"', 'serif'],
       },
       boxShadow: {
         soft: '0 1px 2px rgba(0, 0, 0, 0.4)',
