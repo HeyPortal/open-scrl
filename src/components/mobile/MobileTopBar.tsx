@@ -29,28 +29,29 @@ export function MobileTopBar({ onOpenProject, onOpenExport }: { onOpenProject: (
   const exporting = useExport((s) => s.exporting);
 
   return (
-    <header className="mobile-topbar relative z-20 flex shrink-0 items-center gap-0.5 border-b border-line bg-bg/85 px-1 backdrop-blur">
+    <header className="mobile-topbar relative z-20 flex shrink-0 items-center border-b border-line bg-bg/85 px-0.5 backdrop-blur">
       <button type="button" className={barButton} aria-label="Projects" onClick={goToProjects}>
         <ChevronLeft size={24} aria-hidden />
       </button>
       <button
         type="button"
-        className="flex h-11 min-w-0 flex-1 items-center gap-1.5 rounded-full px-2 text-left active:bg-bg-hover"
+        className="flex h-11 min-w-0 flex-1 items-center gap-1 rounded-full pl-1 pr-1.5 text-left active:bg-bg-hover"
         aria-label={`Project settings: ${docName || 'Untitled'}`}
         onClick={onOpenProject}
       >
-        <span className="min-w-0 truncate text-[15px] font-semibold text-ink">{docName || 'Untitled'}</span>
+        <span className="min-w-0 truncate text-[16px] font-semibold text-ink">{docName || 'Untitled'}</span>
         <SaveDot />
         <ChevronDown size={15} className="shrink-0 text-ink-faint" aria-hidden />
       </button>
       <button type="button" className={barButton} aria-label="Undo" disabled={past === 0} onClick={undo}>
         <Undo2 size={20} aria-hidden />
       </button>
-      <button type="button" className={barButton} aria-label="Redo" disabled={future === 0} onClick={redo}>
+      {/* The redo target overlaps undo by 4 px; both keep their full 44 px hit box. */}
+      <button type="button" className={`${barButton} -ml-1`} aria-label="Redo" disabled={future === 0} onClick={redo}>
         <Redo2 size={20} aria-hidden />
       </button>
-      <button type="button" className="flex h-11 shrink-0 items-center px-1" aria-label={exporting ? 'Exporting' : 'Export'} onClick={onOpenExport}>
-        <span className="flex h-9 items-center gap-1.5 rounded-full bg-accent pl-3.5 pr-4 text-[14px] font-semibold text-white transition-colors active:bg-accent-hover">
+      <button type="button" className="flex h-11 shrink-0 items-center px-0.5" aria-label={exporting ? 'Exporting' : 'Export'} onClick={onOpenExport}>
+        <span className="flex h-9 items-center gap-1 rounded-full bg-accent pl-2.5 pr-3 text-[15px] font-semibold text-white transition-colors active:bg-accent-hover">
           {exporting ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <Share size={16} aria-hidden />}
           Export
         </span>

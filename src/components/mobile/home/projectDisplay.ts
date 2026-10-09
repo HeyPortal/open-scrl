@@ -9,11 +9,19 @@ const COVERS = [
   ['#14b8a6', '#6366f1'],
 ];
 
+/** FNV-1a, 32-bit: deterministic and well mixed, so ids that differ by one character land on unrelated covers. */
+function hash32(text: string) {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return hash >>> 0;
+}
+
 /** Stable decorative cover colours per project (projects have no stored thumbnail). */
 export function coverFor(id: string) {
-  let hash = 0;
-  for (const ch of id) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
-  const [from, to] = COVERS[hash % COVERS.length];
+  const [from, to] = COVERS[hash32(id) % COVERS.length];
   return `linear-gradient(135deg, ${from}, ${to})`;
 }
 
