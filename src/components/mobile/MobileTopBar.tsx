@@ -39,9 +39,11 @@ export function MobileTopBar({ onOpenProject, onOpenExport }: { onOpenProject: (
         aria-label={`Project settings: ${docName || 'Untitled'}`}
         onClick={onOpenProject}
       >
-        <span className="heading-md min-w-0 truncate text-ink">{docName || 'Untitled'}</span>
+        {/* Narrower than 380 px (e.g. 360) the serif name drops to 20 px and the chevron hides, so a
+            name like "Florida, mostly" still fits beside undo, redo and Export. */}
+        <span className="heading-md min-w-0 truncate text-ink max-[379px]:text-[20px]">{docName || 'Untitled'}</span>
         <SaveDot />
-        <ChevronDown size={15} className="shrink-0 text-ink-faint" aria-hidden />
+        <ChevronDown size={15} className="shrink-0 text-ink-faint max-[379px]:hidden" aria-hidden />
       </button>
       <button type="button" className={barButton} aria-label="Undo" disabled={past === 0} onClick={undo}>
         <Undo2 size={20} aria-hidden />

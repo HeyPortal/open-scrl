@@ -31,28 +31,29 @@
 
 @layer components {
   /* Headings ------------------------------------------------------------ */
-  /* Fraunces, for titles and headings of roughly 15px and up. Small text, controls, labels and
-     numbers stay in the sans: a text serif at 11-13px reads poorly on a dark UI. The optical size
-     follows the font size, so small headings get sturdier hairlines and large ones finer detail.
-     Lighter weights and tighter tracking suit the larger sizes; the smaller ones keep a heavier
-     weight and normal tracking so the thin strokes hold up. */
+  /* Instrument Serif, for titles and headings. It is a single-weight (400) condensed display face
+     with a small x-height, so it is set larger than the sans would be at the same visual size, and
+     it never gets a bold: font-weight is pinned to 400 and font-synthesis is off, so a parent's
+     font-semibold cannot make the browser fake one. Small text, controls, labels and numbers stay
+     in the sans. A heading that cannot grow to at least the -sm size without breaking its layout
+     should use the sans (font-semibold) instead. Tracking is slightly tight at the largest size
+     and normal to slightly open as the size drops, where the condensed forms need the air. */
   .font-display {
-    font-optical-sizing: auto;
+    font-weight: 400;
     font-synthesis: none;
+    word-spacing: 0.06em;
   }
   .heading-hero {
-    @apply font-display text-[28px] leading-none tracking-[-0.025em];
-    font-weight: 560;
+    @apply font-display text-[36px] leading-[1.02] tracking-[-0.01em];
   }
   .heading-lg {
-    @apply font-display text-[20px] leading-tight tracking-[-0.015em];
-    font-weight: 580;
+    @apply font-display text-[26px] leading-[1.1] tracking-normal;
   }
   .heading-md {
-    @apply font-display text-[17px] font-semibold leading-tight tracking-[-0.005em];
+    @apply font-display text-[22px] leading-[1.15] tracking-[0.005em];
   }
   .heading-sm {
-    @apply font-display text-[15px] font-semibold leading-tight;
+    @apply font-display text-[19px] leading-[1.2] tracking-[0.01em];
   }
 
   /* Buttons ------------------------------------------------------------- */

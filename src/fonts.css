@@ -2,12 +2,12 @@
  * Self-hosted fonts, served from the Fontsource packages (no CDN, so they work offline and are
  * precached with the rest of the app).
  *
- * These declarations mirror the packages' own wght.css / opsz.css, but only for the latin and
- * latin-ext subsets: the packages' default CSS also registers cyrillic, greek and vietnamese files
- * that the precache would download for nothing. Text outside these ranges falls back to the system
- * font in the stack (see fontFamily in tailwind.config.js).
+ * These declarations mirror the packages' own @font-face rules, but only for the latin and
+ * latin-ext subsets: Inter's default CSS also registers cyrillic, greek and vietnamese files that
+ * the precache would download for nothing. Text outside these ranges falls back to the system font
+ * in the stack (see fontFamily in tailwind.config.js).
  *
- * Fontsource registers the families as 'Inter Variable' and 'Fraunces Variable'. Plain 'Inter' is
+ * Fontsource registers the families as 'Inter Variable' and 'Instrument Serif'. Plain 'Inter' is
  * deliberately NOT registered here: text layers use fontFamily 'Inter', and the canvas and the
  * export worker must keep rendering them exactly as before.
  */
@@ -31,23 +31,23 @@
 }
 
 /*
- * Fraunces: the display serif for titles and headings (wght + opsz axes). The SOFT and WONK axes
- * are not shipped, so they stay at their defaults (0): crisp terminals, no leaning letterforms.
- * Browsers pick the optical size from the font size (font-optical-sizing: auto).
+ * Instrument Serif: the display serif for titles and headings. A single-weight (400) condensed
+ * face with a small x-height, so headings using it are set larger than the sans would be, and are
+ * never bolded (font-synthesis is off, see .heading-* in index.css). Static files, no axes.
  */
 @font-face {
-  font-family: 'Fraunces Variable';
+  font-family: 'Instrument Serif';
   font-style: normal;
   font-display: swap;
-  font-weight: 100 900;
-  src: url('@fontsource-variable/fraunces/files/fraunces-latin-ext-opsz-normal.woff2') format('woff2-variations');
+  font-weight: 400;
+  src: url('@fontsource/instrument-serif/files/instrument-serif-latin-ext-400-normal.woff2') format('woff2');
   unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 @font-face {
-  font-family: 'Fraunces Variable';
+  font-family: 'Instrument Serif';
   font-style: normal;
   font-display: swap;
-  font-weight: 100 900;
-  src: url('@fontsource-variable/fraunces/files/fraunces-latin-opsz-normal.woff2') format('woff2-variations');
+  font-weight: 400;
+  src: url('@fontsource/instrument-serif/files/instrument-serif-latin-400-normal.woff2') format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }

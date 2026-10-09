@@ -6,7 +6,7 @@ import { round } from '@/lib/nano';
 export function PanelHeader({ title, hint, action }: { title: string; hint?: ReactNode; action?: ReactNode }) {
   return (
     <div className="px-3 pb-2.5 pt-3">
-      <div className="flex h-6 items-center justify-between gap-2">
+      <div className="flex h-7 items-center justify-between gap-2">
         <h2 className="heading-md text-ink">{title}</h2>
         {action}
       </div>
