@@ -37,8 +37,22 @@ export function migrateV1ToV2(legacy: Document): ProjectDocumentV2 {
   };
 }
 
+function migrateFrameStyles(doc: ProjectDocumentV2): ProjectDocumentV2 {
+  // Frames are an additive v2 field. Missing styles retain legacy border/crop
+  // geometry; unsupported values fall back to that same legacy behavior.
+  const supported = new Set(['polaroid', 'paper', 'film', 'postcard']);
+  const invalid = Object.values(doc.layers).filter((layer) => layer.kind === 'image' && layer.frameStyle !== undefined && !supported.has(layer.frameStyle));
+  if (!invalid.length) return doc;
+  const migrated = structuredClone(doc);
+  for (const layer of invalid) {
+    const photo = migrated.layers[layer.id];
+    if (photo.kind === 'image') delete photo.frameStyle;
+  }
+  return migrated;
+}
+
 export function migrateDocument(value: PersistedDocument | unknown): ProjectDocumentV2 {
-  if (isDocumentV2(value)) return value;
-  if (isLegacyDocument(value)) return migrateV1ToV2(value);
+  if (isDocumentV2(value)) return migrateFrameStyles(value);
+  if (isLegacyDocument(value)) return migrateFrameStyles(migrateV1ToV2(value));
   throw new UnsupportedDocumentVersionError(getSchemaVersion(value));
 }
