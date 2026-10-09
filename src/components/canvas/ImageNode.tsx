@@ -50,9 +50,15 @@ interface Props {
   onTransformEnd: (e: Konva.KonvaEventObject<Event>) => void;
   groupRef: (n: Konva.Group | null) => void;
   renderScale: number;
+  /** Mobile canvas: selects on tap or drag, not on touchstart, so a pinch never changes the selection. */
+  touch?: boolean;
+  /** Extra reach of the hit area on each side, in canvas units, so thin layers stay tappable. */
+  hitPad?: { x: number; y: number };
+  /** Canvas units per screen pixel; with `touch`, keeps the empty-frame hint readable when zoomed out. */
+  pixel?: number;
 }
 
-export function ImageNode({ layer, asset, activeSlide, selected, onSelect, onClick, onDblClick, outline, onDragStart, onDragMove, onDragEnd, onTransform, onTransformEnd, groupRef, renderScale }: Props) {
+export function ImageNode({ layer, asset, activeSlide, selected, onSelect, onClick, onDblClick, outline, onDragStart, onDragMove, onDragEnd, onTransform, onTransformEnd, groupRef, renderScale, touch, hitPad, pixel }: Props) {
   const [baseImg, setBaseImg] = useState<DrawableImage | null>(null);
   const [detailImg, setDetailImg] = useState<ImageBitmap | null>(null);
   const [detailEdge, setDetailEdge] = useState(NAVIGATION_IMAGE_EDGE);
@@ -144,12 +150,12 @@ export function ImageNode({ layer, asset, activeSlide, selected, onSelect, onCli
   const media: PaintMedia | null = img ? { source: img, width: img.width, height: img.height } : null;
   const hit = (context: Konva.Context, shape: Konva.Shape) => {
     context.beginPath();
-    context.rect(0, 0, layer.width, layer.height);
+    context.rect(-(hitPad?.x ?? 0), -(hitPad?.y ?? 0), layer.width + (hitPad?.x ?? 0) * 2, layer.height + (hitPad?.y ?? 0) * 2);
     context.closePath();
     context.fillStrokeShape(shape);
   };
 
-  return <Group ref={groupRef} id={layer.id} name="layer" x={layer.x + layer.width / 2} y={layer.y + layer.height / 2} offsetX={layer.width / 2} offsetY={layer.height / 2} rotation={layer.rotation} opacity={layer.opacity} visible={layer.visible} draggable={!layer.locked} onMouseDown={onSelect} onTouchStart={onSelect} onTap={onSelect} onClick={onClick} onDblClick={onDblClick} onDblTap={onDblClick} onDragStart={onDragStart} onDragMove={onDragMove} onDragEnd={onDragEnd} onTransform={onTransform} onTransformEnd={onTransformEnd}>
+  return <Group ref={groupRef} id={layer.id} name="layer" x={layer.x + layer.width / 2} y={layer.y + layer.height / 2} offsetX={layer.width / 2} offsetY={layer.height / 2} rotation={layer.rotation} opacity={layer.opacity} visible={layer.visible} draggable={!layer.locked} onMouseDown={onSelect} onTouchStart={touch ? undefined : onSelect} onTap={onSelect} onClick={onClick} onDblClick={onDblClick} onDblTap={onDblClick} onDragStart={onDragStart} onDragMove={onDragMove} onDragEnd={onDragEnd} onTransform={onTransform} onTransformEnd={onTransformEnd}>
     {media ? (
       <Shape ref={imageRef} width={layer.width} height={layer.height} perfectDrawEnabled={false} hitFunc={hit}
         sceneFunc={(context) => { const ctx = context._context; paintLayerShadow(ctx, layer, media); paintImageContent(ctx, layer, media); }} />
@@ -165,7 +171,7 @@ export function ImageNode({ layer, asset, activeSlide, selected, onSelect, onCli
           ctx.stroke(path);
         }} />
     )}
-    {missing && !img && <Group listening={false}><Line points={[layer.width*.35,layer.height*.58,layer.width*.47,layer.height*.44,layer.width*.55,layer.height*.51,layer.width*.65,layer.height*.42]} stroke={selected?'#a996ff':'#5c5c68'} strokeWidth={4} lineCap="round" lineJoin="round"/><Text x={0} y={layer.height*.64} width={layer.width} text={selected?'Choose from Media':'Add media'} fontFamily="Inter" fontStyle={selected?'bold':'normal'} fontSize={Math.min(24,Math.max(12,layer.width/13))} fill={selected?'#c4b8ff':'#7d7d89'} align="center" listening={false}/></Group>}
-    <SelectionOutline width={layer.width} height={layer.height} show={outline} />
+    {missing && !img && <Group listening={false}><Line points={[layer.width*.35,layer.height*.58,layer.width*.47,layer.height*.44,layer.width*.55,layer.height*.51,layer.width*.65,layer.height*.42]} stroke={selected?'#a996ff':'#5c5c68'} strokeWidth={4} lineCap="round" lineJoin="round"/><Text x={0} y={layer.height*.64} width={layer.width} text={selected?'Choose from Media':'Add media'} fontFamily="Inter" fontStyle={selected?'bold':'normal'} fontSize={touch&&pixel?Math.min(layer.width/9,Math.max(Math.min(24,Math.max(12,layer.width/13)),12*pixel)):Math.min(24,Math.max(12,layer.width/13))} fill={selected?'#c4b8ff':'#7d7d89'} align="center" listening={false}/></Group>}
+    <SelectionOutline width={layer.width} height={layer.height} show={outline} touch={touch} />
   </Group>;
 }

@@ -19,9 +19,13 @@ interface Props {
   onTransformEnd: (e: Konva.KonvaEventObject<Event>) => void;
   onDblClick: () => void;
   nodeRef: (n: Konva.Group | null) => void;
+  /** Mobile canvas: selects on tap or drag, not on touchstart, so a pinch never changes the selection. */
+  touch?: boolean;
+  /** Extra reach of the hit area on each side, in canvas units, so thin layers stay tappable. */
+  hitPad?: { x: number; y: number };
 }
 
-export function TextNode({ layer, editing, onSelect, onClick, outline, onDragStart, onDragMove, onDragEnd, onTransform, onTransformEnd, onDblClick, nodeRef }: Props) {
+export function TextNode({ layer, editing, onSelect, onClick, outline, onDragStart, onDragMove, onDragEnd, onTransform, onTransformEnd, onDblClick, nodeRef, touch, hitPad }: Props) {
   return (
     <Group
       ref={nodeRef}
@@ -36,7 +40,7 @@ export function TextNode({ layer, editing, onSelect, onClick, outline, onDragSta
       visible={layer.visible}
       draggable={!layer.locked}
       onMouseDown={onSelect}
-      onTouchStart={onSelect}
+      onTouchStart={touch ? undefined : onSelect}
       onTap={onSelect}
       onClick={onClick}
       onDragStart={onDragStart}
@@ -59,12 +63,12 @@ export function TextNode({ layer, editing, onSelect, onClick, outline, onDragSta
         }}
         hitFunc={(context, shape) => {
           context.beginPath();
-          context.rect(0, 0, layer.width, layer.height);
+          context.rect(-(hitPad?.x ?? 0), -(hitPad?.y ?? 0), layer.width + (hitPad?.x ?? 0) * 2, layer.height + (hitPad?.y ?? 0) * 2);
           context.closePath();
           context.fillStrokeShape(shape);
         }}
       />
-      <SelectionOutline width={layer.width} height={layer.height} show={outline && !editing} />
+      <SelectionOutline width={layer.width} height={layer.height} show={outline && !editing} touch={touch} />
     </Group>
   );
 }
