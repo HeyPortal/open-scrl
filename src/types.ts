@@ -210,6 +210,10 @@ export interface AssetMeta {
   id: string;
   blobKey: string;
   thumbnailKey: string;
+  /** Untouched source when the editing rendition is converted. */
+  sourceKey?: string;
+  sourceMime?: string;
+  sourceName?: string;
   hash: string;
   name: string;
   mime: string;

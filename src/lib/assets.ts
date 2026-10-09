@@ -1,3 +1,4 @@
+import { editingPhoto } from './decodePhoto';
 import type { Asset, AssetMeta } from '@/types';
 import { AssetImportController, DuplicateAssetError } from '@/assets/AssetImportController';
 import type { PreparedAsset } from '@/assets/AssetRepository';
@@ -42,7 +43,8 @@ async function prepareVideo(file: File) {
 }
 
 async function prepareOnMain(file: File) {
-  const bitmap = await createImageBitmap(file);
+  const normalized = await editingPhoto(file);
+  const bitmap = await createImageBitmap(normalized);
   const scale = Math.min(1, 240 / Math.max(bitmap.width, bitmap.height));
   const canvas = document.createElement('canvas'); canvas.width = Math.max(1, Math.round(bitmap.width * scale)); canvas.height = Math.max(1, Math.round(bitmap.height * scale));
   canvas.getContext('2d')?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
@@ -52,7 +54,7 @@ async function prepareOnMain(file: File) {
   const mediaKind = file.type === 'image/gif' ? 'gif' as const : 'image' as const;
   let duration = 0;
   if (mediaKind === 'gif') { try { const { parseGIF, decompressFrames } = await import('gifuct-js'); duration = decompressFrames(parseGIF(await file.arrayBuffer()), false).reduce((total, frame) => total + Math.max(20, frame.delay || 100), 0) / 1000; } catch { duration = 0; } }
-  const result = { file, thumbnail, hash, width: bitmap.width, height: bitmap.height, mime: file.type || 'image/png', name: file.name, mediaKind, duration };
+  const result = { file: normalized, sourceFile: normalized === file ? undefined : file, sourceMime: file.type || 'image/heic', sourceName: file.name, thumbnail, hash, width: bitmap.width, height: bitmap.height, mime: normalized.type || file.type || 'image/png', name: file.name, mediaKind, duration };
   bitmap.close(); return result;
 }
 
@@ -65,6 +67,9 @@ async function importPrepared(prepared: PreparedAsset, projectId: string) {
 }
 
 export async function importAsset(file: File, projectId: string): Promise<AssetMeta> {
+  if (/heic|heif/i.test(file.type) || /\.(heic|heif)$/i.test(file.name)) {
+    return importPrepared(await prepareOnMain(file), projectId);
+  }
   if (file.type.startsWith('video/') || VIDEO_EXTENSIONS.has(extension(file.name))) {
     return importPrepared(await prepareVideo(file), projectId);
   }

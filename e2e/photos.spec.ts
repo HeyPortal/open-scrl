@@ -26,7 +26,7 @@ async function setup(page: Page) {
     context.fillRect(0, 0, 400, 300);
     return { name: `${name}.png`, data: canvas.toDataURL('image/png').split(',')[1] };
   }));
-  await page.locator('input[type=file]').setInputFiles(images.slice(0, 3).map((image) => ({
+  await page.getByLabel('Import media files').setInputFiles(images.slice(0, 3).map((image) => ({
     name: image.name, mimeType: 'image/png', buffer: Buffer.from(image.data, 'base64'),
   })));
   await expect(page.getByAltText('Green.png')).toBeVisible();

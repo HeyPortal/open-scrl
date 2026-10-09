@@ -1,4 +1,4 @@
-import { Grid3x3, Image, Keyboard, Palette, PanelLeftClose, PanelLeftOpen, Shapes, Type } from 'lucide-react';
+import { Download, Grid3x3, Image, Keyboard, Palette, PanelLeftClose, PanelLeftOpen, Shapes, Type } from 'lucide-react';
 import type { LeftPanel } from '@/store/editor';
 import { useEditorSession } from '@/editor/sessionStore';
 import { isMac } from '@/app/actions';
@@ -9,6 +9,7 @@ const TABS: { id: LeftPanel; label: string; icon: typeof Image }[] = [
   { id: 'text', label: 'Text', icon: Type },
   { id: 'shapes', label: 'Shapes', icon: Shapes },
   { id: 'background', label: 'Background', icon: Palette },
+  { id: 'export', label: 'Export', icon: Download },
 ];
 
 export function LeftRail() {

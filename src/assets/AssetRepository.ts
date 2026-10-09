@@ -2,6 +2,9 @@ import type { AssetMeta } from '@/types';
 
 export interface PreparedAsset {
   file: Blob;
+  sourceFile?: Blob;
+  sourceMime?: string;
+  sourceName?: string;
   thumbnail: Blob;
   hash: string;
   width: number;

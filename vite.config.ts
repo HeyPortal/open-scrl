@@ -2,10 +2,12 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import path from 'node:path';
+import { nativeImages } from './native/server';
 
 export default defineConfig({
   plugins: [
     react(),
+    nativeImages(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
@@ -44,7 +46,7 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    host: true,
+    host: '127.0.0.1',
   },
   worker: { format: 'es' },
   // This worker-only import is missed by the initial dependency scan. Discovering

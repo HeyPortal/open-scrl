@@ -4,6 +4,7 @@ import { LeftRail } from '@/components/LeftRail';
 import { RightPanel } from '@/components/RightPanel';
 import { Filmstrip } from '@/components/Filmstrip';
 import { Canvas } from '@/components/canvas/Canvas';
+import { ExportPanel } from '@/components/panels/ExportPanel';
 import { TemplatesPanel } from '@/components/panels/TemplatesPanel';
 import { PhotosPanel } from '@/components/panels/PhotosPanel';
 import { TextPanel } from '@/components/panels/TextPanel';
@@ -20,7 +21,7 @@ import { PhonePreview } from '@/components/preview/PhonePreview';
 
 function PanelContent() {
   const panel=useEditorSession((s)=>s.leftPanel);
-  if(panel==='templates')return <TemplatesPanel/>;if(panel==='photos')return <PhotosPanel/>;if(panel==='text')return <TextPanel/>;if(panel==='shapes')return <ShapesPanel/>;if(panel==='background')return <BackgroundPanel/>;return null;
+  if(panel==='templates')return <TemplatesPanel/>;if(panel==='photos')return <PhotosPanel/>;if(panel==='text')return <TextPanel/>;if(panel==='shapes')return <ShapesPanel/>;if(panel==='background')return <BackgroundPanel/>;if(panel==='export')return <ExportPanel/>;return null;
 }
 
 export default function EditorShell(){

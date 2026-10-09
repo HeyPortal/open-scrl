@@ -33,3 +33,7 @@ test-results/
 # Agent scratch
 .superpowers/
 .claude/worktrees/
+
+.native-runtime/
+
+test-artifacts/
