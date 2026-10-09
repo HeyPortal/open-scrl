@@ -5,7 +5,7 @@
 <h1 align="center">Open-SCRL</h1>
 
 <p align="center">
-  Photo carousels and grids for Instagram, made on your own machine.<br />
+  Photo carousels and grids for socials, made on your own machine.<br />
   No account, no subscription, nothing uploaded.
 </p>
 
