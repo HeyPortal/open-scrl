@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ChevronDown, SlidersHorizontal } from 'lucide-react';
 import { GRID_TEMPLATES, MAX_GRID_INSET, linkedMax, maxMargin, type GridTemplate } from '@/lib/grids';
 import { useEditor } from '@/store/editor';
 import { useEditorSession } from '@/editor/sessionStore';
@@ -31,12 +32,15 @@ function GridThumb({ tpl, gap, margin, ratio }: { tpl: GridTemplate; gap: number
   );
 }
 
-export function TemplatesPanel() {
+/** `sheet` is the touch layout used inside the mobile bottom sheet; `sidebar` is the desktop panel. */
+export function TemplatesPanel({ layout = 'sidebar' }: { layout?: 'sidebar' | 'sheet' }) {
+  const sheet = layout === 'sheet';
   const applyGrid = useEditor((s) => s.applyGrid);
   const linkGridSpacing = useEditor((s) => s.linkGridSpacing);
   const format = useEditor((s) => s.doc.format);
   const [gap, setGap] = useState(0);
   const [margin, setMargin] = useState(0);
+  const [spacingOpen, setSpacingOpen] = useState(false);
   const linked = useEditorSession((s) => s.gridLinked);
   const setGridLinked = useEditorSession((s) => s.setGridLinked);
   // No template is chosen yet, so the shared limit is just the slider range; each template clamps its own layout.
@@ -49,18 +53,39 @@ export function TemplatesPanel() {
   };
   const ratio = format.width / format.height;
 
+  const sliders = (
+    <LinkedSliders
+      linked={linked}
+      onToggle={toggleLinked}
+      top={<Slider label="Gap between photos" display={`${gap} px`} min={0} max={linked ? sharedMax : 120} value={Math.min(gap, linked ? sharedMax : 120)} onChange={linked ? setBoth : setGap} valueText={`${gap} pixels`} />}
+      bottom={<Slider label="Outer margin" display={`${margin} px`} min={0} max={marginMax} value={Math.min(margin, marginMax)} onChange={linked ? setBoth : setMargin} valueText={`${margin} pixels`} />}
+    />
+  );
+
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <PanelHeader title="Photo grids" hint={`Replaces the current slide's layers with empty photo slots. Undo with ${isMac ? '⌘' : 'Ctrl'} Z.`} />
-      <div className="space-y-2.5 px-3 pb-3">
-        <LinkedSliders
-          linked={linked}
-          onToggle={toggleLinked}
-          top={<Slider label="Gap between photos" display={`${gap} px`} min={0} max={linked ? sharedMax : 120} value={Math.min(gap, linked ? sharedMax : 120)} onChange={linked ? setBoth : setGap} valueText={`${gap} pixels`} />}
-          bottom={<Slider label="Outer margin" display={`${margin} px`} min={0} max={marginMax} value={Math.min(margin, marginMax)} onChange={linked ? setBoth : setMargin} valueText={`${margin} pixels`} />}
-        />
-      </div>
-      <div className="grid min-h-0 flex-1 grid-cols-3 content-start gap-2 overflow-auto border-t border-line px-3 py-3 scrollbar-thin">
+    <div className={sheet ? 'flex flex-col' : 'flex h-full min-h-0 flex-col'}>
+      {sheet
+        ? <p className="px-4 pb-3 text-[12px] leading-relaxed text-ink-faint">Replaces this slide's layers with empty photo slots.</p>
+        : <PanelHeader title="Photo grids" hint={`Replaces the current slide's layers with empty photo slots. Undo with ${isMac ? '⌘' : 'Ctrl'} Z.`} />}
+      {sheet ? (
+        <div className="px-4 pb-4">
+          <button
+            type="button"
+            aria-expanded={spacingOpen}
+            onClick={() => setSpacingOpen((open) => !open)}
+            className="flex h-12 w-full items-center gap-3 rounded-xl bg-bg-inset px-3.5 text-left transition-colors active:bg-bg-hover"
+          >
+            <SlidersHorizontal size={18} className="shrink-0 text-ink-dim" aria-hidden />
+            <span className="flex-1 text-[14px] font-medium text-ink">Spacing</span>
+            <span className="text-[12px] tabular-nums text-ink-faint">Gap {gap} · Margin {margin}</span>
+            <ChevronDown size={16} className={`shrink-0 text-ink-faint transition-transform duration-150 ${spacingOpen ? 'rotate-180' : ''}`} aria-hidden />
+          </button>
+          {spacingOpen && <div className="pt-3">{sliders}</div>}
+        </div>
+      ) : (
+        <div className="space-y-2.5 px-3 pb-3">{sliders}</div>
+      )}
+      <div className={sheet ? 'grid grid-cols-[repeat(auto-fill,minmax(96px,1fr))] content-start gap-2 border-t border-line px-4 py-4' : 'grid min-h-0 flex-1 grid-cols-3 content-start gap-2 overflow-auto border-t border-line px-3 py-3 scrollbar-thin'}>
         {GRID_TEMPLATES.map((t) => {
           // Linked spacing has to fit this template, or the inspector would show a smaller value than the one stored.
           const v = Math.min(gap, linkedMax(t, format));

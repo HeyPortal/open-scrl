@@ -41,7 +41,9 @@ const PRESETS: ShapePreset[] = [
   },
 ];
 
-export function ShapesPanel() {
+/** `sheet` is the touch layout used inside the mobile bottom sheet; `sidebar` is the desktop panel. */
+export function ShapesPanel({ layout = 'sidebar' }: { layout?: 'sidebar' | 'sheet' }) {
+  const sheet = layout === 'sheet';
   const add = useEditor((s) => s.addShapeLayer);
   const updateLayer = useEditor((s) => s.updateLayer);
   const beginTransaction = useEditor((s) => s.beginTransaction);
@@ -61,11 +63,13 @@ export function ShapesPanel() {
   };
 
   return (
-    <div className="flex h-full flex-col">
-      <PanelHeader title="Shapes" hint="Use shapes as colour blocks, frames, and text backgrounds." />
-      <div className="grid grid-cols-2 gap-2 px-3 pb-4">
+    <div className={sheet ? 'flex flex-col' : 'flex h-full flex-col'}>
+      {sheet
+        ? <p className="px-4 pb-3 text-[12px] leading-relaxed text-ink-faint">Use shapes as colour blocks, frames, and text backgrounds.</p>
+        : <PanelHeader title="Shapes" hint="Use shapes as colour blocks, frames, and text backgrounds." />}
+      <div className={sheet ? 'grid grid-cols-3 gap-2 px-4 pb-4' : 'grid grid-cols-2 gap-2 px-3 pb-4'}>
         {PRESETS.map((preset) => (
-          <button key={preset.name} className="tile group flex flex-col items-center gap-2 px-2 pb-2.5 pt-4" onClick={() => insert(preset)}>
+          <button key={preset.name} className={`tile group flex flex-col items-center gap-2 px-2 pb-2.5 pt-4 ${sheet ? 'active:bg-bg-hover' : ''}`} onClick={() => insert(preset)}>
             <span className="flex h-12 items-center justify-center">
               <span
                 className={`block transition-transform group-hover:scale-110 ${preset.patch?.(format).fill ? 'bg-ink-dim' : 'bg-accent'}`}

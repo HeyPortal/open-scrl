@@ -11,7 +11,9 @@ const PRESETS = [
   { name: 'Caption', text: 'caption · 2026', size: 24, weight: 400 },
 ];
 
-export function TextPanel() {
+/** `sheet` is the touch layout used inside the mobile bottom sheet; `sidebar` is the desktop panel. */
+export function TextPanel({ layout = 'sidebar' }: { layout?: 'sidebar' | 'sheet' }) {
+  const sheet = layout === 'sheet';
   const addText = useEditor((s) => s.addTextLayer);
   const updateLayer = useEditor((s) => s.updateLayer);
   const selectedLayerId = useEditorSession((s) => s.selectedLayerId);
@@ -35,20 +37,20 @@ export function TextPanel() {
   const editing = selectedLayerId && selectedLayer?.kind === 'text';
 
   return (
-    <div className="flex h-full flex-col">
-      <PanelHeader title="Text" />
-      <div className="px-3 pb-3">
-        <button className="btn btn-primary w-full" onClick={() => addText()}>
-          <Plus size={16} aria-hidden /> Add text box
+    <div className={sheet ? 'flex flex-col' : 'flex h-full flex-col'}>
+      {!sheet && <PanelHeader title="Text" />}
+      <div className={sheet ? 'px-4 pb-4 pt-1' : 'px-3 pb-3'}>
+        <button className={sheet ? 'flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-accent text-[15px] font-semibold text-white transition-colors active:bg-accent-hover' : 'btn btn-primary w-full'} onClick={() => addText(sheet ? 'Double-tap to edit' : undefined)}>
+          <Plus size={sheet ? 18 : 16} aria-hidden /> Add text box
         </button>
       </div>
-      <div className="flex items-center justify-between border-t border-line px-3 pb-2 pt-3">
+      <div className={`flex items-center justify-between border-t border-line pb-2 pt-3 ${sheet ? 'px-4' : 'px-3'}`}>
         <h3 className="section-title">Styles</h3>
-        <span className={`text-[11px] ${editing ? 'font-medium text-accent' : 'text-ink-faint'}`}>{editing ? 'Applies to selected text' : 'Click to add'}</span>
+        <span className={`text-[11px] ${editing ? 'font-medium text-accent' : 'text-ink-faint'}`}>{editing ? 'Applies to selected text' : sheet ? 'Tap to add' : 'Click to add'}</span>
       </div>
-      <div className="flex flex-col gap-2 overflow-auto px-3 pb-4 scrollbar-thin">
+      <div className={sheet ? 'flex flex-col gap-2 px-4 pb-4' : 'flex flex-col gap-2 overflow-auto px-3 pb-4 scrollbar-thin'}>
         {PRESETS.map((p) => (
-          <button key={p.name} onClick={() => apply(p)} className="tile px-3.5 py-3 text-left">
+          <button key={p.name} onClick={() => apply(p)} className={`tile text-left ${sheet ? 'px-4 py-3.5 active:bg-bg-hover' : 'px-3.5 py-3'}`}>
             <div className="truncate leading-tight text-ink" style={{ fontSize: Math.max(13, Math.min(p.size / 5, 30)), fontWeight: p.weight }}>
               {p.text.split('\n')[0]}
             </div>
@@ -56,7 +58,7 @@ export function TextPanel() {
           </button>
         ))}
       </div>
-      <p className="mt-auto border-t border-line px-3 py-3 text-[11px] leading-relaxed text-ink-faint">Tip: double-click text on the canvas to edit it in place.</p>
+      {!sheet && <p className="mt-auto border-t border-line px-3 py-3 text-[11px] leading-relaxed text-ink-faint">Tip: double-click text on the canvas to edit it in place.</p>}
     </div>
   );
 }
