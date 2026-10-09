@@ -1,0 +1,21 @@
+import { expect, test } from '@playwright/test';
+test('post layouts apply undoably and custom templates survive reopening', async ({ page }) => {
+  await page.goto('/'); await page.getByRole('button', { name: /create.*open editor/i }).click();
+  await page.getByRole('navigation', { name: 'Tools' }).getByRole('button', { name: 'Templates', exact: true }).click();
+  await page.getByRole('button', { name: 'Post templates', exact: true }).click();
+  await page.getByRole('button', { name: /Gallery Three photos/ }).click();
+  await expect(page.getByTitle('Slide 3', { exact: true })).toBeVisible();
+  await page.screenshot({ path: 'docs/images/web-post-templates.png' });
+  await page.getByLabel('Template name').fill('Saved gallery');
+  await page.getByRole('button', { name: 'Save layout', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Saved gallery', exact: true })).toBeVisible();
+  await page.getByTitle(/Undo/).first().click();
+  await expect(page.getByTitle('Slide 3', { exact: true })).toHaveCount(0);
+  await page.getByTitle('Projects', { exact: true }).click();
+  await page.reload();
+  await page.getByRole('button', { name: /Untitled/ }).click();
+  await page.getByRole('navigation', { name: 'Tools' }).getByRole('button', { name: 'Templates', exact: true }).click();
+  await page.getByRole('button', { name: 'Post templates', exact: true }).click();
+  await page.getByRole('button', { name: 'Saved gallery', exact: true }).click();
+  await expect(page.getByTitle('Slide 3', { exact: true })).toBeVisible();
+});
