@@ -4,7 +4,7 @@ import { useEditorSession } from '@/editor/sessionStore';
 import { isMac } from '@/app/actions';
 
 const TABS: { id: LeftPanel; label: string; icon: typeof Image }[] = [
-  { id: 'templates', label: 'Grids', icon: Grid3x3 },
+  { id: 'templates', label: 'Templates', icon: Grid3x3 },
   { id: 'photos', label: 'Media', icon: Image },
   { id: 'text', label: 'Text', icon: Type },
   { id: 'shapes', label: 'Shapes', icon: Shapes },

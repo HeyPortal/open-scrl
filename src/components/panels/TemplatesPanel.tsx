@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { PostTemplates } from './PostTemplates';
 import { GRID_TEMPLATES, MAX_GRID_INSET, linkedMax, maxMargin, type GridTemplate } from '@/lib/grids';
 import { useEditor } from '@/store/editor';
 import { useEditorSession } from '@/editor/sessionStore';
@@ -35,6 +36,7 @@ export function TemplatesPanel() {
   const applyGrid = useEditor((s) => s.applyGrid);
   const linkGridSpacing = useEditor((s) => s.linkGridSpacing);
   const format = useEditor((s) => s.doc.format);
+  const [tab, setTab] = useState<'grids' | 'posts'>('grids');
   const [gap, setGap] = useState(0);
   const [margin, setMargin] = useState(0);
   const linked = useEditorSession((s) => s.gridLinked);
@@ -51,6 +53,11 @@ export function TemplatesPanel() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
+      <div className="segmented mx-3 mt-3 grid-cols-2" aria-label="Template types">
+        <button className={`segmented-btn ${tab === 'grids' ? 'segmented-btn-active' : ''}`} onClick={() => setTab('grids')}>Photo grids</button>
+        <button className={`segmented-btn ${tab === 'posts' ? 'segmented-btn-active' : ''}`} onClick={() => setTab('posts')}>Post templates</button>
+      </div>
+      {tab === 'posts' ? <div className="min-h-0 flex-1 overflow-auto pt-3"><PostTemplates/></div> : <>
       <PanelHeader title="Photo grids" hint={`Replaces the current slide's layers with empty photo slots. Undo with ${isMac ? '⌘' : 'Ctrl'} Z.`} />
       <div className="space-y-2.5 px-3 pb-3">
         <LinkedSliders
@@ -81,6 +88,7 @@ export function TemplatesPanel() {
           );
         })}
       </div>
+      </>}
     </div>
   );
 }

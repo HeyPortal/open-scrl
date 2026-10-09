@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 test('adjusts the gap and outer margin of an inserted grid from the slide inspector', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: /create|start/i }).first().click();
-  await page.getByRole('navigation', { name: 'Tools' }).getByRole('button', { name: 'Grids', exact: true }).click();
+  await page.getByRole('navigation', { name: 'Tools' }).getByRole('button', { name: 'Templates', exact: true }).click();
   await page.getByTitle('Apply “2 × 2” grid').click();
 
   const slots = () => page.evaluate(async () => {
@@ -32,7 +32,7 @@ test('adjusts the gap and outer margin of an inserted grid from the slide inspec
 test('linking gap and outer margin snaps the margin to the gap and moves both together', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: /create|start/i }).first().click();
-  await page.getByRole('navigation', { name: 'Tools' }).getByRole('button', { name: 'Grids', exact: true }).click();
+  await page.getByRole('navigation', { name: 'Tools' }).getByRole('button', { name: 'Templates', exact: true }).click();
   await page.getByTitle('Apply “2 × 2” grid').click();
 
   const grid = () => page.evaluate(async () => {
@@ -69,7 +69,7 @@ test('linking gap and outer margin snaps the margin to the gap and moves both to
 test('undoing a link shows the toggle unlinked with the restored values', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: /create|start/i }).first().click();
-  await page.getByRole('navigation', { name: 'Tools' }).getByRole('button', { name: 'Grids', exact: true }).click();
+  await page.getByRole('navigation', { name: 'Tools' }).getByRole('button', { name: 'Templates', exact: true }).click();
   await page.getByTitle('Apply “2 × 2” grid').click();
 
   const grid = () => page.evaluate(async () => {
@@ -107,7 +107,7 @@ test('undoing a link shows the toggle unlinked with the restored values', async 
 test('apply to all slides copies the gap and outer margin to every slide with a grid', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: /create|start/i }).first().click();
-  await page.getByRole('navigation', { name: 'Tools' }).getByRole('button', { name: 'Grids', exact: true }).click();
+  await page.getByRole('navigation', { name: 'Tools' }).getByRole('button', { name: 'Templates', exact: true }).click();
   await page.getByTitle('Apply “2 × 2” grid').click();
   const inspector = page.getByRole('tabpanel');
   await expect(inspector.getByRole('button', { name: /^Apply grid spacing to all/ })).toHaveCount(0);
