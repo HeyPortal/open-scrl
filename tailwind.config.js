@@ -30,7 +30,7 @@ export default {
       },
       fontFamily: {
         // Fontsource registers the self-hosted Inter as 'Inter Variable'. Plain 'Inter' is deliberately
-        // not registered: text layers use it as their font name and must keep rendering as before.
+        // not registered: resolveFontFamily maps that portable document name to the bundled face.
         sans: ['"Inter Variable"', 'Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
         // Serif for titles and headings only (see .heading-* in index.css). The fallbacks are ordinary
         // text serifs, which run wider than the condensed Instrument Serif.

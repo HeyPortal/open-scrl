@@ -3,6 +3,7 @@ import type Konva from 'konva';
 import type { TextLayer } from '@/types';
 import { useEditor } from '@/store/editor';
 import { editorActivity } from '@/editor/activity';
+import { resolveFontFamily } from '@/render/fonts/families';
 
 interface Props {
   layer: TextLayer;
@@ -58,7 +59,7 @@ export function TextEditor({ layer, stage, offsetX = 0, scale: scaleProp, viewpo
         left: x,
         top: y,
         width: w,
-        fontFamily: layer.fontFamily,
+        fontFamily: resolveFontFamily(layer.fontFamily),
         fontSize: layer.fontSize * scale,
         fontWeight: layer.fontWeight,
         fontStyle: layer.italic ? 'italic' : 'normal',

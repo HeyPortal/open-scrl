@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import type Konva from 'konva';
 import type { TextLayer } from '@/types';
 import { useEditor } from '@/store/editor';
+import { resolveFontFamily } from '@/render/fonts/families';
 
 /** iOS Safari zooms the whole page when a field with a smaller font gets focus. */
 const MIN_FONT_PX = 16;
@@ -120,7 +121,7 @@ export function MobileTextEditor({ layer, stage, offsetX = 0, scale: scaleProp, 
           top,
           width,
           maxHeight,
-          fontFamily: layer.fontFamily,
+          fontFamily: resolveFontFamily(layer.fontFamily),
           fontWeight: layer.fontWeight,
           fontStyle: layer.italic ? 'italic' : 'normal',
           color: displaced ? '#ffffff' : layer.fill,

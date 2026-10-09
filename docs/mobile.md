@@ -28,7 +28,7 @@ A sheet rises from the dock and the canvas shrinks to make room. The slide strip
 
 - **Photos**: **Import media** opens the file picker for images, GIFs, and videos. **As slides** imports each file onto its own new slide, and panoramas span as many slides as they need. Tap a photo to add it to the current slide. The ⋯ button on a photo offers **Add to slide**, **Spread across N slides**, **New slide with this**, and **Remove from project**. When a photo frame is selected, the menu also offers to fill or replace it. Files stay on the device.
 - **Grids**: tap a grid to apply it to the current slide. This replaces the slide's layers with empty photo frames. Open **Spacing** to set the gap and margin the grid uses. To fill an empty frame, select it and then tap a photo in **Photos**.
-- **Text**: **Add text box** adds a box that reads "Double-tap to edit". The style presets below it work two ways. With a text layer selected, a preset replaces that layer's text, size, and weight. Otherwise it adds a new box.
+- **Text**: **Add text box** adds a box that reads "Double-tap to edit". The style presets below it work two ways. With a text layer selected, a preset replaces that layer's text, size, and weight. Otherwise it adds a new box. Inter is bundled with the app, including italics, so it uses the same face while editing and in exported images and videos. Existing Inter text also uses the bundled face; its line wrapping may change from the previous fallback font.
 - **Shapes**: tap a shape to add it to the slide.
 - **Canvas**: sets the background of the current slide to a color, gradient, photo, or none. **Apply to all N slides** copies it to every slide.
 

@@ -43,6 +43,7 @@ import { ALIGN_BUTTONS, SelectionInspector } from './inspector/SelectionInspecto
 import { groupMemberIds } from '@/core/document/selectors';
 import { getLiveGrid, hasLinkedSpacing } from '@/core/document/grid';
 import { linkedMax, maxGapFor, maxMargin } from '@/lib/grids';
+import { resolveFontFamily } from '@/render/fonts/families';
 
 const KIND_META = {
   image: { label: 'Photo', Icon: ImageIcon },
@@ -342,9 +343,9 @@ function TextInspector({ layer }: { layer: TextLayer }) {
         <textarea className="input min-h-[4.5rem] resize-y" rows={3} value={layer.text} onChange={(e) => u({ text: e.target.value })} aria-label="Text content" />
       </Section>
       <Section title="Typography">
-        <select className="input" value={layer.fontFamily} onChange={(e) => u({ fontFamily: e.target.value })} aria-label="Font" style={{ fontFamily: layer.fontFamily }}>
+        <select className="input" value={layer.fontFamily} onChange={(e) => u({ fontFamily: e.target.value })} aria-label="Font" style={{ fontFamily: resolveFontFamily(layer.fontFamily) }}>
           {FONTS.map((f) => (
-            <option key={f} style={{ fontFamily: f }}>{f}</option>
+            <option key={f} style={{ fontFamily: resolveFontFamily(f) }}>{f}</option>
           ))}
         </select>
         <div className="grid grid-cols-2 gap-2">

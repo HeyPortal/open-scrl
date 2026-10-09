@@ -8,6 +8,7 @@ import { getAsset, getAssetMetadata } from '@/lib/assets';
 import { getMediaKind, setVideoElementPlaying } from '@/lib/media';
 import { createTemporaryExportFile } from '@/storage/exportTemp';
 import { captureSlotForElapsed } from './timeline';
+import { loadInterFonts } from '@/render/fonts/inter';
 import {
   createAnimatedGifCanvas,
   seekAnimatedGifCanvas,
@@ -265,6 +266,7 @@ async function renderSlideVideo(
     throw new Error('MP4 export needs a browser with WebCodecs support. Try the latest Chrome or Edge.');
   }
   if (!project.slides[slideId]) throw new Error('A slide no longer exists.');
+  await loadInterFonts();
   await document.fonts?.ready;
   const { config, fps } = await bestSupportedConfig(project);
   const { animated, duration } = await inspectSlideVideo(project, slideId);

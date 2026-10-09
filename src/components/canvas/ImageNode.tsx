@@ -171,7 +171,7 @@ export function ImageNode({ layer, asset, activeSlide, selected, onSelect, onCli
           ctx.stroke(path);
         }} />
     )}
-    {missing && !img && <Group listening={false}><Line points={[layer.width*.35,layer.height*.58,layer.width*.47,layer.height*.44,layer.width*.55,layer.height*.51,layer.width*.65,layer.height*.42]} stroke={selected?'#a996ff':'#5c5c68'} strokeWidth={4} lineCap="round" lineJoin="round"/><Text x={0} y={layer.height*.64} width={layer.width} text={selected?'Choose from Media':'Add media'} fontFamily="Inter" fontStyle={selected?'bold':'normal'} fontSize={touch&&pixel?Math.min(layer.width/9,Math.max(Math.min(24,Math.max(12,layer.width/13)),12*pixel)):Math.min(24,Math.max(12,layer.width/13))} fill={selected?'#c4b8ff':'#7d7d89'} align="center" listening={false}/></Group>}
+    {missing && !img && <Group listening={false}><Line points={[layer.width*.35,layer.height*.58,layer.width*.47,layer.height*.44,layer.width*.55,layer.height*.51,layer.width*.65,layer.height*.42]} stroke={selected?'#a996ff':'#5c5c68'} strokeWidth={4} lineCap="round" lineJoin="round"/><Text x={0} y={layer.height*.64} width={layer.width} text={selected?'Choose from Media':'Add media'} fontFamily="Inter Variable" fontStyle={selected?'bold':'normal'} fontSize={touch&&pixel?Math.min(layer.width/9,Math.max(Math.min(24,Math.max(12,layer.width/13)),12*pixel)):Math.min(24,Math.max(12,layer.width/13))} fill={selected?'#c4b8ff':'#7d7d89'} align="center" listening={false}/></Group>}
     <SelectionOutline width={layer.width} height={layer.height} show={outline} touch={touch} />
   </Group>;
 }
