@@ -68,6 +68,13 @@ export async function importAsset(file: File, projectId: string): Promise<AssetM
   if (file.type.startsWith('video/') || VIDEO_EXTENSIONS.has(extension(file.name))) {
     return importPrepared(await prepareVideo(file), projectId);
   }
+  if (/heic|heif/i.test(`${file.type} ${file.name}`)) {
+    // heic2any owns a decoder worker, but its adapter needs window and canvas.
+    const { default: convert } = await import('heic2any');
+    const converted = await convert({ blob: file, toType: 'image/jpeg', quality: 0.92 });
+    const normalized = Array.isArray(converted) ? converted[0] : converted;
+    file = new File([normalized], file.name.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg', lastModified: file.lastModified });
+  }
   if (importer === undefined) importer = typeof Worker !== 'undefined' ? new AssetImportController(assetRepository, 2) : null;
   if (importer) return importer.import(file, projectId);
   return importPrepared(await prepareOnMain(file), projectId);

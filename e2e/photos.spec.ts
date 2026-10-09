@@ -50,9 +50,10 @@ async function setup(page: Page) {
 }
 
 async function framePoint(page: Page, id: string) {
-  return page.evaluate(async (layerId) => {
-    const path = '/node_modules/.vite/deps/konva.js';
-    const { default: Konva } = await import(path) as typeof import('konva');
+  return page.evaluate((layerId) => {
+    // Konva exposes the app's singleton. Importing an optimizer-generated URL
+    // without its version query can create a second instance after Vite upgrades.
+    const Konva = (window as unknown as { Konva: typeof import('konva')['default'] }).Konva;
     const stage = Konva.stages[0];
     const bounds = stage.findOne(`#${layerId}`)!.getClientRect();
     const container = stage.container().getBoundingClientRect();
@@ -117,8 +118,8 @@ test('file drops reuse imported photos, fill only available frames, and undo in 
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect((await documentState(page)).layers).toEqual(before.layers);
   const emptyPoint = await page.evaluate(async () => {
-    const konvaPath = '/node_modules/.vite/deps/konva.js', editorPath = '/src/editor/documentStore.ts';
-    const { default: Konva } = await import(konvaPath) as typeof import('konva');
+    const editorPath = '/src/editor/documentStore.ts';
+    const Konva = (window as unknown as { Konva: typeof import('konva')['default'] }).Konva;
     const { useDocumentStore } = await import(editorPath) as typeof import('../src/editor/documentStore');
     const stage = Konva.stages[0], format = useDocumentStore.getState().doc.format;
     const point = stage.getLayers()[0].getChildren()[0].getAbsoluteTransform().point({ x: format.width / 2, y: format.height / 2 });

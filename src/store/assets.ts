@@ -11,6 +11,7 @@ import type { AssetMeta } from '@/types';
 import { command } from '@/core/document/commands';
 import { useToasts } from './toasts';
 import { useEditor } from './editor';
+import { editorActivity } from '@/editor/activity';
 
 interface AssetsState {
   projectId: string | null;
@@ -111,62 +112,67 @@ export const useAssets = create<AssetsState>((set, get) => ({
       });
       return [];
     }
-    const imported: AssetMeta[] = [];
-    const usable: AssetMeta[] = [];
-    const duplicates: string[] = [];
-    const failed: string[] = [];
-    for (const f of arr) {
-      try {
-        const a = await idbImport(f, projectId);
-        imported.push(a);
-        usable.push(a);
-      } catch (err) {
-        if (err instanceof DuplicateAssetError) {
-          duplicates.push(f.name);
-          if (options?.reuseExisting) usable.push(err.existing);
-          else useToasts.getState().addToast(`${f.name} has already been imported.`, 'warning');
-          continue;
+    const releaseActivity = editorActivity.begin();
+    try {
+      const imported: AssetMeta[] = [];
+      const usable: AssetMeta[] = [];
+      const duplicates: string[] = [];
+      const failed: string[] = [];
+      for (const f of arr) {
+        try {
+          const a = await idbImport(f, projectId);
+          imported.push(a);
+          usable.push(a);
+        } catch (err) {
+          if (err instanceof DuplicateAssetError) {
+            duplicates.push(f.name);
+            if (options?.reuseExisting) usable.push(err.existing);
+            else useToasts.getState().addToast(`${f.name} has already been imported.`, 'warning');
+            continue;
+          }
+          console.error('Failed to import', f.name, err);
+          failed.push(f.name);
         }
-        console.error('Failed to import', f.name, err);
-        failed.push(f.name);
       }
-    }
-    if (get().projectId !== projectId || useEditor.getState().activeProjectId !== projectId) {
-      return options?.reuseExisting ? usable : imported;
-    }
-    if (imported.length > 0) {
-      const next = [...get().assets, ...imported];
-      const parts: string[] = [];
-      parts.push(`Imported ${imported.length} media file${imported.length === 1 ? '' : 's'}.`);
-      if (skipped > 0) parts.push(`Skipped ${skipped} unsupported file${skipped === 1 ? '' : 's'}.`);
-      if (duplicates.length > 0) {
-        parts.push(
-          `${duplicates.length} duplicate file${duplicates.length === 1 ? ' was' : 's were'} already imported.`,
-        );
+      if (get().projectId !== projectId || useEditor.getState().activeProjectId !== projectId) {
+        return options?.reuseExisting ? usable : imported;
       }
-      if (failed.length > 0) {
-        parts.push(
-          failed.length === 1
-            ? `Couldn't decode ${failed[0]}.`
-            : `Couldn't decode ${failed.length} files.`,
-        );
-      }
-      set({ assets: next, importMessage: parts.join(' ') });
+      if (imported.length > 0) {
+        const next = [...get().assets, ...imported];
+        const parts: string[] = [];
+        parts.push(`Imported ${imported.length} media file${imported.length === 1 ? '' : 's'}.`);
+        if (skipped > 0) parts.push(`Skipped ${skipped} unsupported file${skipped === 1 ? '' : 's'}.`);
+        if (duplicates.length > 0) {
+          parts.push(
+            `${duplicates.length} duplicate file${duplicates.length === 1 ? ' was' : 's were'} already imported.`,
+          );
+        }
+        if (failed.length > 0) {
+          parts.push(
+            failed.length === 1
+              ? `Couldn't decode ${failed[0]}.`
+              : `Couldn't decode ${failed.length} files.`,
+          );
+        }
+        set({ assets: next, importMessage: parts.join(' ') });
 
-      for (const a of imported) {
-        await get().ensureThumb(a.id);
+        for (const a of imported) {
+          await get().ensureThumb(a.id);
+        }
+      } else {
+        set({
+          importMessage:
+            duplicates.length > 0 && failed.length === 0
+              ? `${duplicates.length} duplicate file${duplicates.length === 1 ? ' was' : 's were'} already imported.`
+              : failed.length > 0
+              ? `Couldn't decode ${failed.length} file${failed.length === 1 ? '' : 's'}. If these are HEIC photos, they should import now; otherwise they may be unsupported.`
+              : 'No media was imported.',
+        });
       }
-    } else {
-      set({
-        importMessage:
-          duplicates.length > 0 && failed.length === 0
-            ? `${duplicates.length} duplicate file${duplicates.length === 1 ? ' was' : 's were'} already imported.`
-            : failed.length > 0
-            ? `Couldn't decode ${failed.length} file${failed.length === 1 ? '' : 's'}. If these are HEIC photos, they should import now; otherwise they may be unsupported.`
-            : 'No media was imported.',
-      });
+      return options?.reuseExisting ? usable : imported;
+    } finally {
+      releaseActivity();
     }
-    return options?.reuseExisting ? usable : imported;
   },
 
   remove: async (id) => {

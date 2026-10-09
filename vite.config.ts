@@ -5,9 +5,10 @@ import path from 'node:path';
 
 export default defineConfig({
   plugins: [
-    react(),
+    react({ compiler: false }),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
+      injectRegister: null,
       includeAssets: ['favicon.svg'],
       manifest: {
         name: 'Open-SCRL',
@@ -29,7 +30,7 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         runtimeCaching: [
           {
-            urlPattern: /\/(?:assets\/)?(?:heic2any|export\.worker|zip)[^/]*\.js$/,
+            urlPattern: ({ url, sameOrigin }) => sameOrigin && /\/(?:assets\/)?(?:heic2any|export\.worker|zip)[^/]*\.js$/.test(url.pathname),
             handler: 'CacheFirst',
             options: { cacheName: 'optional-editor-tools', expiration: { maxEntries: 8, maxAgeSeconds: 60 * 60 * 24 * 30 } },
           },
@@ -39,7 +40,7 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      '@': path.resolve(import.meta.dirname, './src'),
     },
   },
   server: {
@@ -47,14 +48,17 @@ export default defineConfig({
     host: true,
   },
   worker: { format: 'es' },
-  // This worker-only import is missed by the initial dependency scan. Discovering
-  // it during an import otherwise reloads every open page on a cold dev server.
+  experimental: { bundledDev: false },
+  // Prebundle the optional HEIC adapter before the first import so a cold dev
+  // server does not discover another dependency and reload an open editor.
   optimizeDeps: { include: ['heic2any'] },
   build: {
-    rollupOptions: {
+    // Preserve Vite 6's browser syntax support when changing build tools.
+    target: ['es2020', 'edge88', 'firefox78', 'chrome87', 'safari14'],
+    rolldownOptions: {
       output: {
-        manualChunks(moduleId) {
-          if (moduleId.includes('@zip.js/zip.js')) return 'zip';
+        codeSplitting: {
+          groups: [{ name: 'zip', test: /[\\/]node_modules[\\/]@zip\.js[\\/]zip\.js[\\/]/ }],
         },
       },
     },

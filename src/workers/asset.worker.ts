@@ -8,13 +8,6 @@ async function hash(blob: Blob) {
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-async function normalize(file: File): Promise<Blob> {
-  if (!/heic|heif/i.test(`${file.type} ${file.name}`)) return file;
-  const module = await import('heic2any');
-  const converted = await module.default({ blob: file, toType: 'image/jpeg', quality: 0.92 });
-  return Array.isArray(converted) ? converted[0] : converted;
-}
-
 async function gifDuration(blob: Blob) {
   try {
     const { parseGIF, decompressFrames } = await import('gifuct-js');
@@ -27,7 +20,7 @@ self.onmessage = async (event: MessageEvent<{ id: string; file: File }>) => {
   const { id, file } = event.data;
   let bitmap: ImageBitmap | undefined;
   try {
-    const normalized = await normalize(file);
+    const normalized = file;
     const mime = normalized.type || file.type || 'image/png';
     const mediaKind = mime === 'image/gif' ? 'gif' : 'image';
     bitmap = await createImageBitmap(normalized);

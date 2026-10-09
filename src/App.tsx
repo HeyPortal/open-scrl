@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { AlertTriangle, LayoutGrid, Loader2 } from 'lucide-react';
 import { LandingPage } from './components/LandingPage';
 import { ToastViewport } from './components/ToastViewport';
@@ -6,6 +6,7 @@ import { useEditor } from './store/editor';
 import { useAssets } from './store/assets';
 import { PersistenceController } from './editor/persistenceController';
 import { useEditorSession } from './editor/sessionStore';
+import { PwaUpdatePrompt } from './app/PwaUpdatePrompt';
 
 const EditorShell=lazy(()=>import('./app/EditorShell'));
 
@@ -17,6 +18,7 @@ export default function App(){
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [mediaAttempt, setMediaAttempt] = useState(0);
   const [retryingSave, setRetryingSave] = useState(false);
+  const flushPersistence = useCallback(() => controller.current?.flush() ?? Promise.resolve(), []);
   useEffect(() => {
     let cancelled = false;
     void load().then(() => { if (!cancelled) setLoadError(false); }, () => { if (!cancelled) setLoadError(true); });
@@ -53,5 +55,5 @@ export default function App(){
     {mediaError && mediaError === activeProjectId && <div role="alert" className="fixed bottom-28 left-1/2 z-50 flex max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-3 rounded-lg border border-amber-500/40 bg-[#2a2214] py-1.5 pl-3 pr-1.5 text-xs text-amber-100 shadow-lift">
       <AlertTriangle size={15} className="shrink-0 text-amber-400" aria-hidden /><span>Your media library could not be loaded.</span><button className="btn btn-sm shrink-0 bg-amber-500 text-black hover:bg-amber-400" onClick={() => { setMediaError(null); setMediaAttempt((n) => n + 1); }}>Retry media</button>
     </div>}
-    {activeProjectId?<Suspense fallback={<div className="flex h-full w-full items-center justify-center gap-2 text-sm text-ink-dim"><Loader2 size={16} className="animate-spin" aria-hidden />Opening editor…</div>}><EditorShell/></Suspense>:<LandingPage/>}<ToastViewport/></>;
+    {activeProjectId?<Suspense fallback={<div className="flex h-full w-full items-center justify-center gap-2 text-sm text-ink-dim"><Loader2 size={16} className="animate-spin" aria-hidden />Opening editor…</div>}><EditorShell/></Suspense>:<LandingPage/>}<ToastViewport/><PwaUpdatePrompt flush={flushPersistence}/></>;
 }

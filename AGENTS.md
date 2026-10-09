@@ -6,7 +6,7 @@ Open-SCRL is a local-first photo grid / social carousel maker. The repo holds tw
 
 ## Web app commands
 
-Node 22+. Path alias `@/*` → `src/*`.
+Node 22.12+. Path alias `@/*` → `src/*`.
 
 ```bash
 npm run dev                # Vite dev server on :5173
@@ -15,10 +15,11 @@ npm test                   # vitest run (jsdom; setup in src/test/setup.ts)
 npx vitest run src/core/scene/compileScene.test.ts   # single test file
 npx vitest run -t "name"   # single test by name
 npm run test:e2e           # Playwright (Chromium only); auto-starts or reuses dev server on :5173
+npm run test:pwa           # production Chromium offline/update lifecycle checks
 npx playwright test e2e/smoke.spec.ts
 ```
 
-- `verify` does **not** run the Playwright tests; CI runs `verify` then `test:e2e`. Run `npx playwright install --with-deps chromium` once first.
+- `verify` does **not** run the Playwright tests; CI runs `verify`, `test:e2e`, then `test:pwa`. Run `npx playwright install --with-deps chromium` once first.
 - `bundle:check` fails if the initial entry chunk exceeds 120 KiB gzip, so heavy deps must stay in lazy chunks/workers (see `src/app/` lazy boundaries).
 
 ## Mac app commands
@@ -92,6 +93,7 @@ Rebase on `main` before asking for review if it has moved, and say in the PR wha
 ```bash
 npm run verify
 npm run test:e2e
+npm run test:pwa
 ```
 
 If you touched `macos/`, also build it in Xcode 27 and run the scripts in `macos/Scripts/` that cover your change (`test-gpu-rendering.sh`, `test-canvas-rendering.sh`, `test-seam-blend.sh`, `check-features.sh`; see `docs/mac.md`). If you changed the project schema, update both `src/core/document` (plus a migration) and `ProjectFile.swift` in the same PR.

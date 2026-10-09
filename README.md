@@ -65,7 +65,9 @@ npm run verify     # typecheck, lint, tests, build
 npm run test:e2e   # Playwright (run `npx playwright install chromium` first)
 ```
 
-Requires Node 22+. For the Mac app, open `macos/OpenSCRL.xcodeproj` in Xcode 27 and run it.
+Requires Node 22.12+. For the Mac app, open `macos/OpenSCRL.xcodeproj` in Xcode 27 and run it.
+
+See [web updates and offline tools](docs/web-updates.md) for reload and caching behavior.
 [AGENTS.md](./AGENTS.md) has a tour of the code, and the [changelog](./CHANGELOG.md) lists
 every release.
 

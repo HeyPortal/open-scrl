@@ -5,6 +5,9 @@
   "type": "module",
   "description": "Open-source, feature-rich photo grid + Instagram carousel maker (PWA). MIT licensed alternative to SCRL.",
   "license": "MIT",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -14,6 +17,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "test:pwa": "playwright test --config playwright.pwa.config.ts",
     "bundle:check": "node scripts/check-bundle.mjs",
     "verify": "npm run typecheck && npm run lint && npm run test && npm run build && npm run bundle:check"
   },
@@ -43,7 +47,7 @@
     "@types/node": "^25.6.0",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
-    "@vitejs/plugin-react": "^4.7.0",
+    "@vitejs/plugin-react": "^6.1.2",
     "@vitest/coverage-v8": "^4.1.10",
     "autoprefixer": "^10.4.21",
     "eslint": "^10.3.0",
@@ -55,8 +59,8 @@
     "tailwindcss": "^3.4.17",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.59.1",
-    "vite": "^6.3.5",
-    "vite-plugin-pwa": "^1.0.3",
+    "vite": "^8.3.4",
+    "vite-plugin-pwa": "^2.0.0",
     "vitest": "^4.1.10"
   },
   "overrides": {
