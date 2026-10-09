@@ -203,6 +203,7 @@ export function PhotosPanel() {
         <input
           ref={inputRef}
           type="file"
+          aria-label="Import media files"
           accept="image/*,video/*,.heic,.heif,.avif,.webp,.mp4,.mov,.m4v,.webm"
           multiple
           hidden
@@ -227,7 +228,7 @@ export function PhotosPanel() {
               ? targetSlot.assetId
                 ? <>Click or drag a photo onto <strong>{targetSlot.name}</strong> to replace it, or click its current photo to duplicate it.</>
                 : <>Click a photo to fill <strong>{targetSlot.name}</strong>.</>
-              : 'Click a photo to add it to the slide, or drag it onto a frame or the canvas.'}
+              : 'Click a photo to add it, or drag it onto a frame. Originals are kept for HDR export and project backups.'}
           </p>
         )}
       </div>

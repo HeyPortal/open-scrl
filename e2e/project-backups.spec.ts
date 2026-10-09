@@ -1,0 +1,24 @@
+import { expect, test } from '@playwright/test';
+const image = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
+test('an editable backup restores photos and edits as a new project', async ({ page }) => {
+  await page.goto('/'); await page.getByRole('button', { name: /create.*open editor/i }).click();
+  await page.getByLabel('Import media files').setInputFiles({ name: 'original.png', mimeType: 'image/png', buffer: image });
+  await page.getByAltText('original.png').click();
+  await page.getByLabel('Crop zoom').fill('2');
+  await page.getByRole('banner').getByRole('button', { name: 'Export', exact: true }).click();
+  await page.getByLabel('Image format', { exact: true }).selectOption('png');
+  await expect(page.getByText('Checking HDR export support…', { exact: true })).toHaveCount(0);
+  await page.screenshot({ path: 'docs/images/web-photo-export.png' });
+  const pending = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Backup project', exact: true }).click();
+  const backup = await pending;
+  expect(backup.suggestedFilename()).toMatch(/\.openscrl$/);
+  await page.getByTitle('Projects', { exact: true }).click();
+  await page.getByLabel('Restore project backup').setInputFiles((await backup.path())!);
+  await expect(page.getByText('Backup restored as a new project.', { exact: true })).toBeVisible();
+  const doc = await page.evaluate(async () => { const modulePath = '/src/editor/documentStore.ts'; const { useDocumentStore } = await import(modulePath); return useDocumentStore.getState().doc; });
+  expect(doc.name).toMatch(/\(restored\)$/);
+  expect(Object.values(doc.layers)[0]).toMatchObject({ cropScale: 2 });
+  await page.getByRole('navigation', { name: 'Tools' }).getByRole('button', { name: 'Media', exact: true }).click();
+  await expect(page.getByAltText('original.png')).toBeVisible();
+});

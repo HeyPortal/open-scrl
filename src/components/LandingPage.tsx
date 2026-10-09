@@ -1,5 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { ArrowRight, HardDrive, Images, LayoutGrid, List, Loader2, Search } from 'lucide-react';
+import { ProjectTransfer } from './ProjectTransfer';
 import type { Format } from '@/types';
 import { FORMATS } from '@/lib/format';
 import { useEditor } from '@/store/editor';
@@ -192,7 +193,7 @@ export function LandingPage() {
         </div>
         <span className="inline-flex items-center gap-1.5 text-[11px] text-ink-faint">
           <HardDrive size={12} aria-hidden />
-          Saved on this device — never uploaded
+          Saved in this browser
         </span>
       </nav>
 
@@ -230,6 +231,7 @@ export function LandingPage() {
             </div>
           </form>
 
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-ink-dim">Projects stay in this browser. Keep a backup to move devices or protect your work.</p><ProjectTransfer/></div>
           <section className="mt-8">
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <h2 className="mr-auto flex items-baseline gap-2 text-sm font-semibold">

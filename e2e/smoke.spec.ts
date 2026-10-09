@@ -59,12 +59,14 @@ test('creates a large project while keeping viewport canvases bounded', async ({
   });
 
   await test.step('Export the final slide', async () => {
-    const [download] = await Promise.all([
-      page.waitForEvent('download'),
-      page.getByRole('button', { name: 'Slide PNG' }).click(),
-    ]);
+    await page.getByRole('banner').getByRole('button', { name: 'Export', exact: true }).click();
+    await page.getByLabel('Slides', { exact: true }).selectOption('current');
+    await page.getByLabel('Image format', { exact: true }).selectOption('png');
+    await page.getByRole('button', { name: 'Prepare export', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Download image' })).toBeVisible();
+    const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Download image' }).click()]);
     expect(download.suggestedFilename()).toMatch(/_20\.png$/);
-    await expect(page.getByRole('button', { name: 'Export Carousel' })).toBeVisible();
+    await expect(page.getByRole('banner').getByRole('button', { name: 'Export', exact: true })).toBeVisible();
     expect(errors).toEqual([]);
   });
 });
@@ -72,7 +74,7 @@ test('creates a large project while keeping viewport canvases bounded', async ({
 test('imports, deduplicates, persists, and uses asset metadata',async({page})=>{
   await page.goto('/');await page.getByRole('button',{name:/create|start/i}).first().click();
   const largePngBase64=await page.evaluate(()=>{const canvas=document.createElement('canvas');canvas.width=1200;canvas.height=800;const context=canvas.getContext('2d')!;context.fillStyle='#7c5cff';context.fillRect(0,0,1200,800);return canvas.toDataURL('image/png').split(',')[1];});
-  const largePng=Buffer.from(largePngBase64,'base64');const input=page.locator('input[type=file]');await input.setInputFiles({name:'large.png',mimeType:'image/png',buffer:largePng});await expect(page.getByText('Imported 1 media file.')).toBeVisible();const thumbnail=page.getByAltText('large.png');await expect(thumbnail).toBeVisible();expect(await thumbnail.evaluate((image)=>(image as HTMLImageElement).naturalWidth)).toBeLessThanOrEqual(240);
+  const largePng=Buffer.from(largePngBase64,'base64');const input=page.getByLabel('Import media files');await input.setInputFiles({name:'large.png',mimeType:'image/png',buffer:largePng});await expect(page.getByText('Imported 1 media file.')).toBeVisible();const thumbnail=page.getByAltText('large.png');await expect(thumbnail).toBeVisible();expect(await thumbnail.evaluate((image)=>(image as HTMLImageElement).naturalWidth)).toBeLessThanOrEqual(240);
   await input.setInputFiles({name:'large-copy.png',mimeType:'image/png',buffer:largePng});await expect(page.getByText(/already been imported/).first()).toBeVisible();
   await thumbnail.click();await expect(page.getByText('Photo').last()).toBeVisible();const cropZoom=page.getByLabel('Crop zoom');await expect(cropZoom).toBeVisible();await cropZoom.fill('2');await expect(cropZoom).toHaveValue('2');await page.getByLabel('Horizontal crop position').fill('0.25');await expect(page.getByLabel('Horizontal crop position')).toHaveValue('0.25');await page.locator('input.input').first().fill('First project');await page.getByTitle('Projects').click();await expect(page.getByText('Your projects')).toBeVisible();
   await page.getByLabel('Project name').fill('Second project');await page.getByRole('button',{name:/create|start/i}).first().click();await expect(page.getByText('No media yet.')).toBeVisible();await expect(page.getByAltText('large.png')).toHaveCount(0);
@@ -81,7 +83,7 @@ test('imports, deduplicates, persists, and uses asset metadata',async({page})=>{
 
 test('clicking selected media again duplicates its image layer',async({page})=>{
   await page.goto('/');await page.getByRole('button',{name:/create|start/i}).first().click();
-  const input=page.locator('input[type=file]');await input.setInputFiles({name:'tiny.png',mimeType:'image/png',buffer:tinyPng});const thumbnail=page.getByAltText('tiny.png');await expect(thumbnail).toBeVisible();
+  const input=page.getByLabel('Import media files');await input.setInputFiles({name:'tiny.png',mimeType:'image/png',buffer:tinyPng});const thumbnail=page.getByAltText('tiny.png');await expect(thumbnail).toBeVisible();
   await thumbnail.click();await expect(page.getByText('1 of 1')).toBeVisible();await thumbnail.click();await expect(page.getByText('2 of 2')).toBeVisible();
 });
 
@@ -94,7 +96,7 @@ test('slide navigation does not rescan the complete media catalog',async({page})
     Object.assign(window,{__metadataGetAllCount:0});const original=IDBObjectStore.prototype.getAll;
     IDBObjectStore.prototype.getAll=function(query?:IDBValidKey|IDBKeyRange|null,count?:number){if(this.name==='metadata')(window as unknown as{__metadataGetAllCount:number}).__metadataGetAllCount++;return original.call(this,query,count);};
   });
-  await page.goto('/');await page.getByRole('button',{name:/create|start/i}).first().click();const input=page.locator('input[type=file]');await input.setInputFiles({name:'tiny.png',mimeType:'image/png',buffer:tinyPng});
+  await page.goto('/');await page.getByRole('button',{name:/create|start/i}).first().click();const input=page.getByLabel('Import media files');await input.setInputFiles({name:'tiny.png',mimeType:'image/png',buffer:tinyPng});
   for(let slide=0;slide<6;slide++){await page.getByAltText('tiny.png').click();if(slide<5)await page.getByTitle('Add slide').click();}
   await page.evaluate(()=>(window as unknown as{__metadataGetAllCount:number}).__metadataGetAllCount=0);
   for(const slide of [1,6,2,5,3,4])await page.getByTitle(`Slide ${slide}`).click();
@@ -102,12 +104,12 @@ test('slide navigation does not rescan the complete media catalog',async({page})
 });
 
 test('exports every static carousel slide as a separate PNG',async({page})=>{
-  await page.goto('/');await page.getByRole('button',{name:/create|start/i}).first().click();await page.getByTitle('Add slide').click();const download=page.waitForEvent('download');await page.getByRole('button',{name:'Export Carousel'}).click();const value=await download;expect(value.suggestedFilename()).toMatch(/_instagram\.zip$/);expect(await archiveEntries(value)).toEqual(['01.png','02.png']);
+  await page.goto('/');await page.getByRole('button',{name:/create|start/i}).first().click();await page.getByTitle('Add slide').click();await page.getByRole('banner').getByRole('button',{name:'Export',exact:true}).click();await page.getByLabel('Image format',{exact:true}).selectOption('png');await page.getByRole('button',{name:'Prepare export',exact:true}).click();await expect(page.getByRole('button',{name:'Download ZIP'})).toBeVisible();const download=page.waitForEvent('download');await page.getByRole('button',{name:'Download ZIP'}).click();const value=await download;expect(value.suggestedFilename()).toMatch(/_carousel\.zip$/);expect(await archiveEntries(value)).toEqual(['Untitled_01.png','Untitled_02.png']);
 });
 
 test('exports animated carousel slides as MP4 without combining slides',async({page})=>{
-  await page.goto('/');await page.getByRole('button',{name:/create|start/i}).first().click();const button=page.getByRole('button',{name:'Export Carousel'});await expect(button).toBeEnabled();
-  const input=page.locator('input[type=file]');await input.setInputFiles({name:'tiny.gif',mimeType:'image/gif',buffer:tinyGif});await page.getByAltText('tiny.gif').click();await page.getByTitle('Add slide').click();
+  await page.goto('/');await page.getByRole('button',{name:/create|start/i}).first().click();const button=page.getByRole('button',{name:'Export animated carousel'});
+  const input=page.getByLabel('Import media files');await input.setInputFiles({name:'tiny.gif',mimeType:'image/gif',buffer:tinyGif});await page.getByAltText('tiny.gif').click();await page.getByTitle('Add slide').click();await page.getByRole('banner').getByRole('button',{name:'Export',exact:true}).click();await expect(button).toBeEnabled();
   const download=page.waitForEvent('download',{timeout:30000}).then((value)=>({type:'download' as const,value})).catch(()=>({type:'timeout' as const}));const unsupported=page.getByText(/WebCodecs support|cannot encode an Instagram-compatible/).waitFor({state:'visible',timeout:30000}).then(()=>({type:'unsupported' as const})).catch(()=>({type:'timeout' as const}));await button.click();const outcome=await Promise.race([download,unsupported]);expect(outcome.type).not.toBe('timeout');
   if(outcome.type==='download'){expect(outcome.value.suggestedFilename()).toMatch(/_instagram\.zip$/);expect(await archiveEntries(outcome.value)).toEqual(['01.mp4','02.png']);}
 });

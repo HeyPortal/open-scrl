@@ -162,7 +162,7 @@ export const useAssets = create<AssetsState>((set, get) => ({
           duplicates.length > 0 && failed.length === 0
             ? `${duplicates.length} duplicate file${duplicates.length === 1 ? ' was' : 's were'} already imported.`
             : failed.length > 0
-            ? `Couldn't decode ${failed.length} file${failed.length === 1 ? '' : 's'}. If these are HEIC photos, they should import now; otherwise they may be unsupported.`
+            ? `Couldn't decode ${failed.length} file${failed.length === 1 ? '' : 's'}. For HEIC photos, check that the local Mac image helper is running, or try Safari on a supported device.`
             : 'No media was imported.',
       });
     }

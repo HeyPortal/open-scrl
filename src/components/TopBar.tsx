@@ -10,7 +10,6 @@ import {
   ImagePlus,
   Loader2,
   Minus,
-  Package,
   Plus,
   Redo2,
   Square,
@@ -120,8 +119,7 @@ export function TopBar() {
   const exporting = useExport((s) => s.exporting);
   const setPreviewOpen = useEditorView((s) => s.setPreviewOpen);
   const progress = useExport((s) => s.progress);
-  const exportCurrentSlide = useExport((s) => s.exportCurrentSlide);
-  const exportCarousel = useExport((s) => s.exportCarousel);
+  const setLeftPanel = useEditorSession((s) => s.setLeftPanel);
   const goProjects = () => buildActions().find((a) => a.id === 'go-projects')?.run();
 
   return (
@@ -209,17 +207,7 @@ export function TopBar() {
         <button className="btn btn-secondary" onClick={() => setPreviewOpen(true)} title={hint('Preview on a phone', 'preview')}>
           <Smartphone size={14} aria-hidden /> <span className="hidden xl:inline">Preview</span><span className="sr-only xl:hidden">Preview</span>
         </button>
-        <button className="btn btn-secondary" disabled={exporting} onClick={() => void exportCurrentSlide()} title="Download the selected slide as a PNG">
-          <Download size={14} aria-hidden /> <span className="hidden xl:inline">Slide PNG</span><span className="sr-only xl:hidden">Slide PNG</span>
-        </button>
-        <button
-          className="btn btn-primary"
-          disabled={exporting}
-          onClick={() => void exportCarousel()}
-          title={hint('Export every slide as separate PNG or MP4 files', 'export-carousel')}
-        >
-          <Package size={14} aria-hidden /> Export Carousel
-        </button>
+        <button className="btn btn-primary" disabled={exporting} onClick={() => setLeftPanel('export')} title="Export images, choose HDR, or back up the project"><Download size={14} aria-hidden/> Export</button>
       </div>
     </header>
   );

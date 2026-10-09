@@ -60,7 +60,7 @@ test('two tabs importing the same file keep one original and both project links'
     await tab.getByRole('button', { name: /create|start/i }).first().click();
     await expect(tab.getByTitle('Projects')).toBeVisible();
   }));
-  await Promise.all([page, other].map((tab) => tab.locator('input[type=file]').setInputFiles({ name: 'same.png', mimeType: 'image/png', buffer: tinyPng })));
+  await Promise.all([page, other].map((tab) => tab.getByLabel('Import media files').setInputFiles({ name: 'same.png', mimeType: 'image/png', buffer: tinyPng })));
   for (const tab of [page, other]) await expect(tab.getByText('Imported 1 media file.')).toBeVisible();
   const metadata = await page.evaluate(async () => {
     const path = '/src/assets/indexeddb/IndexedDbAssetRepository.ts';

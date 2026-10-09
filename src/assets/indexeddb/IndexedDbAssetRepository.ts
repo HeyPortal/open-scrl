@@ -172,6 +172,13 @@ export class IndexedDbAssetRepository implements AssetRepository {
     return (await db.get('blobs', meta.blobKey)) ?? await readOpfsBlob(meta.blobKey);
   }
 
+  async readSource(assetId: string): Promise<Blob | undefined> {
+    const meta = await this.readMetadata(assetId);
+    if (!meta?.sourceKey) return this.readOriginal(assetId);
+    const db = await getAssetDatabase();
+    return (await db.get('blobs', meta.sourceKey)) ?? await readOpfsBlob(meta.sourceKey);
+  }
+
   async readThumbnail(assetId: string) {
     await this.indexLegacy(); const db = await getAssetDatabase(); const meta = await this.readMetadata(assetId);
     if (!meta) return undefined;
@@ -223,11 +230,13 @@ export class IndexedDbAssetRepository implements AssetRepository {
     const assetId = id();
     const blobKey = `asset-${assetId}`;
     const thumbnailKey = `thumb-${assetId}`;
+    const sourceKey = prepared.sourceFile ? `source-${assetId}` : undefined;
     let retained = false;
     try {
       const originalInOpfs = await writeOpfsBlob(blobKey, prepared.file);
       const thumbInOpfs = await writeOpfsBlob(thumbnailKey, prepared.thumbnail);
-      const meta: AssetMeta = { id: assetId, blobKey, thumbnailKey, hash: prepared.hash, name: prepared.name, mime: prepared.mime, width: prepared.width, height: prepared.height, size: prepared.file.size, mediaKind: prepared.mediaKind, duration: prepared.duration };
+      const sourceInOpfs = prepared.sourceFile && sourceKey ? await writeOpfsBlob(sourceKey, prepared.sourceFile) : false;
+      const meta: AssetMeta = { id: assetId, blobKey, thumbnailKey, hash: prepared.hash, name: prepared.name, mime: prepared.mime, width: prepared.width, height: prepared.height, size: prepared.file.size, sourceKey, sourceMime: prepared.sourceMime, sourceName: prepared.sourceName, mediaKind: prepared.mediaKind, duration: prepared.duration };
       const tx = db.transaction(['metadata', 'blobs', 'thumbnails', 'projectAssets'], 'readwrite');
       let result = meta;
       await completeTransaction(tx, async () => {
@@ -237,6 +246,7 @@ export class IndexedDbAssetRepository implements AssetRepository {
           await tx.objectStore('metadata').put(meta, assetId);
           if (!originalInOpfs) await tx.objectStore('blobs').put(prepared.file, blobKey);
           if (!thumbInOpfs) await tx.objectStore('thumbnails').put(prepared.thumbnail, thumbnailKey);
+          if (prepared.sourceFile && sourceKey && !sourceInOpfs) await tx.objectStore('blobs').put(prepared.sourceFile, sourceKey);
         }
         const link = { id: linkId(projectId, result.id), projectId, assetId: result.id, addedAt: Date.now() };
         await tx.objectStore('projectAssets').put(link, link.id);
@@ -244,7 +254,7 @@ export class IndexedDbAssetRepository implements AssetRepository {
       retained = result.id === assetId;
       return result;
     } finally {
-      if (!retained) await Promise.all([deleteOpfsBlob(blobKey), deleteOpfsBlob(thumbnailKey)]);
+      if (!retained) await Promise.all([deleteOpfsBlob(blobKey), deleteOpfsBlob(thumbnailKey), ...(sourceKey ? [deleteOpfsBlob(sourceKey)] : [])]);
     }
   }
 
@@ -263,11 +273,12 @@ export class IndexedDbAssetRepository implements AssetRepository {
       if (!removed) return;
       await tx.objectStore('metadata').delete(assetId);
       await tx.objectStore('blobs').delete(removed.blobKey);
+      if (removed.sourceKey) await tx.objectStore('blobs').delete(removed.sourceKey);
       await tx.objectStore('thumbnails').delete(removed.thumbnailKey);
       await tx.objectStore('assets').delete(assetId);
     });
     if (!removed) return false;
-    await Promise.all([deleteOpfsBlob(removed.blobKey), deleteOpfsBlob(removed.thumbnailKey)]);
+    await Promise.all([deleteOpfsBlob(removed.blobKey), deleteOpfsBlob(removed.thumbnailKey), ...(removed.sourceKey ? [deleteOpfsBlob(removed.sourceKey)] : [])]);
     return true;
   }
 
