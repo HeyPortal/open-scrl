@@ -1,0 +1,107 @@
+/* Studio library panels (Grids, Media, Text, Shapes, Background). The same markup renders in the desktop
+   .studio-left-panel and in the phone bottom sheet, so nothing here is scoped to the left panel. */
+
+/* Panel roots are size containers: the desktop card narrows to 220px on small windows. */
+.lib-panel { container: lib / inline-size; }
+
+/* Preset tiles (text styles, shapes): a light press response, dropped under reduced motion below. */
+.lib-tile { transition: background-color 150ms ease, box-shadow 150ms ease, transform 150ms ease; }
+.lib-tile:active { transform: scale(.98); }
+.lib-tile:hover { background: rgb(var(--c-bg-hover)); box-shadow: inset 0 0 0 1px rgb(var(--c-line-strong) / var(--c-line-strong-alpha)); }
+.lib-tile .lib-tile-add { opacity: 0; transform: scale(.8); transition: opacity 150ms ease, transform 150ms ease; }
+.lib-tile:is(:hover, :focus-visible) .lib-tile-add { opacity: 1; transform: none; }
+@media (hover: none) { .lib-tile .lib-tile-add { opacity: .55; transform: none; } }
+
+/* Not `.grid`: landing.css styles `section .grid > button` (the home format picker), which also matches
+   the phone bottom sheet's <section>. Panel grids with direct button children use this class instead. */
+.lib-grid { display: grid; }
+
+/* Grid cards: the thumbnail well is the inset surface, so the card itself stays clear until hovered. */
+.lib-card-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.lib-card {
+  border-radius: 12px; background: transparent;
+  transition: background-color 150ms ease, transform 150ms ease;
+}
+.lib-card:hover { background: rgb(var(--c-bg-hover)); }
+.lib-card:active { transform: scale(.98); }
+.lib-card-well {
+  border-radius: var(--radius-control); background: rgb(var(--c-bg-inset));
+  box-shadow: inset 0 0 0 1px rgb(var(--c-line) / var(--c-line-strong-alpha));
+}
+.lib-card-label { font-size: 11px; font-weight: 500; color: rgb(var(--c-ink-dim)); }
+.lib-card:hover .lib-card-label { color: rgb(var(--c-ink)); }
+.lib-card-sheet .lib-card-label { font-size: 12px; }
+@container lib (max-width: 250px) {
+  .lib-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Shared wording for the hint rows under panel titles. */
+.lib-hint { font-size: 12px; line-height: 1.5; color: rgb(var(--c-ink-dim)); }
+
+/* Photo count beside the Media title. */
+.media-count {
+  display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 999px;
+  background: rgb(var(--c-bg-inset)); color: rgb(var(--c-ink-dim));
+  font-size: 11px; font-weight: 500; font-variant-numeric: tabular-nums;
+}
+
+/* Background type switch: a quiet track with a clearly raised active segment, also at phone touch size. */
+.bg-modes .segmented { padding: 3px; gap: 2px; border-radius: var(--radius-control); background: rgb(var(--c-bg-inset)); box-shadow: inset 0 0 0 1px rgb(var(--c-line) / var(--c-line-alpha)); }
+.bg-modes .segmented-btn { border-radius: 6px; background: transparent; }
+.bg-modes .segmented-btn:hover { background: rgb(var(--c-bg-hover) / .6); }
+.bg-modes .segmented-btn-active, .bg-modes .segmented-btn-active:hover { background: rgb(var(--c-bg-hover)); color: rgb(var(--c-ink)); box-shadow: inset 0 0 0 1px rgb(var(--c-line-strong) / var(--c-line-strong-alpha)), var(--shadow-soft); }
+.bg-modes .segmented-btn[aria-checked='true'] { color: rgb(var(--c-ink)); }
+
+@media (prefers-reduced-motion: reduce) {
+  .lib-tile, .lib-card { transition: background-color 150ms ease, box-shadow 150ms ease; }
+  .lib-tile:active, .lib-card:active { transform: none; }
+  .lib-tile .lib-tile-add { transition: opacity 150ms ease; transform: none; }
+}
+
+/* Import drop zone ------------------------------------------------------------------------------------------
+   Big (empty library): a dark glass well with a coral glow. Compact (library has media): one slim dashed row so
+   the photo grid stays above the fold. Both brighten while files are dragged anywhere over the panel. */
+.media-dropzone button { cursor: pointer; }
+.media-dropzone button:disabled { cursor: progress; opacity: .6; }
+
+.media-dropzone button.media-dropzone-main {
+  gap: 6px; padding: 26px 16px 20px; border: 1.5px dashed rgb(255 255 255 / .16); border-radius: var(--radius-panel);
+  background: radial-gradient(120% 90% at 50% 0%, rgb(var(--c-accent) / .14), transparent 60%), rgb(var(--c-bg-inset) / .6);
+}
+.media-dropzone button.media-dropzone-main:hover:not(:disabled) { border-color: rgb(var(--c-accent) / .7); }
+.media-dropzone[data-dragging] button.media-dropzone-main {
+  border-style: solid; border-color: rgb(var(--c-accent));
+  background: radial-gradient(120% 100% at 50% 0%, rgb(var(--c-accent) / .28), transparent 65%), rgb(var(--c-bg-inset) / .7);
+}
+.media-dropzone span.media-dropzone-icon { width: 48px; height: 48px; margin-bottom: 6px; box-shadow: 0 0 0 6px rgb(var(--c-accent) / .14), 0 10px 30px -8px rgb(var(--c-accent) / .7); }
+.media-dropzone span.media-dropzone-title { font-family: 'Instrument Serif', ui-serif, Georgia, serif; font-size: 22px; font-weight: 400; font-synthesis: none; line-height: 1.1; }
+.media-dropzone span.media-dropzone-hint { font-size: 11.5px; }
+.media-dropzone span.media-dropzone-types { margin-top: 4px; font-size: 10px; letter-spacing: .08em; color: rgb(var(--c-ink-dim)); }
+.media-dropzone span.media-dropzone-private { font-size: 10.5px; color: rgb(var(--c-ink-dim)); }
+.media-dropzone button.media-dropzone-slides {
+  display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; margin-top: 8px; padding: 7px 8px;
+  border-radius: var(--radius-control); box-shadow: inset 0 0 0 1px rgb(255 255 255 / .1);
+  font-size: 11px; font-weight: 500; color: rgb(var(--c-ink-dim)); transition: background-color 150ms ease, color 150ms ease;
+}
+.media-dropzone button.media-dropzone-slides:hover:not(:disabled) { background: rgb(var(--c-bg-hover)); color: rgb(var(--c-ink)); }
+
+/* Compact row: [ ⬆ Import media ............ ] [ ▥ Import as new slides ]; wraps to two rows in a narrow card. */
+.media-dropzone-compact { display: flex; flex-wrap: wrap; gap: 8px; }
+.media-dropzone-compact button.media-dropzone-main {
+  flex: 1 0 auto; display: flex; align-items: center; gap: 6px; min-width: 0; height: 40px; padding: 0 10px 0 6px; text-align: left;
+  border-radius: var(--radius-control);
+  background: rgb(var(--c-bg-inset) / .6);
+}
+.media-dropzone-compact[data-dragging] button.media-dropzone-main { background: rgb(var(--c-accent) / .22); }
+.media-dropzone-compact span.media-dropzone-icon { width: 24px; height: 24px; margin: 0; box-shadow: 0 0 0 3px rgb(var(--c-accent) / .16); }
+.media-dropzone-compact span.media-dropzone-title { font-family: inherit; font-size: 12.5px; font-weight: 600; line-height: 1.2; white-space: nowrap; color: rgb(var(--c-ink)); }
+.media-dropzone-compact button.media-dropzone-slides { flex: 0 1 auto; width: auto; margin: 0; height: 40px; padding: 0 10px; white-space: nowrap; }
+.media-dropzone-compact.media-dropzone-sheet button.media-dropzone-main { height: 48px; padding-left: 10px; }
+.media-dropzone-compact.media-dropzone-sheet span.media-dropzone-icon { width: 28px; height: 28px; }
+.media-dropzone-compact.media-dropzone-sheet span.media-dropzone-title { font-size: 14px; }
+.media-dropzone-compact.media-dropzone-sheet button.media-dropzone-slides { height: 48px; padding: 0 14px; font-size: 13px; }
+.media-dropzone-sheet:not(.media-dropzone-compact) button.media-dropzone-slides { min-height: 44px; font-size: 13px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .media-dropzone button.media-dropzone-main { transition: border-color 160ms ease, background 200ms ease; }
+}

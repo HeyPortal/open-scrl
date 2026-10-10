@@ -153,16 +153,16 @@ export function MobileTextEditor({ layer, stage, offsetX = 0, scale: scaleProp, 
           fontFamily: resolveFontFamily(layer.fontFamily),
           fontWeight: layer.fontWeight,
           fontStyle: layer.italic ? 'italic' : 'normal',
-          color: displaced ? '#ffffff' : layer.fill,
-          caretColor: '#7c5cff',
+          color: displaced ? 'rgb(var(--c-text-edit-ink))' : layer.fill,
+          caretColor: 'rgb(var(--c-accent))',
           textAlign: layer.align,
           lineHeight: layer.lineHeight,
           letterSpacing: layer.letterSpacing * (fontPx / layer.fontSize),
-          background: displaced ? 'rgba(18, 18, 22, 0.94)' : 'transparent',
-          border: displaced ? '1.5px solid #7c5cff' : '1px dashed #7c5cff',
+          background: displaced ? 'rgb(var(--c-text-edit-bg) / 0.94)' : 'transparent',
+          border: displaced ? '1.5px solid rgb(var(--c-accent))' : '1px dashed rgb(var(--c-accent))',
           borderRadius: displaced ? 10 : 0,
           // Replaces the app-wide focus ring, which would draw over the layer's own outline.
-          boxShadow: displaced ? '0 8px 24px rgba(0, 0, 0, 0.45)' : 'none',
+          boxShadow: displaced ? 'var(--shadow-text-edit)' : 'none',
           outline: 'none',
           resize: 'none',
           padding: displaced ? 8 : 0,
@@ -181,7 +181,7 @@ export function MobileTextEditor({ layer, stage, offsetX = 0, scale: scaleProp, 
         // Keep focus in the field until the click, so the keyboard doesn't flicker.
         onPointerDown={(e) => e.preventDefault()}
         onClick={() => ref.current?.blur()}
-        className="flex items-center justify-center rounded-full bg-accent text-[14px] font-semibold text-white shadow-lift active:bg-accent-hover"
+        className="flex items-center justify-center rounded-full bg-accent text-[14px] font-semibold text-accent-ink shadow-lift active:bg-accent-hover"
         style={{ position: 'fixed', left: left + width - DONE_WIDTH, top: top - DONE_HEIGHT - DONE_GAP, width: DONE_WIDTH, height: DONE_HEIGHT, zIndex: 101, touchAction: 'manipulation' }}
       >
         Done

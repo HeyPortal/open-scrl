@@ -27,7 +27,7 @@ import { TextEditor } from './TextEditor';
 import { MobileTextEditor } from './MobileTextEditor';
 import { SlideHeaders } from './SlideHeaders';
 import { SlideBackground } from './SlideBackground';
-import { SELECTION_COLOR } from './SelectionOutline';
+import { canvasTheme } from './canvasTheme';
 import { contentPointAt, scrollForAnchor, slideIndexAtCentre, zoomLimits, type ViewGeometry } from './touchMath';
 import { useTouchGestures, type GestureHost } from './useTouchGestures';
 import { addPhotosAt, describeFill, dragCarriesAsset, dragCarriesFiles, locateDrop, readDroppedAssetId, readDroppedFiles, type DropLocation } from './mediaDrop';
@@ -85,7 +85,7 @@ interface GroupTransform {
   offset: number;
 }
 
-export function Canvas({ width, height, variant = 'desktop' }: { width: number; height: number; /** Touch-first behaviour for the mobile editor. */ variant?: 'desktop' | 'mobile' }) {
+export function Canvas({ width, height, variant = 'desktop' }: { width: number; height: number; /** Touch-first behaviour for the mobile editor. */ variant?: 'desktop' | 'mobile'; }) {
   const mobile = variant === 'mobile';
   const PADDING = mobile ? MOBILE_PADDING : DESKTOP_PADDING;
   const doc = useEditor((s) => s.doc);
@@ -561,7 +561,7 @@ export function Canvas({ width, height, variant = 'desktop' }: { width: number; 
       const additive = isAdditive(e.evt);
       pendingNarrow.current = !additive && 'button' in e.evt && e.evt.button === 0 && clickWouldNarrow(layer.id) ? layer.id : null;
       pickCanvasLayer(layer.id, additive);
-      if (!additive && layer.kind === 'image' && !layer.assetId) setLeftPanel('photos');
+      if (!additive && layer.kind === 'image' && !layer.assetId) { setLeftPanel('photos'); }
     };
     // A click (no drag) on a layer inside a larger selection narrows the selection to it.
     const onClick = () => { if (pendingNarrow.current === layer.id) narrowTo(layer.id); pendingNarrow.current = null; };
@@ -637,29 +637,29 @@ export function Canvas({ width, height, variant = 'desktop' }: { width: number; 
       <Stage ref={stageRef} width={Math.max(1,width)} height={Math.max(1,height)} {...(mobile?{dragDistance:TOUCH_DRAG_DISTANCE}:{})} onWheel={onWheel} onContextMenu={(e)=>{e.evt.preventDefault();openContextMenu(e.evt.clientX,e.evt.clientY,layerMenu(),'Canvas actions');}} onMouseDown={(e)=>{if(e.target!==e.target.getStage()||(mobile&&touchGestures.recentTouch()))return;if(e.evt.button===0)startMarquee(e.evt);else selectPageAtPointer();}} onTouchStart={mobile?undefined:onTouchStart} onTouchMove={mobile?undefined:onTouchMove} onTouchEnd={mobile?undefined:(e)=>{if(touch.current)selectPageAtPointer();touch.current=null;if(!e.evt.touches.length)endActivity('touch');}} onTouchCancel={mobile?undefined:()=>{touch.current=null;endActivity('touch');}}>
         <KLayer listening={false}><Group x={viewportOffset.x} y={viewportOffset.y} scaleX={zoom} scaleY={zoom}>
           {/* One shadow under the whole strip, so neighboring slides don't shade each other at the seams. */}
-          <Rect x={stripStart} width={stripWidth} height={fmt.height} fill="#ffffff" shadowColor="#000000" shadowOpacity={0.55} shadowBlur={32/zoom} shadowOffsetY={8/zoom}/>
-          {visibleSlides.map(({slide,index})=>{const x=index*fmt.width;const bgAsset=slide.background.kind==='image'&&slide.background.assetId?assetsById.get(slide.background.assetId):undefined;const selected=slide.id===selectedSlideId;return <Group key={slide.id} x={x}><SlideBackground background={slide.background} asset={bgAsset} width={fmt.width} height={fmt.height} zoom={zoom}/>{!wideMode&&<Rect width={fmt.width} height={fmt.height} stroke={selected?SELECTION_COLOR:'#2a2a31'} strokeWidth={(selected?3:1)/zoom}/>}</Group>;})}
+          <Rect x={stripStart} width={stripWidth} height={fmt.height} fill="#ffffff" shadowColor={canvasTheme.slideShadow} shadowOpacity={0.55} shadowBlur={32/zoom} shadowOffsetY={8/zoom}/>
+          {visibleSlides.map(({slide,index})=>{const x=index*fmt.width;const bgAsset=slide.background.kind==='image'&&slide.background.assetId?assetsById.get(slide.background.assetId):undefined;const selected=slide.id===selectedSlideId;return <Group key={slide.id} x={x}><SlideBackground background={slide.background} asset={bgAsset} width={fmt.width} height={fmt.height} zoom={zoom}/>{!wideMode&&<Rect width={fmt.width} height={fmt.height} stroke={selected?canvasTheme.selection:canvasTheme.slideOutline} strokeWidth={(selected?3:1)/zoom}/>}</Group>;})}
         </Group></KLayer>
         <KLayer><Group x={viewportOffset.x} y={viewportOffset.y} scaleX={zoom} scaleY={zoom}>
           {visibleItems.map((item)=>renderNode(item.slideId,item.layer))}
           {selectionBox&&<Rect ref={proxyRef} x={pageX(selectionBox.slideId)+selectionBox.bounds.x} y={selectionBox.bounds.y} width={selectionBox.bounds.width} height={selectionBox.bounds.height} listening={false}/>}
-          <Transformer ref={transformerRef} rotateEnabled anchorSize={mobile?18:10} anchorCornerRadius={mobile?9:3} anchorStroke={SELECTION_COLOR} anchorFill="#ffffff" borderStroke={SELECTION_COLOR} borderStrokeWidth={mobile?2.5:1.5} borderDash={multi?[4,3]:undefined} {...(mobile?{visible:!editingTextId,anchorStrokeWidth:2,rotateAnchorOffset:32,anchorStyleFunc:touchAnchor}:{})} keepRatio={multi||active?.kind==='image'} flipEnabled={!multi} ignoreStroke
+          <Transformer ref={transformerRef} rotateEnabled anchorSize={mobile?18:10} anchorCornerRadius={mobile?9:3} anchorStroke={canvasTheme.selection} anchorFill={canvasTheme.transformerAnchorFill} borderStroke={canvasTheme.selection} borderStrokeWidth={mobile?2.5:1.5} borderDash={multi?[4,3]:undefined} {...(mobile?{visible:!editingTextId,anchorStrokeWidth:2,rotateAnchorOffset:32,anchorStyleFunc:touchAnchor}:{})} keepRatio={multi||active?.kind==='image'} flipEnabled={!multi} ignoreStroke
             enabledAnchors={!multi&&active?.kind==='text'&&!active.autoFit?['middle-left','middle-right']:mobile&&!multi&&active?.kind==='image'?MOBILE_ANCHORS:undefined}
             boundBoxFunc={(oldBox,newBox)=>multi&&(Math.abs(newBox.width)<MIN_LAYER_SIZE*zoom||Math.abs(newBox.height)<MIN_LAYER_SIZE*zoom)?oldBox:newBox}
             onTransformStart={()=>{beginActivity('transform');onGroupTransformStart();}} onTransform={()=>applyGroupTransform(false)} onTransformEnd={onGroupTransformEnd}/>
         </Group></KLayer>
         <KLayer listening={false}><Group x={viewportOffset.x} y={viewportOffset.y} scaleX={zoom} scaleY={zoom}>
-          {wideMode&&visibleSlides.slice(1).map(({index})=><Line key={`seam-${index}`} points={[index*fmt.width,0,index*fmt.width,fmt.height]} stroke="#ffffff" opacity={0.45} strokeWidth={1/zoom} dash={[6/zoom,5/zoom]}/>)}
-          {wideMode&&selectedIndex>=visibleRange.start&&selectedIndex<=visibleRange.end&&<Rect x={selectedIndex*fmt.width} y={fmt.height+8/zoom} width={fmt.width} height={3/zoom} cornerRadius={1.5/zoom} fill={SELECTION_COLOR}/>}
-          {resizeSeams.map((seam)=><Group key={`seam-${seam.x}`}><Rect x={seam.x-6/zoom} y={seam.y} width={12/zoom} height={seam.height} fill="#ff3b8a" opacity={0.2}/><Line points={[seam.x,seam.y,seam.x,seam.y+seam.height]} stroke="#ff3b8a" strokeWidth={3/zoom} dash={[10/zoom,6/zoom]}/></Group>)}
+          {wideMode&&visibleSlides.slice(1).map(({index})=><Line key={`seam-${index}`} points={[index*fmt.width,0,index*fmt.width,fmt.height]} stroke={canvasTheme.seam} opacity={0.45} strokeWidth={1/zoom} dash={[6/zoom,5/zoom]}/>)}
+          {wideMode&&selectedIndex>=visibleRange.start&&selectedIndex<=visibleRange.end&&<Rect x={selectedIndex*fmt.width} y={fmt.height+8/zoom} width={fmt.width} height={3/zoom} cornerRadius={1.5/zoom} fill={canvasTheme.selection}/>}
+          {resizeSeams.map((seam)=><Group key={`seam-${seam.x}`}><Rect x={seam.x-6/zoom} y={seam.y} width={12/zoom} height={seam.height} fill={canvasTheme.guide} opacity={0.2}/><Line points={[seam.x,seam.y,seam.x,seam.y+seam.height]} stroke={canvasTheme.guide} strokeWidth={3/zoom} dash={[10/zoom,6/zoom]}/></Group>)}
           {dropHover&&dropIndex>=0&&(dropLayer
-            ?<Rect x={dropIndex*fmt.width+dropLayer.x+dropLayer.width/2} y={dropLayer.y+dropLayer.height/2} offsetX={dropLayer.width/2} offsetY={dropLayer.height/2} width={dropLayer.width} height={dropLayer.height} rotation={dropLayer.rotation} stroke={SELECTION_COLOR} strokeWidth={4/zoom} fill="rgba(124,92,255,0.22)"/>
-            :<Rect x={dropIndex*fmt.width} width={fmt.width} height={fmt.height} stroke={SELECTION_COLOR} strokeWidth={3/zoom} dash={[12/zoom,8/zoom]} fill="rgba(124,92,255,0.06)"/>)}
-          {guides.map((g,i)=>g.orientation==='v'?<Line key={i} points={[guideOffsetX+g.position,g.start,guideOffsetX+g.position,g.end]} stroke="#ff3b8a" strokeWidth={1/zoom}/>:<Line key={i} points={[guideOffsetX+g.start,g.position,guideOffsetX+g.end,g.position]} stroke="#ff3b8a" strokeWidth={1/zoom}/>)}
+            ?<Rect x={dropIndex*fmt.width+dropLayer.x+dropLayer.width/2} y={dropLayer.y+dropLayer.height/2} offsetX={dropLayer.width/2} offsetY={dropLayer.height/2} width={dropLayer.width} height={dropLayer.height} rotation={dropLayer.rotation} stroke={canvasTheme.selection} strokeWidth={4/zoom} fill={canvasTheme.dropFill}/>
+            :<Rect x={dropIndex*fmt.width} width={fmt.width} height={fmt.height} stroke={canvasTheme.selection} strokeWidth={3/zoom} dash={[12/zoom,8/zoom]} fill={canvasTheme.slideDropFill}/>)}
+          {guides.map((g,i)=>g.orientation==='v'?<Line key={i} points={[guideOffsetX+g.position,g.start,guideOffsetX+g.position,g.end]} stroke={canvasTheme.guide} strokeWidth={1/zoom}/>:<Line key={i} points={[guideOffsetX+g.start,g.position,guideOffsetX+g.end,g.position]} stroke={canvasTheme.guide} strokeWidth={1/zoom}/>)}
         </Group></KLayer>
       </Stage>
     </div>
-    {marquee&&<div className="pointer-events-none absolute rounded-[2px] border border-accent" style={{left:marquee.x,top:marquee.y,width:marquee.width,height:marquee.height,background:'rgba(124,92,255,0.12)'}} data-testid="marquee"/>}
+    {marquee&&<div className="pointer-events-none absolute rounded-[2px] border border-accent" style={{left:marquee.x,top:marquee.y,width:marquee.width,height:marquee.height,background:canvasTheme.selectionFill}} data-testid="marquee"/>}
     {!mobile&&<SlideHeaders containerRef={workspaceRef} slides={visibleSlides} count={doc.slideOrder.length} selectedSlideId={selectedSlideId} offset={viewportOffset} slideWidth={fmt.width*zoom} slideHeight={fmt.height*zoom} numbersOnly={wideMode}/>}
     {editingTextId&&active?.kind==='text'&&stageRef.current&&(
       mobile

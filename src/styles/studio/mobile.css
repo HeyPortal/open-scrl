@@ -1,0 +1,91 @@
+/* Islands stay in flow: canvas fit and shared pre-paint sheet measurement remain intact. */
+.studio-mobile-shell .mobile-root {
+  --mobile-topbar-h: calc(54px + env(safe-area-inset-top));
+  --mobile-dock-h: calc(64px + env(safe-area-inset-bottom));
+  --mobile-strip-h: 76px;
+  background-color: rgb(var(--c-canvas-bg));
+  background-image: radial-gradient(rgb(var(--c-canvas-dot) / var(--c-canvas-dot-alpha)) .8px, transparent .8px);
+  background-size: 20px 20px;
+  gap: 8px;
+}
+.studio-mobile-shell :is(.mobile-topbar, .mobile-dock, .mobile-strip, .mobile-sheet, [aria-label='Selection actions']) {
+  margin-left: 8px; margin-right: 8px;
+  background: rgb(var(--c-bg-panel) / var(--c-bg-panel-alpha));
+  border: 1px solid rgb(var(--c-line) / var(--c-line-alpha));
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-panel);
+  backdrop-filter: blur(20px) saturate(140%);
+}
+.studio-mobile-shell .mobile-topbar { margin-top: 8px; padding-right: 4px; }
+.studio-mobile-shell .mobile-dock { margin-bottom: 8px; border-radius: 20px; }
+.studio-mobile-shell .mobile-dock [role='tab'] { min-height: 44px; }
+/* The active tool sits on a soft coral pill behind its icon instead of a bar on the island edge. Icon and label are lifted above the pill. */
+.studio-mobile-shell .mobile-dock [role='tab'] > span[aria-hidden] {
+  top: calc(50% - 24px); left: 50%; width: 56px; height: 32px;
+  border-radius: 999px;
+  background: rgb(var(--c-accent-soft) / var(--c-accent-soft-alpha));
+  transform: translateX(-50%);
+}
+.studio-mobile-shell .mobile-dock [role='tab'] > :is(svg, span:not([aria-hidden])) { position: relative; }
+.studio-mobile-shell :is(button, [role='tab']):focus-visible { outline: 2px solid rgb(var(--c-accent)); outline-offset: 2px; }
+.studio-mobile-shell .mobile-dock [role='tab']:not([aria-selected='true']):active > span[aria-hidden] { opacity: 1; background: rgb(var(--c-bg-hover) / .7); }
+.studio-mobile-shell .mobile-strip { margin-top: 8px; }
+/* Thumbnails fade out under the island edges when the strip scrolls. */
+.studio-mobile-shell .mobile-strip > .no-scrollbar {
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 10px, #000 calc(100% - 10px), transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 10px, #000 calc(100% - 10px), transparent);
+}
+.studio-mobile-shell .mobile-strip-menu { border-radius: var(--radius-panel); box-shadow: var(--shadow-lift); }
+.studio-mobile-shell [aria-label='Selection actions'] { margin-bottom: 8px; }
+.studio-mobile-shell [aria-label='Selection actions'] button { min-height: 44px; }
+.studio-mobile-shell .mobile-sheet { margin-top: 8px; }
+/* The 36px chip keeps its weight against the title; its tap area still reaches 44px. */
+.studio-mobile-shell .mobile-sheet :is(button[aria-label^='Close'], .sheet-action) { position: relative; }
+.studio-mobile-shell .mobile-sheet :is(button[aria-label^='Close'], .sheet-action)::after { content: ''; position: absolute; inset: -4px; }
+.studio-mobile-shell .mobile-sheet-handle { transition: background-color 150ms; }
+/* Scrolled content dissolves into the island's bottom edge instead of being cut. */
+.studio-mobile-shell .mobile-sheet::after {
+  content: ''; position: absolute; inset: auto 0 0; height: 16px; pointer-events: none;
+  background: linear-gradient(180deg, transparent, rgb(var(--c-bg-panel) / .92));
+}
+.studio-mobile-shell .mobile-sheet button[aria-label^='Expand'],
+.studio-mobile-shell .mobile-sheet button[aria-label^='Collapse'] { position: relative; }
+.studio-mobile-shell .mobile-sheet button[aria-label^='Expand']::after,
+.studio-mobile-shell .mobile-sheet button[aria-label^='Collapse']::after { content: ''; position: absolute; inset: -12px -4px; min-height: 44px; }
+.studio-mobile-shell .mobile-sheet :is(.input:not(textarea), .segmented-btn, .btn-sm) { min-height: 44px; }
+/* A phone on its side: tools or selection actions become a left rail, so the canvas keeps the full height under the top bar. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .studio-mobile-shell .mobile-root {
+    --mobile-topbar-h: calc(44px + env(safe-area-inset-top));
+    --mobile-dock-h: calc(52px + env(safe-area-inset-bottom));
+    --mobile-strip-h: 56px;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 4px;
+    padding-bottom: 4px;
+  }
+  .studio-mobile-shell .mobile-topbar { grid-column: 1 / -1; margin-top: 4px; }
+  .studio-mobile-shell .mobile-main { grid-column: 2; grid-row: 2; }
+  .studio-mobile-shell :is(.mobile-dock, .mobile-selbar) {
+    grid-column: 1; grid-row: 2;
+    width: 68px; height: auto;
+    margin: 0 0 0 8px;
+    border-radius: var(--radius-panel);
+  }
+  .studio-mobile-shell .mobile-dock { flex-direction: column; padding-top: 4px; padding-bottom: calc(4px + env(safe-area-inset-bottom)); }
+  .studio-mobile-shell .mobile-dock [role='tab'] { flex: 1 1 0; }
+  .studio-mobile-shell .mobile-dock [role='tab'] > span[aria-hidden] { width: 48px; }
+  .studio-mobile-shell .mobile-selbar-row { flex-direction: column; height: 100%; }
+  .studio-mobile-shell .mobile-selbar-chip { width: auto; flex: 0 0 auto; padding: 8px 0 6px; border-right: 0; border-bottom: 1px solid rgb(var(--c-line) / var(--c-line-alpha)); }
+  .studio-mobile-shell .mobile-selbar-actions { flex-direction: column; flex: 1 1 0; gap: 2px; padding: 4px; }
+  .studio-mobile-shell .mobile-selbar-btn { height: auto; width: 100%; flex: 1 1 0; }
+  .studio-mobile-shell .mobile-selbar-done { border-left: 0; border-top: 1px solid rgb(var(--c-line) / var(--c-line-alpha)); padding: 6px; }
+  .studio-mobile-shell .mobile-selbar-done button { width: 100%; padding-left: 0; padding-right: 0; }
+  .studio-mobile-shell .mobile-strip { margin-top: 4px; }
+  .studio-mobile-shell .mobile-sheet { margin-top: 0; margin-left: 4px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .studio-mobile-shell :is(.mobile-dock [role='tab'], .mobile-dock [role='tab'] > span[aria-hidden], [aria-label='Selection actions'] button, .mobile-sheet-handle) { transition-duration: 0ms; }
+  .studio-mobile-shell .mobile-sheet-slot > .mobile-sheet { animation: none; }
+}
