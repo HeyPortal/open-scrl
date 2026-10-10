@@ -29,7 +29,7 @@ export function MobileTopBar({ onOpenProject, onOpenExport }: { onOpenProject: (
   const exporting = useExport((s) => s.exporting);
 
   return (
-    <header className="mobile-topbar relative z-20 flex shrink-0 items-center border-b border-line bg-bg/85 px-0.5 backdrop-blur">
+    <header className="mobile-topbar relative z-20 flex shrink-0 items-center px-0.5">
       <button type="button" className={barButton} aria-label="Projects" onClick={goToProjects}>
         <ChevronLeft size={24} aria-hidden />
       </button>
@@ -42,8 +42,8 @@ export function MobileTopBar({ onOpenProject, onOpenExport }: { onOpenProject: (
         {/* Narrower than 380 px (e.g. 360) the serif name drops to 20 px and the chevron hides, so a
             name like "Florida, mostly" still fits beside undo, redo and Export. */}
         <span className="heading-md min-w-0 truncate text-ink max-[379px]:text-[20px]">{docName || 'Untitled'}</span>
-        <SaveDot />
         <ChevronDown size={15} className="shrink-0 text-ink-faint max-[379px]:hidden" aria-hidden />
+        <SaveDot />
       </button>
       <button type="button" className={barButton} aria-label="Undo" disabled={past === 0} onClick={undo}>
         <Undo2 size={20} aria-hidden />
@@ -53,7 +53,7 @@ export function MobileTopBar({ onOpenProject, onOpenExport }: { onOpenProject: (
         <Redo2 size={20} aria-hidden />
       </button>
       <button type="button" className="flex h-11 shrink-0 items-center px-0.5" aria-label={exporting ? 'Exporting' : 'Export'} onClick={onOpenExport}>
-        <span className="flex h-9 items-center gap-1 rounded-full bg-accent pl-2.5 pr-3 text-[15px] font-semibold text-white transition-colors active:bg-accent-hover">
+        <span className="flex h-9 items-center gap-1.5 rounded-full bg-accent pl-3 pr-3.5 text-[15px] font-semibold text-accent-ink transition-colors active:bg-accent-hover">
           {exporting ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <Share size={16} aria-hidden />}
           Export
         </span>

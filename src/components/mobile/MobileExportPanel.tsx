@@ -59,8 +59,8 @@ function ActionCard({
   primary?: boolean;
   children?: ReactNode;
 }) {
-  const surface = primary ? 'bg-accent text-white active:bg-accent-hover' : 'bg-bg-inset text-ink ring-1 ring-inset ring-line-strong active:bg-bg-hover';
-  const tile = primary ? 'bg-white/20 text-white' : 'bg-accent-soft text-accent';
+  const surface = primary ? 'bg-accent text-accent-ink active:bg-accent-hover' : 'bg-bg-inset text-ink ring-1 ring-inset ring-line-strong active:bg-bg-hover';
+  const tile = primary ? 'bg-white/20 text-accent-ink' : 'bg-accent-soft text-accent';
   return (
     <button
       type="button"
@@ -78,7 +78,7 @@ function ActionCard({
         </span>
         <span className="min-w-0 flex-1">
           <span className="heading-md block">{title}</span>
-          <span className={`mt-1 block text-[13px] leading-snug ${primary ? 'text-white/80' : 'text-ink-dim'}`}>{description}</span>
+          <span className={`mt-1 block text-[13px] leading-snug ${primary ? 'text-accent-ink/80' : 'text-ink-dim'}`}>{description}</span>
         </span>
       </span>
       {children}
@@ -112,7 +112,7 @@ export function MobileExportPanel({ onDone }: { onDone: () => void }) {
   };
 
   return (
-    <div className="space-y-3 px-4 pb-4 pt-1">
+    <div className="space-y-3 px-4 pb-4 pt-2">
       <p className="text-[13px] tabular-nums text-ink-dim">
         {slideCount} {slideCount === 1 ? 'slide' : 'slides'} · {format.name} · {format.width}×{format.height}
       </p>

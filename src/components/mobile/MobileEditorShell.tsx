@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { EditorShellServices } from '@/app/shells/shared/EditorShellServices';
+import { useEditorShellEvents, useStageMeasurement } from '@/app/shells/shared/useEditorShell';
+import { useEffect, useLayoutEffect, useState, type ReactNode } from 'react';
 import { ListChecks } from 'lucide-react';
 import { Canvas } from '@/components/canvas/Canvas';
 import { TemplatesPanel } from '@/components/panels/TemplatesPanel';
@@ -7,15 +9,8 @@ import { TextPanel } from '@/components/panels/TextPanel';
 import { ShapesPanel } from '@/components/panels/ShapesPanel';
 import { BackgroundPanel } from '@/components/panels/BackgroundPanel';
 import { LayersPanel } from '@/components/LayersPanel';
-import { ContextMenuHost, useContextMenu } from '@/components/Menu';
-import { EditorOverlays } from '@/components/Overlays';
-import { PhonePreview } from '@/components/preview/PhonePreview';
-import { handleEditorKey } from '@/app/actions';
-import { isLikelyMediaFile } from '@/lib/assets';
-import { useAssets } from '@/store/assets';
 import { useEditor } from '@/store/editor';
 import { useEditorSession } from '@/editor/sessionStore';
-import { useEditorView } from '@/editor/viewStore';
 import { BottomSheet, type SheetDetent } from './BottomSheet';
 import { MobileDock, isDockTab } from './MobileDock';
 import { MobileExportPanel } from './MobileExportPanel';
@@ -58,7 +53,7 @@ function SlideCounter() {
       aria-label={`Slide ${position + 1} of ${count}`}
       className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center"
     >
-      <span className="rounded-full bg-black/55 px-3 py-1 text-[12px] font-semibold tabular-nums text-white backdrop-blur">
+      <span className="rounded-full bg-black/60 px-3 py-1 text-[12px] font-semibold tabular-nums text-white ring-1 ring-inset ring-white/10">
         {position + 1} / {count}
       </span>
     </div>
@@ -67,8 +62,7 @@ function SlideCounter() {
 
 /** Mobile editor: top bar, canvas, slide strip, tool dock and bottom sheets. */
 export default function MobileEditorShell() {
-  const importFiles = useAssets((s) => s.importFiles);
-  const previewOpen = useEditorView((s) => s.previewOpen);
+  const dragHandlers = useEditorShellEvents();
   const selectedIds = useEditorSession((s) => s.selectedLayerIds);
   const hasSelection = selectedIds.length > 0;
   const inspectTitle = useInspectTitle(selectedIds);
@@ -93,44 +87,10 @@ export default function MobileEditorShell() {
     setOpenSheet(null);
   };
 
-  // Stage measurement, as in the desktop shell.
-  const stageRef = useRef<HTMLDivElement>(null);
-  const frame = useRef<number | null>(null);
-  const [size, setSize] = useState({ width: 1, height: 1 });
-  const measure = useCallback(() => {
-    const rect = stageRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const next = { width: Math.max(1, Math.round(rect.width)), height: Math.max(1, Math.round(rect.height)) };
-    setSize((old) => (old.width === next.width && old.height === next.height ? old : next));
-  }, []);
-  useLayoutEffect(() => {
-    const element = stageRef.current;
-    if (!element) return;
-    const schedule = () => {
-      if (frame.current !== null) cancelAnimationFrame(frame.current);
-      frame.current = requestAnimationFrame(measure);
-    };
-    measure();
-    const observer = new ResizeObserver(schedule);
-    observer.observe(element);
-    return () => {
-      if (frame.current !== null) cancelAnimationFrame(frame.current);
-      observer.disconnect();
-    };
-  }, [measure]);
+  const { stageRef, size, measure } = useStageMeasurement();
   // Sheets and the selection bar change the canvas height. Measure before paint
   // so the first tap after closing a sheet uses the visible layer positions.
   useLayoutEffect(measure, [measure, sheet, hasSelection]);
-
-  // Hardware keyboards (iPad, Bluetooth) get the same shortcuts as desktop.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.defaultPrevented || useEditorSession.getState().overlay || useEditorView.getState().previewOpen || useContextMenu.getState().menu) return;
-      handleEditorKey(e);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
 
   const toolSheet = isDockTab(sheet);
   const title = sheet === 'inspect' ? inspectTitle : sheet ? SHEET_TITLES[sheet] : '';
@@ -152,8 +112,8 @@ export default function MobileEditorShell() {
       aria-pressed={multiSelect}
       onPointerDown={(e) => e.stopPropagation()}
       onClick={() => setMultiSelect((on) => !on)}
-      className={`flex h-9 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium transition-colors ${
-        multiSelect ? 'bg-accent text-white' : 'bg-bg-inset text-ink-dim active:bg-bg-hover'
+      className={`sheet-action relative flex h-9 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium transition-colors ${
+        multiSelect ? 'bg-accent text-accent-ink' : 'bg-bg-inset text-ink-dim active:bg-bg-hover'
       }`}
     >
       <ListChecks size={16} aria-hidden /> Select
@@ -163,14 +123,7 @@ export default function MobileEditorShell() {
   return (
     <div
       className="mobile-root"
-      onDragOver={(e) => { if (e.dataTransfer.types.includes('Files')) e.preventDefault(); }}
-      onDrop={async (e) => {
-        if (e.defaultPrevented) return;
-        const files = Array.from(e.dataTransfer.files).filter(isLikelyMediaFile);
-        if (!files.length) return;
-        e.preventDefault();
-        await importFiles(files);
-      }}
+      {...dragHandlers}
     >
       <MobileTopBar onOpenProject={() => open('project')} onOpenExport={() => open('export')} />
 
@@ -199,9 +152,7 @@ export default function MobileEditorShell() {
         <MobileDock active={toolSheet ? sheet : null} onSelect={(tab) => (tab === sheet ? close() : open(tab))} />
       )}
 
-      <ContextMenuHost />
-      <EditorOverlays />
-      {previewOpen && <PhonePreview />}
+      <EditorShellServices />
     </div>
   );
 }

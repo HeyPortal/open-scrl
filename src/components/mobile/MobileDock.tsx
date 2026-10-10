@@ -19,7 +19,7 @@ export function MobileDock({ active, onSelect }: { active: DockTab | null; onSel
     <nav
       role="tablist"
       aria-label="Editor tools"
-      className="mobile-dock flex shrink-0 items-stretch border-t border-line bg-bg-rail/90 backdrop-blur"
+      className="mobile-dock flex shrink-0 items-stretch"
     >
       {TABS.map(({ id, label, Icon }) => {
         const selected = active === id;
@@ -41,7 +41,7 @@ export function MobileDock({ active, onSelect }: { active: DockTab | null; onSel
               }`}
             />
             <Icon size={22} strokeWidth={selected ? 2.25 : 1.85} aria-hidden className={selected ? 'text-accent' : undefined} />
-            <span className="text-[11px] font-medium leading-none">{label}</span>
+            <span className="text-[11px] font-medium leading-none tracking-[0.01em]">{label}</span>
           </button>
         );
       })}

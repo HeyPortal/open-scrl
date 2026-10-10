@@ -8,6 +8,21 @@ import type { Slide } from '@/types';
 import { SlidePreviewImage } from '../SlidePreviewCanvas';
 
 const MIN_TILE_W = 44;
+const LANDSCAPE_PHONE = '(orientation: landscape) and (max-height: 500px)';
+
+/** True on a phone held on its side, where the strip shrinks to leave the canvas room. */
+function useLandscapePhone() {
+  const [match, setMatch] = useState(() => !!window.matchMedia?.(LANDSCAPE_PHONE).matches);
+  useEffect(() => {
+    const query = window.matchMedia?.(LANDSCAPE_PHONE);
+    if (!query) return;
+    const update = () => setMatch(query.matches);
+    update();
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
+  return match;
+}
 
 interface SlideTileProps {
   slide: Slide;
@@ -29,13 +44,13 @@ const SlideTile = memo(function SlideTile({ slide, scene, index, active, thumbW,
       aria-label={`Slide ${index + 1}${active ? ', selected. Tap for slide actions' : ''}`}
       aria-current={active ? 'true' : undefined}
       className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-lg transition-shadow duration-150 ${
-        active ? 'shadow-[0_0_0_2px_#7c5cff]' : 'shadow-[0_0_0_1px_#34343c]'
+        active ? 'shadow-[0_0_0_2px_rgb(var(--c-accent))]' : 'shadow-[0_0_0_1px_rgb(var(--c-line-strong)/var(--c-line-strong-alpha))]'
       }`}
       style={{ width: Math.max(thumbW, MIN_TILE_W), height: thumbH }}
     >
       <SlidePreviewImage scene={scene} format={format} width={thumbW} height={thumbH} delay={150} />
       {active && (
-        <span className="absolute bottom-1 left-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-bold tabular-nums leading-none text-white shadow">
+        <span className="absolute bottom-1 left-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-bold tabular-nums leading-none text-accent-ink shadow">
           {index + 1}
         </span>
       )}
@@ -50,8 +65,8 @@ function ActionButton({ label, Icon, onClick, disabled, danger }: { label: strin
       role="menuitem"
       disabled={disabled}
       onClick={onClick}
-      className={`flex h-14 w-[68px] flex-col items-center justify-center gap-1 rounded-xl text-[11px] font-medium transition-colors active:bg-bg-hover disabled:pointer-events-none disabled:opacity-35 ${
-        danger ? 'text-red-300' : 'text-ink'
+      className={`flex h-14 w-[68px] flex-col items-center justify-center gap-1 rounded-control text-[11px] font-medium transition-colors active:bg-bg-hover disabled:pointer-events-none disabled:opacity-35 ${
+        danger ? 'text-danger' : 'text-ink'
       }`}
     >
       <Icon size={19} aria-hidden />
@@ -89,7 +104,7 @@ export function MobileSlideStrip({ visible = true }: { visible?: boolean }) {
   const [menuLeft, setMenuLeft] = useState(0);
   const [caretLeft, setCaretLeft] = useState(0);
 
-  const thumbH = 56;
+  const thumbH = useLandscapePhone() ? 44 : 56;
   const thumbW = Math.round(thumbH * (format.width / format.height));
 
   const activeTile = () => scrollerRef.current?.querySelector<HTMLElement>(`[data-slide-id="${selectedId}"]`) ?? null;
@@ -158,13 +173,13 @@ export function MobileSlideStrip({ visible = true }: { visible?: boolean }) {
   };
 
   return (
-    <div ref={wrapRef} className="mobile-strip relative shrink-0 border-t border-line bg-bg-rail/90 backdrop-blur" hidden={!visible}>
+    <div ref={wrapRef} className="mobile-strip relative shrink-0" hidden={!visible}>
       {menuOpen && (
         <div
           ref={popoverRef}
           role="menu"
           aria-label="Slide actions"
-          className="absolute bottom-[calc(100%+10px)] z-30 flex rounded-2xl border border-line-strong bg-bg-overlay p-1 shadow-[0_-6px_24px_-8px_rgba(0,0,0,0.7)]"
+          className="mobile-strip-menu absolute bottom-[calc(100%+10px)] z-30 flex rounded-panel border border-line-strong bg-bg-overlay p-1 shadow-mobile-menu"
           style={{ left: menuLeft }}
         >
           <ActionButton label="Duplicate" Icon={Copy} onClick={() => { setMenuOpen(false); duplicateSlide(selectedId); }} />
@@ -178,7 +193,7 @@ export function MobileSlideStrip({ visible = true }: { visible?: boolean }) {
           />
         </div>
       )}
-      <div ref={scrollerRef} className="no-scrollbar relative flex items-center gap-2.5 overflow-x-auto px-4" style={{ height: 'var(--mobile-strip-h)' }}>
+      <div ref={scrollerRef} className="no-scrollbar relative flex items-center gap-2.5 overflow-x-auto px-3" style={{ height: 'var(--mobile-strip-h)' }}>
         {slides.map((slide, i) => (
           <SlideTile
             key={slide.id}

@@ -58,7 +58,7 @@ export function BottomSheet({ title, detent, onDetentChange, onClose, headerActi
       ref={sheetRef}
       aria-label={title}
       data-detent={detent}
-      className={`mobile-sheet relative flex shrink-0 flex-col overflow-hidden rounded-t-[22px] border-t border-line-strong bg-bg-panel shadow-[0_-12px_32px_-12px_rgba(0,0,0,0.7)] ${
+      className={`mobile-sheet relative flex shrink-0 flex-col overflow-hidden ${
         dragHeight === null ? 'transition-[height] duration-200 ease-out' : ''
       }`}
       style={{ height: dragHeight ?? (detent === 'full' ? 'var(--sheet-full)' : 'var(--sheet-half)') }}
@@ -72,7 +72,7 @@ export function BottomSheet({ title, detent, onDetentChange, onClose, headerActi
       >
         <button
           type="button"
-          className="h-1.5 w-10 rounded-full bg-line-strong"
+          className="mobile-sheet-handle h-1.5 w-10 rounded-full bg-ink-faint/50"
           aria-label={detent === 'half' ? `Expand ${title}` : `Collapse ${title}`}
           onClick={(event) => {
             // Pointer handlers already toggle on tap; keep keyboard activation working.
@@ -84,7 +84,7 @@ export function BottomSheet({ title, detent, onDetentChange, onClose, headerActi
           {headerAction && <div className="flex items-center gap-2" onPointerDown={(event) => event.stopPropagation()}>{headerAction}</div>}
           <button
             type="button"
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-bg-inset text-ink-dim active:bg-bg-hover"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-bg-inset text-ink-dim transition-colors active:bg-bg-hover active:text-ink"
             aria-label={`Close ${title}`}
             onPointerDown={(event) => event.stopPropagation()}
             onClick={onClose}
@@ -93,7 +93,7 @@ export function BottomSheet({ title, detent, onDetentChange, onClose, headerActi
           </button>
         </div>
       </div>
-      <div className="mobile-sheet-body min-h-0 flex-1 overflow-y-auto overscroll-contain pb-3">{children}</div>
+      <div className="mobile-sheet-body min-h-0 flex-1 overflow-y-auto overscroll-contain pb-4">{children}</div>
     </section>
   );
 }
