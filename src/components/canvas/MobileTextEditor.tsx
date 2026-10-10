@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import type Konva from 'konva';
 import type { TextLayer } from '@/types';
 import { useEditor } from '@/store/editor';
+import { editorActivity } from '@/editor/activity';
 import { resolveFontFamily } from '@/render/fonts/families';
 
 /** iOS Safari zooms the whole page when a field with a smaller font gets focus. */
@@ -57,6 +58,12 @@ const clamp = (value: number, min: number, max: number) => Math.max(min, Math.mi
 export function MobileTextEditor({ layer, stage, offsetX = 0, scale: scaleProp, viewportOffset, onClose }: Props) {
   const updateLayer = useEditor((s) => s.updateLayer);
   const ref = useRef<HTMLTextAreaElement | null>(null);
+  const releaseActivity = useRef<(() => void) | null>(null);
+  const closed = useRef(false);
+  /** What the field holds once it has been typed in; null while it is untouched. */
+  const draft = useRef<string | null>(null);
+  const projectId = useEditor((s) => s.activeProjectId);
+  const closeActivity = () => { closed.current = true; releaseActivity.current?.(); releaseActivity.current = null; };
   const viewport = useVisibleViewport();
   const [contentHeight, setContentHeight] = useState(0);
 
@@ -84,6 +91,21 @@ export function MobileTextEditor({ layer, stage, offsetX = 0, scale: scaleProp, 
     setContentHeight(next);
   }, []);
 
+  // An open draft is unfinished work: it holds back a waiting app update until it is committed or discarded.
+  // Blur and Done commit it, Escape discards it, and so does leaving for another project. A field that
+  // goes away on its own within the project (iOS keeps focus when a non-field is tapped) keeps the text.
+  useLayoutEffect(() => {
+    closed.current = false;
+    draft.current = null;
+    releaseActivity.current = editorActivity.begin();
+    return () => {
+      const text = draft.current;
+      const store = useEditor.getState();
+      const current = store.doc.layers[layer.id];
+      if (!closed.current && text !== null && store.activeProjectId === projectId && current?.kind === 'text' && current.text !== text) store.updateLayer(layer.id, { text });
+      closed.current = true; releaseActivity.current?.(); releaseActivity.current = null;
+    };
+  }, [projectId, layer.id]);
   // Focus synchronously: iOS only opens the keyboard from inside the tap that asked for it.
   useLayoutEffect(() => {
     const el = ref.current;
@@ -107,13 +129,20 @@ export function MobileTextEditor({ layer, stage, offsetX = 0, scale: scaleProp, 
         aria-label="Edit text"
         defaultValue={layer.text}
         autoCapitalize="sentences"
-        onInput={fit}
+        onInput={(e) => { draft.current = e.currentTarget.value; fit(); }}
+        // Blur (and Done, which blurs) commits the draft; Escape discards it.
         onBlur={(e) => {
-          updateLayer(layer.id, { text: e.target.value });
-          onClose();
+          if (closed.current) return;
+          try {
+            if (useEditor.getState().activeProjectId === projectId) updateLayer(layer.id, { text: e.target.value });
+            onClose();
+          } finally { closeActivity(); }
         }}
         onKeyDown={(e) => {
-          if (e.key === 'Escape') onClose();
+          if (e.key === 'Escape') {
+            closeActivity();
+            onClose();
+          }
         }}
         style={{
           position: 'fixed',

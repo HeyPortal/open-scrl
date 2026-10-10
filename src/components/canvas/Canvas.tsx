@@ -132,6 +132,8 @@ export function Canvas({ width, height, variant = 'desktop' }: { width: number; 
   const activity = useRef(new Map<CanvasActivity, () => void>());
   const cancelling = useRef(false);
   const cancelGestures = useRef<(() => void) | null>(null);
+  /** Aborts the mobile pinch / pan / two-finger layer transform in flight. */
+  const abortTouchGestures = useRef<(() => void) | null>(null);
   const marqueeCleanup = useRef<(() => void) | null>(null);
   const beginActivity = useCallback((kind: CanvasActivity) => {
     if (!activity.current.has(kind)) activity.current.set(kind, editorActivity.begin());
@@ -162,6 +164,7 @@ export function Canvas({ width, height, variant = 'desktop' }: { width: number; 
       cancelling.current = true;
       drag.current = null; groupTransform.current = null; touch.current = null;
       marqueeCleanup.current?.(); marqueeCleanup.current = null;
+      abortTouchGestures.current?.();
       // Stopping Konva emits end events; cancelled sessions must not commit.
       transformerRef.current?.stopTransform();
       const current = useEditor.getState().doc;
@@ -313,6 +316,7 @@ export function Canvas({ width, height, variant = 'desktop' }: { width: number; 
     };
   });
   const touchGestures = useTouchGestures(mobile, stageRef, scrollRef, gestureHost);
+  abortTouchGestures.current = touchGestures.abort;
 
   /** A selection of more than one layer (several layers, or a group) is handled as one box. */
   const selectionBox = useMemo(() => {

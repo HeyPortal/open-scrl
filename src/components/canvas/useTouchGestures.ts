@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, type MutableRefObject, type RefObject } from '
 import Konva from 'konva';
 import { useEditor } from '@/store/editor';
 import { useEditorSession } from '@/editor/sessionStore';
+import { editorActivity } from '@/editor/activity';
 import { findLayerSlideId } from '@/core/document/selectors';
 import { createMobileHitTest } from './mobileHitTest';
 import {
@@ -97,6 +98,7 @@ export function useTouchGestures(
   hostRef: MutableRefObject<GestureHost | null>,
 ) {
   const lastTouch = useRef(0);
+  const abortGestures = useRef<() => void>(() => undefined);
 
   useLayoutEffect(() => {
     const stage = stageRef.current;
@@ -119,6 +121,13 @@ export function useTouchGestures(
     let transform: TransformSession | null = null;
     let lastTap: { t: number; x: number; y: number } | null = null;
     let tween = 0;
+    // Unfinished canvas work holds back a waiting app update, like the desktop gestures do. It is
+    // taken once a touch the canvas itself handles begins and released when every finger is up,
+    // the touch is cancelled, or the gestures are torn down. A layer drag or handle resize that
+    // Konva runs is tracked by the canvas.
+    let releaseActivity: (() => void) | null = null;
+    const hold = () => { releaseActivity ??= editorActivity.begin(); };
+    const release = () => { const done = releaseActivity; releaseActivity = null; done?.(); };
 
     const host = () => hostRef.current!;
     const local = (t: Touch): Point => {
@@ -315,6 +324,15 @@ export function useTouchGestures(
       if (transform) finishTransform(false);
       pinch = null;
       mode = 'idle';
+      release();
+    };
+
+    // The canvas aborts everything in flight when the window loses focus or the project changes
+    // (it stops Konva's own drag and resize itself). Fingers that are still down are ignored
+    // until the next touch starts.
+    abortGestures.current = () => {
+      stopTween();
+      reset();
     };
 
     // Konva's Transformer only listens for touchend, and its drag cleanup
@@ -352,6 +370,7 @@ export function useTouchGestures(
         if (hit && !layer?.locked) { mode = 'konva'; return; }
         // Empty canvas, or a locked layer that can only be tapped: the finger pans the view.
         mode = 'candidate';
+        hold();
         beginPan(touch, false);
         prevent(e);
         return;
@@ -361,6 +380,7 @@ export function useTouchGestures(
       if (mode === 'pinch' || mode === 'xform' || mode === 'dead' || mode === 'ignore') return;
       if (stage.find<Konva.Transformer>('Transformer').some((t) => t.isTransforming())) { mode = 'ignore'; return; }
       cancelKonvaDrags();
+      hold();
       const [a, b] = [e.touches[0], e.touches[1]];
       if (!beginTransform(a, b)) beginPinch(a, b);
     };
@@ -372,7 +392,7 @@ export function useTouchGestures(
       else if (mode === 'dead') swallow(e);
     };
 
-    const onEnd = (e: TouchEvent) => {
+    const handleEnd = (e: TouchEvent) => {
       const remaining = e.touches.length;
       const cancelled = e.type === 'touchcancel';
       // Cancel a move before stopping its native drag so the preview rolls
@@ -409,6 +429,11 @@ export function useTouchGestures(
       } else if (remaining === 0) mode = 'idle';
     };
 
+    // The hold ends after any commit above, so a waiting update sees the finished document.
+    const onEnd = (e: TouchEvent) => {
+      try { handleEnd(e); } finally { if (e.touches.length === 0) release(); }
+    };
+
     const options = { capture: true, passive: false } as const;
     container.addEventListener('touchstart', onStart, options);
     container.addEventListener('touchmove', onMove, options);
@@ -420,6 +445,7 @@ export function useTouchGestures(
     return () => {
       stopTween();
       reset();
+      abortGestures.current = () => undefined;
       container.removeEventListener('touchstart', onStart, options);
       container.removeEventListener('touchmove', onMove, options);
       container.removeEventListener('touchend', onEnd, options);
@@ -430,5 +456,9 @@ export function useTouchGestures(
     };
   }, [enabled, stageRef, scrollRef, hostRef]);
 
-  return { recentTouch: () => Date.now() - lastTouch.current < TOUCH_ECHO_MS };
+  return {
+    recentTouch: () => Date.now() - lastTouch.current < TOUCH_ECHO_MS,
+    /** Discards the pinch, pan or layer transform in flight without committing it, and releases its hold on updates. */
+    abort: () => abortGestures.current(),
+  };
 }

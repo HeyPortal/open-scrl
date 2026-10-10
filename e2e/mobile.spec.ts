@@ -210,8 +210,7 @@ test.describe('mobile editor', () => {
     await page.getByRole('button', { name: 'Add text box', exact: true }).tap();
     await page.getByRole('button', { name: 'Close Text', exact: true }).tap();
     const point = await page.evaluate(async () => {
-      const path = '/node_modules/.vite/deps/konva.js';
-      const { default: Konva } = await import(path) as typeof import('konva');
+      const Konva = (window as Window & { Konva: typeof import('konva').default }).Konva;
       const stage = Konva.stages[0];
       const bounds = stage.findOne('.layer')!.getClientRect();
       const container = stage.container().getBoundingClientRect();
@@ -477,8 +476,7 @@ test.describe('mobile editor', () => {
     await page.getByRole('button', { name: 'Start with 2 side grid', exact: true }).tap();
     await expect(dock(page)).toBeVisible();
     const point = await page.evaluate(async () => {
-      const path = '/node_modules/.vite/deps/konva.js';
-      const { default: Konva } = await import(path) as typeof import('konva');
+      const Konva = (window as Window & { Konva: typeof import('konva').default }).Konva;
       const stage = Konva.stages[0];
       const bounds = stage.findOne('.layer')!.getClientRect();
       const container = stage.container().getBoundingClientRect();
@@ -518,8 +516,7 @@ test.describe('mobile editor', () => {
 
     await selectionBar(page).getByRole('button', { name: 'Done', exact: true }).tap();
     const point = await page.evaluate(async () => {
-      const konvaPath = '/node_modules/.vite/deps/konva.js';
-      const { default: Konva } = await import(konvaPath) as typeof import('konva');
+      const Konva = (window as Window & { Konva: typeof import('konva').default }).Konva;
       const stage = Konva.stages[0];
       const node = stage.findOne('.layer')!;
       const bounds = node.getClientRect();
@@ -540,8 +537,7 @@ test.describe('mobile editor', () => {
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ ...point, id: 9 }] });
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: point.x + 24, y: point.y + 18, id: 9 }] });
     const isDragging = () => page.evaluate(async () => {
-      const path = '/node_modules/.vite/deps/konva.js';
-      const { default: Konva } = await import(path) as typeof import('konva');
+      const Konva = (window as Window & { Konva: typeof import('konva').default }).Konva;
       return Konva.isDragging();
     });
     await expect.poll(isDragging).toBe(true);
@@ -563,8 +559,7 @@ test.describe('mobile editor', () => {
     await expect.poll(isDragging).toBe(true);
     await expect.poll(photoFrame).toEqual(before);
     const resume = await page.evaluate(async () => {
-      const path = '/node_modules/.vite/deps/konva.js';
-      const { default: Konva } = await import(path) as typeof import('konva');
+      const Konva = (window as Window & { Konva: typeof import('konva').default }).Konva;
       const stage = Konva.stages[0];
       const bounds = stage.findOne('.layer')!.getClientRect();
       const container = stage.container().getBoundingClientRect();
@@ -594,8 +589,7 @@ test.describe('mobile editor', () => {
       const moved = await photoFrame();
       await selectionBar(page).getByRole('button', { name: 'Done', exact: true }).tap();
       const nextPoint = await page.evaluate(async () => {
-        const path = '/node_modules/.vite/deps/konva.js';
-        const { default: Konva } = await import(path) as typeof import('konva');
+        const Konva = (window as Window & { Konva: typeof import('konva').default }).Konva;
         const stage = Konva.stages[0];
         const bounds = stage.findOne('.layer')!.getClientRect();
         const container = stage.container().getBoundingClientRect();
@@ -615,8 +609,7 @@ test.describe('mobile editor', () => {
     await expect.poll(photoFrame).toEqual(before);
 
     const corner = await page.evaluate(async () => {
-      const path = '/node_modules/.vite/deps/konva.js';
-      const { default: Konva } = await import(path) as typeof import('konva');
+      const Konva = (window as Window & { Konva: typeof import('konva').default }).Konva;
       const stage = Konva.stages[0];
       const node = stage.findOne('Transformer')!.findOne('.bottom-right')!;
       const position = node.getAbsolutePosition();
@@ -670,16 +663,14 @@ test.describe('mobile editor', () => {
     });
     const before = await frame();
     const corner = await page.evaluate(async () => {
-      const path = '/node_modules/.vite/deps/konva.js';
-      const { default: Konva } = await import(path) as typeof import('konva');
+      const Konva = (window as Window & { Konva: typeof import('konva').default }).Konva;
       const stage = Konva.stages[0];
       const position = stage.findOne('Transformer')!.findOne('.bottom-right')!.getAbsolutePosition();
       const container = stage.container().getBoundingClientRect();
       return { x: container.left + position.x, y: container.top + position.y };
     });
     const transforming = () => page.evaluate(async () => {
-      const path = '/node_modules/.vite/deps/konva.js';
-      const { default: Konva } = await import(path) as typeof import('konva');
+      const Konva = (window as Window & { Konva: typeof import('konva').default }).Konva;
       return Konva.isTransforming();
     });
     const cdp = await page.context().newCDPSession(page);
@@ -695,8 +686,7 @@ test.describe('mobile editor', () => {
     await expect.poll(frame).toEqual(before);
     await selectionBar(page).getByRole('button', { name: 'Done', exact: true }).tap();
     const centre = await page.evaluate(async () => {
-      const path = '/node_modules/.vite/deps/konva.js';
-      const { default: Konva } = await import(path) as typeof import('konva');
+      const Konva = (window as Window & { Konva: typeof import('konva').default }).Konva;
       const stage = Konva.stages[0];
       const bounds = stage.findOne('.layer')!.getClientRect();
       const container = stage.container().getBoundingClientRect();

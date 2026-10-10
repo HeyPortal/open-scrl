@@ -2,6 +2,10 @@
 
 The web app has a touch-first layout for phones: its own home screen and editor. It opens the same projects as the desktop layout. This page describes how the phone layout works.
 
+| Home screen | Editor |
+| --- | --- |
+| ![Phone home screen with carousel creation and saved projects](./images/mobile-home.png) | ![Phone editor with a selected Inter text layer](./images/mobile-editor.png) |
+
 ## When the mobile layout is used
 
 The mobile layout is used when the browser window is 767 px wide or narrower, or when the screen is a touch screen 500 px tall or less (a phone turned sideways). Tablets in portrait, and wider windows, get the desktop editor. The check runs as the window changes size, so rotating a phone switches layouts without closing the open project.
@@ -63,6 +67,8 @@ Touch selection follows the current position, rotation, and stacking order of th
 The browser's own pinch-zoom is turned off on the canvas, so pinching only changes the canvas.
 
 After an interrupted touch, you can select or move a layer again without refreshing the page. A handle resize interrupted by the browser keeps its last visible size.
+
+A pan, pinch, two-finger layer change, handle resize, layer drag, or unfinished text edit counts as work in progress: a new version of the app waits to be offered until it finishes (see [web updates](./web-updates.md)). Interrupted drags and two-finger transforms are discarded. Text typed in place is kept when you tap **Done** or elsewhere; a hardware **Escape** key, or opening another project, discards it.
 
 ## Slides
 
