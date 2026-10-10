@@ -7,10 +7,19 @@
  * the precache would download for nothing. Text outside these ranges falls back to the system font
  * in the stack (see fontFamily in tailwind.config.js).
  *
- * Fontsource registers the families as 'Inter Variable' and 'Instrument Serif'. Plain 'Inter' is
+ * Fontsource registers 'Inter Variable', 'Instrument Serif', and 'Bluu Next'. Plain 'Inter' is
  * deliberately not registered here: text layers keep the portable fontFamily 'Inter', which
  * resolveFontFamily maps to the bundled face for editing, canvas drawing, and export.
  */
+
+/* Bluu Next: the Open-SCRL wordmark only, using its real bold face. */
+@font-face {
+  font-family: 'Bluu Next';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url('@fontsource/bluu-next/files/bluu-next-latin-700-normal.woff2') format('woff2');
+}
 
 /* Inter: the UI sans (wght axis). */
 @font-face {

@@ -16,7 +16,7 @@ Grid starters may be added to desktop because they reuse an existing phone featu
 ## Desktop
 
 1. **Header island.** Floating glass pill across the top (inset like the editor islands): Mac app icon and
-   "Open-SCRL" in serif on the left; on the right a quiet privacy chip ("Saved on this device") and a lilac
+   "Open-SCRL" in Bluu Next on the left; on the right a quiet privacy chip ("Saved on this device") and a lilac
    "New carousel" button that scrolls to and focuses the create panel.
 2. **Hero / create panel.** One wide glass panel:
    - Left column: serif headline (about 44–52px), for example "Make something worth swiping.", one line of
@@ -43,7 +43,7 @@ Grid starters may be added to desktop because they reuse an existing phone featu
 
 ## Phone
 
-1. **Top bar.** Glass bar with logo and serif title that compacts on scroll (keep the current collapsing
+1. **Top bar.** Glass bar with the Mac icon and Bluu Next wordmark that compacts on scroll (keep the current collapsing
    behavior), safe-area aware.
 2. **Create card.** Serif "New carousel", horizontally snapping format cards with proportional frames, name field,
    lilac full-width "Create carousel" button. 44px minimum targets.

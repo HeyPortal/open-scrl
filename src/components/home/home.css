@@ -6,8 +6,8 @@
 
 /* Serif titles: Instrument Serif is single weight, so pin 400 and never let a parent fake a bold. */
 :is(
-  .home-brand-name, .home-section-title, .home-hero-title, .home-card-name, .home-row-name, .home-prow-name,
-  .home-continue-name, .home-empty-title, .home-phone-title
+  .home-section-title, .home-hero-title, .home-card-name, .home-row-name, .home-prow-name,
+  .home-continue-name, .home-empty-title
 ) {
   font-family: 'Instrument Serif', ui-serif, Georgia, 'Times New Roman', serif;
   font-weight: 400;

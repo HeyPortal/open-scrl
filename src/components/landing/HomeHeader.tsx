@@ -7,7 +7,7 @@ export function HomeHeader({ onNew }: { onNew: () => void }) {
     <header className="home-header studio-glass">
       <div className="home-brand">
         <AppLogo className="home-logo" />
-        <span className="home-brand-name">Open-SCRL</span>
+        <span className="home-brand-name app-wordmark">Open-SCRL</span>
       </div>
       <div className="home-header-actions">
         <span className="home-chip" title="Projects are stored in this browser and never uploaded">

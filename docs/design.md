@@ -6,6 +6,11 @@ Serif titles. Blue, teal and pink join lilac in format previews, grid starters,
 empty-state artwork and fallback project covers. Selection and focus stay
 lilac; canvas alignment guides use blue.
 
+The Open-SCRL wordmark uses Bluu Next’s bold face, self-hosted through
+`@fontsource/bluu-next`. It appears in the desktop header, both phone home
+headers and the loading screen. The phone wordmark is 32px so the wider
+letterforms fit beside the icon at 320px. Other titles use Instrument Serif.
+
 `src/index.css` imports `src/styles/studio/` directly. `tokens.css` defines
 all global `:root` values and `color-scheme: dark`; `chrome.css`, `panels.css`,
 `inspector.css`, `landing.css` and `mobile.css` style their respective areas.

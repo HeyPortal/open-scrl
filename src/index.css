@@ -37,6 +37,13 @@
 }
 
 @layer components {
+  .app-wordmark {
+    font-family: 'Bluu Next', ui-serif, Georgia, serif;
+    font-weight: 700;
+    font-synthesis: none;
+    letter-spacing: -0.025em;
+  }
+
   /* Headings ------------------------------------------------------------ */
   /* Instrument Serif, for titles and headings. It is a single-weight (400) condensed display face
      with a small x-height, so it is set larger than the sans would be at the same visual size, and

@@ -80,7 +80,7 @@ export default function MobileHome() {
       <div aria-hidden className="home-topbar" data-collapsed={collapsed}>
         <div className="home-topbar-inner">
           <AppLogo className="home-logo home-logo-sm" size={26} />
-          <span className="home-brand-name">Open-SCRL</span>
+          <span className="home-brand-name app-wordmark">Open-SCRL</span>
         </div>
       </div>
 
@@ -94,7 +94,7 @@ export default function MobileHome() {
           <header className="home-phone-header">
             <div className="home-phone-brand">
               <AppLogo className="home-logo home-logo-lg" size={44} />
-              <h1 className="home-phone-title">Open-SCRL</h1>
+              <h1 className="home-phone-title app-wordmark">Open-SCRL</h1>
             </div>
             <p>Carousels &amp; photo grids, saved on this device</p>
           </header>
