@@ -79,12 +79,12 @@ function Carousel({ width, height, index, onIndex, children }: { width: number; 
         <>
           <span className="pointer-events-none absolute right-3 top-3 rounded-full bg-black/65 px-2 py-0.5 text-[11px] font-medium tabular-nums text-white">{index + 1}/{count}</span>
           {index > 0 && (
-            <button type="button" aria-label="Previous slide" onPointerDown={(e) => e.stopPropagation()} onClick={() => go(index - 1)} className="absolute left-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-neutral-800 opacity-0 shadow transition-opacity group-hover:opacity-100">
+            <button type="button" aria-label="Previous slide" onPointerDown={(e) => e.stopPropagation()} onClick={() => go(index - 1)} className="absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-neutral-800 opacity-0 shadow transition-opacity hover:bg-white focus-visible:opacity-100 group-hover:opacity-100">
               <ChevronLeft size={16} strokeWidth={2.5} aria-hidden />
             </button>
           )}
           {index < count - 1 && (
-            <button type="button" aria-label="Next slide" onPointerDown={(e) => e.stopPropagation()} onClick={() => go(index + 1)} className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-white/85 text-neutral-800 opacity-0 shadow transition-opacity group-hover:opacity-100">
+            <button type="button" aria-label="Next slide" onPointerDown={(e) => e.stopPropagation()} onClick={() => go(index + 1)} className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-neutral-800 opacity-0 shadow transition-opacity hover:bg-white focus-visible:opacity-100 group-hover:opacity-100">
               <ChevronRight size={16} strokeWidth={2.5} aria-hidden />
             </button>
           )}
@@ -246,12 +246,12 @@ function CropGuide() {
   const crop = ratio > GRID_RATIO ? { w: height * GRID_RATIO, h: height } : { w: width, h: width / GRID_RATIO };
   const matches = Math.abs(ratio - GRID_RATIO) < 0.01;
   return (
-    <div className="w-[280px] rounded-xl border border-line-strong bg-bg-overlay p-4 shadow-lift">
-      <p className="text-xs font-semibold text-ink">Profile grid crop</p>
-      <p className="mt-1 text-[11px] leading-relaxed text-ink-faint">
+    <div className="studio-preview-card">
+      <p className="heading-sm text-ink">Profile grid crop</p>
+      <p className="mt-1.5 text-xs leading-relaxed text-ink-dim">
         {matches ? 'Your format already matches the 3:4 grid, so nothing is cropped.' : 'Your profile shows the first slide cropped to 3:4. Keep faces and titles inside the frame.'}
       </p>
-      <div className="relative mx-auto mt-3 overflow-hidden rounded-md" style={{ width, height }}>
+      <div className="relative mx-auto mt-4 overflow-hidden rounded-md" style={{ width, height }}>
         <SlidePreviewCanvas scene={first.scene} format={format} width={width} height={height} checkerboard />
         {!matches && (
           <span className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-sm ring-2 ring-white" style={{ width: crop.w, height: crop.h, boxShadow: '0 0 0 9999px rgba(0,0,0,0.55)' }} />
@@ -327,7 +327,7 @@ export function PhonePreview() {
     : 'flex h-14 shrink-0 items-center justify-between gap-4 px-5';
 
   return (
-    <div ref={root} className="fixed inset-0 z-[1060] flex flex-col bg-[#09090b]/95 backdrop-blur-md" role="dialog" aria-modal="true" aria-label="Phone preview">
+    <div ref={root} className="studio-preview fixed inset-0 z-[1060] flex flex-col" role="dialog" aria-modal="true" aria-label="Phone preview">
       {!fullscreen && (
         <div className={headerClass}>
           <div className={mobile ? 'flex min-w-0 items-center gap-2' : 'flex items-center gap-3'}>
@@ -338,14 +338,14 @@ export function PhonePreview() {
           </div>
           <div className={mobile ? 'flex shrink-0 items-center gap-1.5' : 'flex items-center gap-1'}>
             {canFullscreen && (
-              <button type="button" className={mobile ? 'btn btn-ghost btn-sm h-11 w-11 px-0' : 'btn btn-ghost btn-sm'} onClick={() => void toggleFullscreen()} title="Full screen (F)" aria-label="Full screen"><Maximize2 size={14} aria-hidden /><span className={mobile ? 'hidden' : undefined}> Full screen</span></button>
+              <button type="button" className={mobile ? 'btn btn-ghost btn-sm h-11 w-11 px-0' : 'btn btn-ghost h-9 px-3'} onClick={() => void toggleFullscreen()} title="Full screen (F)" aria-label="Full screen"><Maximize2 size={14} aria-hidden /><span className={mobile ? 'hidden' : undefined}> Full screen</span></button>
             )}
-            <button type="button" className={mobile ? 'icon-btn h-11 w-11' : 'icon-btn'} onClick={() => close(false)} title="Close preview (Esc)" aria-label="Close preview"><X size={16} aria-hidden /></button>
+            <button type="button" className={mobile ? 'icon-btn h-11 w-11' : 'icon-btn h-9 w-9'} onClick={() => close(false)} title="Close preview (Esc)" aria-label="Close preview"><X size={16} aria-hidden /></button>
           </div>
         </div>
       )}
       <div ref={stage} className="flex min-h-0 flex-1 items-center justify-center gap-10 pb-6">
-        <div className="relative shrink-0 rounded-[54px] bg-[#1b1b1f] shadow-[0_40px_120px_-30px_rgba(0,0,0,0.9),inset_0_0_0_1px_rgba(255,255,255,0.08)]" style={{ padding: BEZEL }}>
+        <div className="studio-preview-device relative shrink-0 rounded-[54px]" style={{ padding: BEZEL }}>
           <div className="relative overflow-hidden rounded-[44px] bg-white" style={{ width: screenWidth, height: screenHeight }}>
             {mode === 'grid'
               ? <GridScreen screenWidth={screenWidth} />
@@ -358,9 +358,9 @@ export function PhonePreview() {
         {mode === 'grid' && !fullscreen && viewport.w > 900 && <CropGuide />}
       </div>
       {fullscreen && (
-        <button type="button" className="btn btn-ghost btn-sm absolute right-4 top-4" onClick={() => void toggleFullscreen()} title="Exit full screen (Esc)"><Minimize2 size={14} aria-hidden /> Exit</button>
+        <button type="button" className="btn btn-secondary h-9 absolute right-4 top-4" onClick={() => void toggleFullscreen()} title="Exit full screen (Esc)"><Minimize2 size={14} aria-hidden /> Exit</button>
       )}
-      {!fullscreen && mode === 'feed' && count > 1 && <p className={`text-center text-[11px] text-ink-faint ${mobile ? 'pb-[max(1rem,env(safe-area-inset-bottom))]' : 'pb-4'}`}>{mobile ? 'Swipe to move between slides' : 'Drag, swipe with two fingers, or use ← → to flip through slides.'}</p>}
+      {!fullscreen && mode === 'feed' && count > 1 && <p className={`text-center text-xs text-ink-faint ${mobile ? 'pb-[max(1rem,env(safe-area-inset-bottom))]' : 'pb-4'}`}>{mobile ? 'Swipe to move between slides' : <><span className="mr-1.5"><kbd className="kbd">←</kbd> <kbd className="kbd">→</kbd></span>flip through slides<span className="mx-2.5 text-ink-faint/60" aria-hidden>·</span><kbd className="kbd mr-1.5">F</kbd>full screen<span className="mx-2.5 text-ink-faint/60" aria-hidden>·</span><kbd className="kbd mr-1.5">Esc</kbd>close</>}</p>}
     </div>
   );
 }

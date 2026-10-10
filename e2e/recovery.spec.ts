@@ -102,7 +102,8 @@ test('a failed media-library load can be retried inside the editor', async ({ pa
   await expect(page.getByRole('button', { name: 'Retry media' })).toBeVisible();
   await page.evaluate(() => Object.assign(window, { failMediaLoad: false }));
   await page.getByRole('button', { name: 'Retry media' }).click();
-  await expect(page.getByText('No media yet.')).toBeVisible();
+  await expect(page.locator('.media-dropzone').getByRole('button', { name: /^Import media/ })).toBeVisible();
+  await expect(page.locator('.studio-left-panel img')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Retry media' })).toHaveCount(0);
   expect(errors).toEqual([]);
 });

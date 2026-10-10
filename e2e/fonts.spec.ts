@@ -44,7 +44,7 @@ for (const mobile of [false, true]) {
         await page.getByRole('button', { name: 'Close Text', exact: true }).click();
         await page.getByRole('button', { name: 'Edit', exact: true }).click();
       } else {
-        await page.getByTitle('Text', { exact: true }).click();
+        await page.getByRole('button', { name: 'Text', exact: true }).click();
         await page.getByRole('button', { name: 'Add text box' }).click();
       }
       await expect(page.getByRole('combobox', { name: 'Font', exact: true })).toHaveCSS('font-family', '"Inter Variable"');

@@ -226,7 +226,8 @@ for (const gesture of ['drag', 'transform'] as const) {
     const name = `${gesture} activation race`;
     await install(page);
     await createProject(page, name);
-    await page.getByRole('button', { name: 'Add rectangle', exact: true }).click();
+    await page.getByRole('button', { name: 'Main menu', exact: true }).click();
+    await page.getByRole('menuitem', { name: /^Add rectangle/ }).click();
     await delayActivation(page);
     const before = await savedLayer(page, name);
     expect(before).not.toBeNull();
@@ -252,7 +253,8 @@ test('activation waits for a text draft and saves its blur commit before reloadi
   const name = 'Text activation race';
   await install(page);
   await createProject(page, name);
-  await page.getByRole('button', { name: 'Add text', exact: true }).click();
+  await page.getByRole('button', { name: 'Main menu', exact: true }).click();
+  await page.getByRole('menuitem', { name: /^Add text/ }).click();
   await delayActivation(page);
   const point = await canvasPoint(page);
   await page.mouse.dblclick(point.x, point.y);

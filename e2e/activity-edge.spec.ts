@@ -18,6 +18,7 @@ async function setup(page: Page) {
   await page.goto('/');
   await page.getByLabel('Project name').fill('Activity source');
   await page.getByRole('button', { name: /create.*open editor/i }).click();
+  await page.getByRole('button', { name: 'Slide design', exact: true }).click();
   const installed = JSON.parse(await readFile(new URL('../node_modules/konva/package.json', import.meta.url), 'utf8')) as { version: string };
   // Use the running application's singleton, including its actual Stage registry.
   await expect.poll(() => page.evaluate(() => (window as unknown as { Konva?: { version: string } }).Konva?.version)).toBe(installed.version);

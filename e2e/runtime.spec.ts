@@ -18,6 +18,7 @@ async function state(page: Page) {
 async function setup(page: Page) {
   await page.goto('/');
   await page.getByRole('button', { name: /create.*open editor/i }).click();
+  await page.getByRole('button', { name: 'Slide design', exact: true }).click();
   const installedKonva = JSON.parse(await readFile(new URL('../node_modules/konva/package.json', import.meta.url), 'utf8')) as { version: string };
   // A reused dev server can otherwise validate a stale optimized dependency after an upgrade.
   await expect.poll(() => page.evaluate(() => (window as unknown as { Konva?: { version: string } }).Konva?.version)).toBe(installedKonva.version);
@@ -124,7 +125,8 @@ test('native canvas gestures commit once and keep refs attached through undo and
   await page.mouse.click(a.x, a.y);
   await page.keyboard.down('Shift'); await page.mouse.click(b.x, b.y); await page.keyboard.up('Shift');
   await expect.poll(async () => (await state(page)).selection).toEqual(['runtime-group-a', 'runtime-group-b']);
-  await page.getByRole('button', { name: 'Group', exact: true }).click();
+  await page.getByRole('toolbar', { name: 'Selection actions', exact: true }).getByRole('button', { name: 'Layer actions' }).click();
+  await page.getByRole('menuitem', { name: /^Group\b/ }).click();
   const grouped = await state(page);
   expect(grouped.doc.layers['runtime-group-a'].groupId).toBeTruthy();
   expect(grouped.doc.layers['runtime-group-b'].groupId).toBe(grouped.doc.layers['runtime-group-a'].groupId);
@@ -269,7 +271,7 @@ test('native touch pan and pinch keep the stage and viewport in sync', async ({ 
   })).toBeCloseTo(1.5, 1);
   const scroll = page.getByTestId('canvas-scroll');
   const before = await scroll.evaluate((element) => element.scrollLeft);
-  const empty = { id: 1, x: stage!.x + stage!.width - 80, y: stage!.y + 180 };
+  const empty = { id: 1, x: stage!.x + stage!.width - 80, y: stage!.y + stage!.height - 12 };
   await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [empty] });
   await client.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ ...empty, x: empty.x - 80 }] });
   await expect.poll(() => scroll.evaluate((element) => element.scrollLeft)).toBeGreaterThan(before);

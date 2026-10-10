@@ -63,13 +63,13 @@ export function ShapesPanel({ layout = 'sidebar' }: { layout?: 'sidebar' | 'shee
   };
 
   return (
-    <div className={sheet ? 'flex flex-col' : 'flex h-full flex-col'}>
+    <div className={sheet ? 'lib-panel flex flex-col' : 'lib-panel flex h-full flex-col'}>
       {sheet
-        ? <p className="px-4 pb-3 text-[12px] leading-relaxed text-ink-faint">Use shapes as colour blocks, frames, and text backgrounds.</p>
-        : <PanelHeader title="Shapes" hint="Use shapes as colour blocks, frames, and text backgrounds." />}
-      <div className={sheet ? 'grid grid-cols-3 gap-2 px-4 pb-4' : 'grid grid-cols-2 gap-2 px-3 pb-4'}>
+        ? <p className="lib-hint px-4 pb-3">Use shapes as color blocks, frames, and text backgrounds.</p>
+        : <PanelHeader title="Shapes" hint="Use shapes as color blocks, frames, and text backgrounds." />}
+      <div className={sheet ? 'lib-grid grid-cols-3 gap-2 px-4 pb-4' : 'lib-card-grid gap-2 px-3 pb-4'}>
         {PRESETS.map((preset) => (
-          <button key={preset.name} className={`tile group flex flex-col items-center gap-2 px-2 pb-2.5 pt-4 ${sheet ? 'active:bg-bg-hover' : ''}`} onClick={() => insert(preset)}>
+          <button key={preset.name} className={`lib-tile group flex flex-col items-center gap-2 rounded-lg bg-bg-inset px-1.5 pb-2.5 pt-3.5 ${sheet ? 'min-h-[104px] active:bg-bg-hover' : ''}`} onClick={() => insert(preset)}>
             <span className="flex h-12 items-center justify-center">
               <span
                 className={`block transition-transform group-hover:scale-110 ${preset.patch?.(format).fill ? 'bg-ink-dim' : 'bg-accent'}`}
@@ -77,7 +77,7 @@ export function ShapesPanel({ layout = 'sidebar' }: { layout?: 'sidebar' | 'shee
                 aria-hidden
               />
             </span>
-            <span className="text-xs font-medium text-ink-dim group-hover:text-ink">{preset.name}</span>
+            <span className="max-w-full truncate text-[11px] font-medium text-ink-dim group-hover:text-ink">{preset.name}</span>
           </button>
         ))}
       </div>

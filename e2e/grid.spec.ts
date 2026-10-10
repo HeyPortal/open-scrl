@@ -14,6 +14,7 @@ test('adjusts the gap and outer margin of an inserted grid from the slide inspec
     return slide.grid!.slotIds.map((id) => ({ x: doc.layers[id].x, y: doc.layers[id].y, w: doc.layers[id].width }));
   });
 
+  await page.getByRole('button', { name: 'Slide design', exact: true }).click();
   const inspector = page.getByRole('tabpanel');
   const flush = await slots();
   expect(flush[0].x).toBe(0);
@@ -43,6 +44,7 @@ test('linking gap and outer margin snaps the margin to the gap and moves both to
     return { gap: g.gap, margin: g.margin, firstX: doc.layers[g.slotIds[0]].x };
   });
 
+  await page.getByRole('button', { name: 'Slide design', exact: true }).click();
   const inspector = page.getByRole('tabpanel');
   const link = inspector.getByRole('button', { name: 'Link gap and outer margin' });
   await inspector.getByRole('slider', { name: 'Gap', exact: true }).fill('30');
@@ -80,6 +82,7 @@ test('undoing a link shows the toggle unlinked with the restored values', async 
     return { gap: g.gap, margin: g.margin };
   });
 
+  await page.getByRole('button', { name: 'Slide design', exact: true }).click();
   const inspector = page.getByRole('tabpanel');
   const link = inspector.getByRole('button', { name: 'Link gap and outer margin' });
   const gap = inspector.getByRole('slider', { name: 'Gap', exact: true });
@@ -109,6 +112,7 @@ test('apply to all slides copies the gap and outer margin to every slide with a 
   await page.getByRole('button', { name: /create|start/i }).first().click();
   await page.getByRole('navigation', { name: 'Tools' }).getByRole('button', { name: 'Grids', exact: true }).click();
   await page.getByTitle('Apply “2 × 2” grid').click();
+  await page.getByRole('button', { name: 'Slide design', exact: true }).click();
   const inspector = page.getByRole('tabpanel');
   await expect(inspector.getByRole('button', { name: /^Apply grid spacing to all/ })).toHaveCount(0);
 

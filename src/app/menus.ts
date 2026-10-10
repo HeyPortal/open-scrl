@@ -1,6 +1,6 @@
 import type { MenuEntry } from '@/components/Menu';
-import { useEditor } from '@/store/editor';
 import { useEditorSession } from '@/editor/sessionStore';
+import { useEditor } from '@/store/editor';
 import { currentSelection } from '@/editor/selectionActions';
 import { buildActions, formatBinding, type Action } from './actions';
 

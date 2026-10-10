@@ -14,7 +14,7 @@ function GridThumb({ tpl, gap, margin, ratio }: { tpl: GridTemplate; gap: number
   const cells = tpl.cells(W - 2 * previewMargin, H - 2 * previewMargin, previewGap).map((c) => ({ ...c, x: c.x + previewMargin, y: c.y + previewMargin }));
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="h-full w-full" preserveAspectRatio="xMidYMid meet" aria-hidden>
-      <rect width={W} height={H} rx={2} fill="#141417" />
+      <rect width={W} height={H} rx={2} fill="rgb(var(--c-bg-rail))" />
       {cells.map((c, i) => (
         <rect
           key={i}
@@ -23,8 +23,8 @@ function GridThumb({ tpl, gap, margin, ratio }: { tpl: GridTemplate; gap: number
           width={c.w}
           height={c.h}
           rx={previewGap > 0 ? 1.5 : 0}
-          className="fill-[#3a3a44] transition-colors group-hover:fill-[#7c5cff]"
-          stroke={previewGap === 0 ? '#141417' : undefined}
+          className="fill-template transition-colors group-hover:fill-accent"
+          stroke={previewGap === 0 ? 'rgb(var(--c-bg-rail))' : undefined}
           strokeWidth={previewGap === 0 ? 0.8 : 0}
         />
       ))}
@@ -63,9 +63,9 @@ export function TemplatesPanel({ layout = 'sidebar' }: { layout?: 'sidebar' | 's
   );
 
   return (
-    <div className={sheet ? 'flex flex-col' : 'flex h-full min-h-0 flex-col'}>
+    <div className={sheet ? 'lib-panel flex flex-col' : 'lib-panel flex h-full min-h-0 flex-col'}>
       {sheet
-        ? <p className="px-4 pb-3 text-[12px] leading-relaxed text-ink-faint">Replaces this slide's layers with empty photo slots.</p>
+        ? <p className="lib-hint px-4 pb-3">Replaces this slide's layers with empty photo slots.</p>
         : <PanelHeader title="Photo grids" hint={`Replaces the current slide's layers with empty photo slots. Undo with ${isMac ? '⌘' : 'Ctrl'} Z.`} />}
       {sheet ? (
         <div className="px-4 pb-4">
@@ -73,19 +73,19 @@ export function TemplatesPanel({ layout = 'sidebar' }: { layout?: 'sidebar' | 's
             type="button"
             aria-expanded={spacingOpen}
             onClick={() => setSpacingOpen((open) => !open)}
-            className="flex h-12 w-full items-center gap-3 rounded-xl bg-bg-inset px-3.5 text-left transition-colors active:bg-bg-hover"
+            className="flex h-12 w-full items-center gap-3 rounded-xl bg-bg-inset px-3.5 text-left transition-colors hover:bg-bg-hover active:bg-bg-hover"
           >
             <SlidersHorizontal size={18} className="shrink-0 text-ink-dim" aria-hidden />
             <span className="flex-1 text-[14px] font-medium text-ink">Spacing</span>
-            <span className="text-[12px] tabular-nums text-ink-faint">Gap {gap} · Margin {margin}</span>
-            <ChevronDown size={16} className={`shrink-0 text-ink-faint transition-transform duration-150 ${spacingOpen ? 'rotate-180' : ''}`} aria-hidden />
+            <span className="text-[12px] tabular-nums text-ink-dim">Gap {gap} · Margin {margin}</span>
+            <ChevronDown size={16} className={`shrink-0 text-ink-dim transition-transform duration-150 ${spacingOpen ? 'rotate-180' : ''}`} aria-hidden />
           </button>
           {spacingOpen && <div className="pt-3">{sliders}</div>}
         </div>
       ) : (
         <div className="space-y-2.5 px-3 pb-3">{sliders}</div>
       )}
-      <div className={sheet ? 'grid grid-cols-[repeat(auto-fill,minmax(96px,1fr))] content-start gap-2 border-t border-line px-4 py-4' : 'grid min-h-0 flex-1 grid-cols-3 content-start gap-2 overflow-auto border-t border-line px-3 py-3 scrollbar-thin'}>
+      <div className={sheet ? 'lib-grid grid-cols-[repeat(auto-fill,minmax(96px,1fr))] content-start gap-1 border-t border-line px-2.5 py-3' : 'lib-card-grid min-h-0 flex-1 content-start gap-1 overflow-auto border-t border-line px-1.5 py-3 scrollbar-thin'}>
         {GRID_TEMPLATES.map((t) => {
           // Linked spacing has to fit this template, or the inspector would show a smaller value than the one stored.
           const v = Math.min(gap, linkedMax(t, format));
@@ -94,14 +94,14 @@ export function TemplatesPanel({ layout = 'sidebar' }: { layout?: 'sidebar' | 's
           return (
             <button
               key={t.id}
-              className="tile group flex flex-col items-stretch gap-1.5 p-1.5 text-center"
+              className={`lib-card group flex flex-col items-stretch gap-1.5 p-1.5 text-center ${sheet ? 'lib-card-sheet' : ''}`}
               onClick={() => applyGrid(t, tGap, tMargin)}
               title={`Apply “${t.name}” grid`}
             >
-              <div className="flex aspect-[4/5] items-center justify-center rounded-lg bg-bg-inset p-1.5">
+              <div className="lib-card-well flex aspect-[4/5] items-center justify-center p-1.5">
                 <GridThumb tpl={t} gap={tGap} margin={tMargin} ratio={ratio} />
               </div>
-              <span className="block truncate text-[11px] font-medium text-ink-dim group-hover:text-ink">{t.name}</span>
+              <span className="lib-card-label block truncate">{t.name}</span>
             </button>
           );
         })}
