@@ -19,10 +19,12 @@ for (const mobile of [false, true]) {
       const create = page.getByRole('button', { name: mobile ? 'Create carousel' : 'Create & open editor', exact: true });
       try {
         await expect(create).toHaveCount(0);
+        await expect(page.getByRole('status', { name: 'Loading Open-SCRL', exact: true })).toBeVisible();
       } finally {
         release();
       }
       await expect(create).toBeVisible();
+      await expect(page.getByRole('status', { name: 'Loading Open-SCRL', exact: true })).toHaveCount(0);
 
       // Check the actual glyph source, rather than only the declared CSS family.
       const cdp = await page.context().newCDPSession(page);
