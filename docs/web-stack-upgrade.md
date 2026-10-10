@@ -138,6 +138,38 @@ other runtime libraries. Cross-browser application behavior remains unverified
 here. On a supported host, install them with
 `npx playwright install --with-deps chromium firefox webkit`.
 
+## Mobile integration — 2026-10-10
+
+The phone redesign in [PR #33](https://github.com/HeyPortal/open-scrl/pull/33)
+was rebased onto the completed stack upgrade and merged with all existing
+commits preserved. Canvas, app-shell, and text-editor conflicts retained both
+main's cancellation/import/update guards and the mobile layout and font mapping.
+The document schema, history, storage, and export interfaces did not change.
+
+Mobile pan/pinch and two-finger transforms, and the mobile inline text editor,
+now participate in the shared activity tracker. Production checks exercise an
+accepted update activating while a gesture or draft is still open, then verify
+that the completed geometry or text saves before reload. Escape and project
+switches discard stale drafts. The phone update card has a separate message row
+and 44px actions; a 320px check covers containment and the desktop check retains
+its compact row.
+
+Touch selection uses live geometry rather than the bitmap hit canvas. Regression
+checks cover text over photos, empty and incorrect bitmap hits, interrupted
+photo movement/resizing, reopening projects, and editing text moved across
+slides without recentering to the owning slide. Inter is now bundled and mapped
+consistently in canvas painting, editing, and export workers. Its metrics can
+change wrapping from the prior fallback face; the earlier pixel comparisons
+describe the stack checkpoint before this font change.
+
+Acceptance passed `npm run verify` (348 tests in 50 files, typecheck, lint,
+build, and a 97.6 KiB gzip entry), 64 Chromium browser tests, and 13 production
+PWA tests. Both GitHub CI runs passed before merge. Physical Android Chrome
+checks confirmed the selection and cross-slide fixes before the rebase;
+the upgraded runtime's mobile coverage uses Chromium touch emulation.
+Physical Android/iOS retesting and the environment limits below remain
+unverified. See [the mobile guide](mobile.md) for the shipped behavior.
+
 ## Measurement protocol
 
 These comparison trials describe the 2026-10-09 stack checkpoint. The

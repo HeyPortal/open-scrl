@@ -90,6 +90,29 @@ All four priorities from the initial review have now been investigated and fixed
   retry followed by a page reload, and media-library retry. Existing editor/export
   browser tests also pass.
 
+## Mobile reliability follow-up — 2026-10-10
+
+The phone layout shares the existing document, asset, and export systems. Its
+touch hit testing now follows live layer geometry rather than a bitmap hit map,
+including text above photos and layers moved across slide boundaries. Interrupted
+drags and two-finger transforms are discarded; interrupted handle resizing keeps
+the last visible size and releases the handle so the layer stays touchable.
+
+Phone gestures and inline text drafts now hold the app-update activity guard
+through commit or cancellation. Production checks verify that an accepted update
+waits for active mobile work and persists it before reload. Escape and project
+switches discard drafts, while a same-project field unmount preserves typed text.
+A loading screen stays visible while the app and bundled fonts initialize.
+These are reliability fixes; no phone performance speedup was measured.
+
+The merged mobile/runtime acceptance passed 348 unit tests in 50 files,
+64 Chromium browser tests, and 13 production PWA tests, with a 97.6 KiB gzip
+entry below the 120 KiB limit. Those figures supplement the historical storage
+review above. Physical Android Chrome checks verified the touch and cross-slide
+fixes before the stack integration; the upgraded runtime was checked through
+Chromium touch emulation. See [mobile workflows](docs/mobile.md) and
+[runtime integration evidence](docs/web-stack-upgrade.md).
+
 ## Scope and limitations
 
 Browser verification covers Chromium. Safari/Firefox and actual disk exhaustion

@@ -9,6 +9,14 @@ activates an update, this tab still waits for its work and offers its own reload
 A failed save keeps the editor open. Use **Retry saving** before updating; the
 update becomes available once saving succeeds.
 
+On phones this includes canvas panning and pinching, two-finger layer transforms,
+photo dragging and handle resizing, and the inline text editor. Tap **Done** or
+elsewhere to save a text draft; **Escape** discards it. Opening another project
+drops the old draft without changing either project. A cancelled drag or
+two-finger transform releases the update hold without saving its preview.
+The update card sits above the bottom tools, with its message above large buttons.
+See the [mobile guide](mobile.md) for touch controls and export options.
+
 The app and editor are cached for offline use after the initial installation.
 HEIC conversion, ZIP packaging, and the export worker are downloaded when first
 used and then cached for up to 30 days. First use of those tools needs a network

@@ -50,6 +50,21 @@ Layering, from framework-independent to UI:
 
 Note: some files (e.g. `src/lib/export.ts`, `scripts/check-bundle.mjs`) are written in a dense, minified style; match the surrounding file rather than reformatting it.
 
+## Mobile web editor
+
+The mobile and desktop layouts share the document store, history, media, and export renderer. This is a responsive web layout, not a separate mobile app or project format.
+
+- `src/app/useMobileLayout.ts` selects the phone layout at widths up to 767px, or on a coarse-pointer screen up to 500px tall. `App.tsx` lazy-loads `MobileHome` and `MobileEditorShell`; wider layouts keep `EditorShell`.
+- `src/components/mobile/` owns the home screen, top bar, dock, slide strip, selection actions, tool sheets, and export UI. Shared panels use their touch layout inside `BottomSheet`; mobile styling lives in `mobile.css`, `home/home.css`, and `selection/inspector.css`. Preserve safe-area insets and the canvas remeasurement when sheets or selection actions change its available size. Landscape moves sheets beside the canvas.
+- `Canvas` receives `variant="mobile"`. `useTouchGestures.ts` handles pan, pinch, slide settling, and two-finger transforms; single-layer drags and handle transforms still use Konva. Avoid running both the desktop Stage touch handlers and the mobile capture listeners for one gesture.
+- `mobileHitTest.ts` overrides `stage.getIntersection` only for mobile and restores it on cleanup. It tests live layer geometry in visual stacking order, including transforms and small targets, with Transformer handles taking priority. Keep this path independent of the bitmap hit canvas: Android regressions produced both empty hits and the wrong layer. Preserve selection of text above a photo and photo selection after reopening or interrupted gestures.
+- A layer's owning slide can differ from the slide where it is drawn. Preserve the mobile viewport when selecting, dragging, or editing a layer moved across a seam; do not recenter only from its owning slide. Keep the continuous world-coordinate model.
+- Gestures and inline drafts hold `editorActivity` until after commit or cancellation so app updates cannot reload unfinished work. Balance holds on touch cancellation, window blur, project switch, and teardown. Review `Konva.DD` and Transformer cleanup assumptions when upgrading Konva.
+- `MobileTextEditor.tsx` keeps editable text at least 16px, follows `visualViewport` around the keyboard, and uses the bundled font mapping. Done/blur commits, Escape discards, and switching projects drops a stale draft; a same-project field unmount preserves typed text. Keep it keyed by project and layer.
+- The mobile `PwaUpdatePrompt` stays above the dock and safe area, wraps its message above 44px actions, and retains the same save/update controller as desktop.
+
+Mobile regression coverage lives in `e2e/mobile.spec.ts`, `e2e/mobile-activity.spec.ts`, `e2e/fonts.spec.ts`, and `e2e/pwa/updates-mobile.pwa.ts`. The gesture specs use Chromium touch emulation/CDP and the actual `window.Konva` singleton; importing a generated Vite dependency filename is brittle across tooling upgrades. Pick unused ports, for example `SCRL_E2E_PORT=5186 npm run test:e2e` and `PWA_PORT=5187 npm run test:pwa`, to avoid another worktree's server. Run builds and PWA checks sequentially because both write `dist/`. For touch changes, also check photo/text selection, move/rotate, cross-slide editing, and keyboard behavior on a physical phone when available; state separately what emulation and hardware verified.
+
 ## Mac architecture
 
 Under `macos/OpenSCRL/`: SwiftUI shell with AppKit for the canvas, menus, and text editing.
@@ -64,7 +79,7 @@ Web and Mac projects are stored separately and don't transfer between apps yet.
 
 ## Docs
 
-`PLAN.md` is the original plan with proposed features (not a list of what's implemented); `PERFORMANCE_REVIEW.md` records performance/reliability fixes and known limitations.
+`PLAN.md` is the original plan with proposed features (not a list of what's implemented); `PERFORMANCE_REVIEW.md` records performance/reliability fixes and known limitations. `docs/mobile.md` describes phone workflows, `docs/web-updates.md` describes offline/update behavior, and `docs/web-stack-upgrade.md` records the runtime upgrade and mobile integration checks. Keep README screenshots and the mobile guide in step with user-visible changes.
 
 ## Commits and pull requests
 

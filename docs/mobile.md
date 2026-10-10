@@ -1,10 +1,10 @@
 # The mobile layout
 
-The web app has a touch-first layout for phones: its own home screen and editor. It opens the same projects as the desktop layout. This page describes how the phone layout works.
+The web app has a touch-first layout for phones: its own home screen and editor. It uses the same projects and media as the desktop layout in that browser; rotating or resizing the window keeps the current project open. Projects stay on the device and are not synced between browsers or devices. This page describes how the phone layout works.
 
 | Home screen | Editor |
 | --- | --- |
-| ![Phone home screen with carousel creation and saved projects](./images/mobile-home.png) | ![Phone editor with a selected Inter text layer](./images/mobile-editor.png) |
+| ![Phone home screen with carousel creation and saved projects](./images/mobile-home.png) | ![Phone editor with photos, text, and touch controls](./images/mobile-editor.png) |
 
 ## When the mobile layout is used
 
@@ -38,6 +38,8 @@ A sheet rises from the dock and the canvas shrinks to make room. The slide strip
 - **Shapes**: tap a shape to add it to the slide.
 - **Canvas**: sets the background of the current slide to a color, gradient, photo, or none. **Apply to all N slides** copies it to every slide.
 
+<img src="./images/mobile-grid.png" alt="A phone carousel with a filled two-by-two photo grid and slide thumbnails." width="320" />
+
 ## Selecting and editing
 
 Tap a layer on the canvas to select it. The selection bar starts with a label (Photo, Text, Shape, Group, or the number of layers) followed by the actions, which scroll sideways when they don't all fit:
@@ -59,7 +61,7 @@ On the canvas, one finger selects one layer at a time. To select several, open *
 - **Drag** empty canvas to pan. At fit zoom, a slow swipe settles on the nearest slide, and a quick flick moves one slide.
 - **Pinch** on empty canvas to zoom around your fingers. Pinching together past the fit view shows several slides side by side. Pinching back to near fit snaps to fit.
 - **Two fingers on a selected layer**: if one unlocked layer is selected and your fingers start on or just around it, pinching scales it, twisting rotates it (snapping to 45° when within 4°), and moving both fingers moves it. Releasing commits the whole change as a single undo step. Two fingers that start elsewhere zoom the canvas instead.
-- **Double-tap** a text layer to edit it in place. The box grows with the text. Tap **Done** above it, or tap outside it, to finish. Touch has no Escape key, so **Done** is the way out.
+- **Double-tap** a text layer to edit it in place. The box grows with the text and stays within the screen above the keyboard. Tap **Done** above it, or tap outside it, to finish.
 - **Double-tap** empty canvas while zoomed in to return to the fit view. At fit zoom, a double-tap does nothing extra.
 
 Touch selection follows the current position, rotation, and stacking order of the visible layers. A title above a photo remains selectable, including after moving layers or reopening a project. Layers moved across slide boundaries can be selected, dragged, and edited where they appear; selecting them keeps the canvas on the slide you are viewing.

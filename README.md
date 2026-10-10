@@ -5,7 +5,7 @@
 <h1 align="center">Open-SCRL</h1>
 
 <p align="center">
-  Photo carousels and grids for socials, made on your own machine.<br />
+  Photo carousels and grids for socials, made on your own device.<br />
   No account, no subscription, nothing uploaded.
 </p>
 
@@ -17,8 +17,8 @@
 
 ![The Open-SCRL web editor with a Florida carousel open.](docs/images/web-editor.webp)
 
-A free, open-source alternative to [SCRL](https://scrl.com), available as a web app and a
-native Mac app. The web app has a touch-first layout on phones ([details](./docs/mobile.md)).
+A free, open-source alternative to [SCRL](https://scrl.com), available as a web app for
+desktop and phones and a native Mac app.
 Lay your photos out across a row of slides, then export one file per slide in posting order.
 It's early, so expect rough edges.
 
@@ -38,6 +38,24 @@ It's early, so expect rough edges.
     <td width="38%"><img src="docs/images/web-preview.webp" alt="The phone preview." /></td>
   </tr>
 </table>
+
+## On your phone
+
+The web app has its own phone home screen and editor, with photo and grid tools in
+bottom sheets. Drag layers to arrange them, pinch to zoom, use two fingers to scale
+and rotate a selected layer, and double-tap text to type in place. Turn the phone
+sideways to put the tools beside the canvas.
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/images/mobile-home.png" alt="Phone home screen with carousel creation and saved projects." width="300" /></td>
+    <td width="50%"><img src="docs/images/mobile-editor.png" alt="Phone editor with photo layers, text, and touch controls." width="300" /></td>
+  </tr>
+</table>
+
+Export one slide or a whole carousel as downloaded files. The app saves projects
+in the browser and waits for unfinished edits before offering an update.
+[Mobile controls and limitations](./docs/mobile.md).
 
 ## Mac app
 
@@ -64,6 +82,7 @@ npm ci
 npm run dev        # http://localhost:5173
 npm run verify     # typecheck, lint, tests, build
 npm run test:e2e   # Playwright (run `npx playwright install chromium` first)
+npm run test:pwa   # production offline and update checks
 ```
 
 Requires Node 22.12+. For the Mac app, open `macos/OpenSCRL.xcodeproj` in Xcode 27 and run it.
