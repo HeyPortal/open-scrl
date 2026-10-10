@@ -1,52 +1,134 @@
-/* Mobile home screen: shared behaviour and small keyframes. */
+/*
+ * Studio phone home. The scroll container is a full-height <main>; the compact bar and the floating
+ * "New carousel" pill are fixed chrome (the only places that use backdrop-filter), so the lists
+ * scroll without stacked blurs. Shared pieces are in src/components/home/home.css.
+ */
 .mobile-home {
   -webkit-tap-highlight-color: transparent;
   -webkit-text-size-adjust: 100%;
   font-size: 15px;
 }
-
 .mobile-home button,
 .mobile-home a,
-.mobile-home label {
-  touch-action: manipulation;
+.mobile-home label { touch-action: manipulation; }
+
+.home-phone {
+  position: relative; height: 100dvh; width: 100%; overflow: hidden; color: rgb(var(--c-ink));
+  background-color: rgb(var(--c-canvas-bg));
+  background-image:
+    radial-gradient(90% 360px at 50% -140px, rgb(var(--c-accent) / .1), transparent),
+    radial-gradient(rgb(var(--c-canvas-dot) / var(--c-canvas-dot-alpha)) .8px, transparent .8px);
+  background-size: auto, 20px 20px;
+}
+.home-phone-scroll { height: 100%; overflow-y: auto; overscroll-behavior: contain; }
+.home-phone-content {
+  width: 100%; max-width: 560px; margin: 0 auto;
+  padding: calc(env(safe-area-inset-top) + 20px) max(16px, env(safe-area-inset-right)) calc(env(safe-area-inset-bottom) + 104px) max(16px, env(safe-area-inset-left));
 }
 
-.mobile-home .home-hscroll {
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
+/* Compact bar: fades in once the large title has scrolled away. */
+.home-topbar {
+  position: absolute; inset: 0 0 auto 0; z-index: 20; display: flex; align-items: flex-end; justify-content: center; pointer-events: none;
+  height: calc(env(safe-area-inset-top) + 52px); opacity: 0;
+  background: rgb(var(--c-bg-panel) / var(--c-bg-panel-alpha)); backdrop-filter: blur(20px) saturate(140%);
+  border-bottom: 1px solid transparent; transition: opacity 200ms ease-out, border-color 200ms ease-out;
+}
+.home-topbar[data-collapsed='true'] { opacity: 1; border-color: rgb(var(--c-line) / var(--c-line-alpha)); }
+.home-topbar-inner { display: flex; align-items: center; gap: 9px; height: 52px; }
+.home-topbar .home-brand-name { font-size: 23px; line-height: 1; }
+
+.home-phone-header { margin-bottom: 20px; }
+.home-phone-brand { display: flex; align-items: center; gap: 12px; }
+.home-phone-title { font-size: 40px; line-height: 1; letter-spacing: -.01em; color: rgb(var(--c-ink)); }
+.home-phone-header p { margin: 10px 0 0; font-size: 15px; line-height: 1.4; color: rgb(var(--c-ink-dim)); }
+.home-phone-content > .home-alert { margin-bottom: 16px; }
+
+/* Create card */
+.home-create {
+  padding: 18px; border-radius: 26px;
+  background: radial-gradient(100% 90% at 100% 0%, rgb(var(--c-accent) / .11), transparent 60%), rgb(var(--c-bg-panel));
+  box-shadow: inset 0 0 0 1px rgb(var(--c-line) / var(--c-line-alpha)), inset 0 1px 0 rgb(var(--c-surface-ring) / .06), var(--shadow-panel);
+}
+.home-create .home-formats {
+  display: flex; gap: 10px; margin: 16px -18px 0; padding: 4px 18px 8px; overflow-x: auto;
+  scroll-snap-type: x proximity; scroll-padding-inline: 18px;
+}
+.home-create .home-format { flex: 0 0 116px; scroll-snap-align: start; min-height: 148px; padding: 8px 8px 12px; }
+.home-create .home-format:active { transform: scale(.97); }
+.home-create .home-format-well { height: 84px; margin-bottom: 8px; }
+
+.home-name {
+  display: flex; align-items: center; gap: 12px; height: 52px; margin-top: 10px; padding: 0 16px;
+  border-radius: 16px; background: rgb(var(--c-bg-inset)); border: 1px solid transparent; transition: border-color 150ms ease-out;
+}
+.home-name:focus-within { border-color: rgb(var(--c-accent)); }
+.home-name > span { width: 40px; flex-shrink: 0; font-size: 13px; color: rgb(var(--c-ink-dim)); }
+.home-name input { flex: 1; min-width: 0; height: 100%; background: transparent; color: rgb(var(--c-ink)); font-size: 16px; outline: none; }
+.home-name input::placeholder { color: rgb(var(--c-ink-faint)); }
+.home-create-button { width: 100%; height: 54px; margin-top: 12px; border-radius: 999px; font-size: 16px; }
+
+/* Grid starters scroll sideways, edge to edge. */
+.home-starters[data-variant='phone'] .home-starters-list {
+  margin: 14px -16px 0; padding: 0 16px 4px; overflow-x: auto; scroll-snap-type: x proximity; scroll-padding-inline: 16px;
+}
+.home-starters[data-variant='phone'] .home-starters-list > li { flex: 0 0 88px; scroll-snap-align: start; }
+.home-starters[data-variant='phone'] .home-starter { padding: 8px 4px 10px; }
+.home-starters[data-variant='phone'] .home-starter-well { height: 84px; }
+
+/* Project rows */
+.home-psearch { position: relative; margin-top: 14px; }
+.home-psearch > svg { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); pointer-events: none; color: rgb(var(--c-ink-dim)); }
+.home-psearch input {
+  width: 100%; height: 46px; padding: 0 46px 0 42px; border-radius: 14px; border: 1px solid transparent;
+  background: rgb(var(--c-bg-inset)); color: rgb(var(--c-ink)); font-size: 16px; outline: none; transition: border-color 150ms ease-out;
+}
+.home-psearch input:focus { border-color: rgb(var(--c-accent)); }
+.home-psearch input::placeholder { color: rgb(var(--c-ink-faint)); }
+.home-psearch input::-webkit-search-cancel-button,
+.home-psearch input::-webkit-search-decoration { display: none; }
+.home-psearch > button { position: absolute; right: 0; top: 0; display: flex; align-items: center; justify-content: center; width: 46px; height: 46px; }
+.home-psearch > button > span { display: flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 999px; background: rgb(var(--c-bg-hover)); color: rgb(var(--c-ink-dim)); }
+
+.home-plist { margin-top: 14px; }
+.home-plist .home-empty, .home-plist .home-nomatch { margin-top: 0; }
+.home-plist-rows {
+  margin: 0; padding: 0; list-style: none; overflow: hidden; border-radius: 22px; background: rgb(var(--c-bg-panel));
+  box-shadow: inset 0 0 0 1px rgb(var(--c-line) / var(--c-line-alpha)), var(--shadow-soft);
+}
+.home-plist-rows > li { position: relative; }
+.home-plist-rows > li + li::before {
+  content: ''; position: absolute; top: 0; left: 88px; right: 0; height: 1px; background: rgb(var(--c-line) / var(--c-line-alpha));
+}
+.home-prow {
+  display: flex; align-items: center; gap: 14px; width: 100%; min-height: 84px; padding: 12px 14px; text-align: left;
+  transition: background-color 100ms ease-out;
+}
+.home-prow:active:not(:disabled) { background: rgb(var(--c-bg-hover)); }
+.home-prow:disabled { opacity: .6; }
+.home-prow-well { flex-shrink: 0; width: 60px; height: 60px; padding: 5px; border-radius: 14px; box-shadow: inset 0 0 0 1px rgb(var(--c-line) / var(--c-line-alpha)); }
+.home-prow-body { display: flex; flex: 1; flex-direction: column; min-width: 0; gap: 1px; }
+.home-prow-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 22px; line-height: 1.2; color: rgb(var(--c-ink)); }
+.home-prow-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; font-size: 13px; line-height: 1.3; color: rgb(var(--c-ink-dim)); }
+.home-prow-time { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; line-height: 1.3; color: rgb(var(--c-ink-dim)); }
+.home-prow-chevron { flex-shrink: 0; color: rgb(var(--c-ink-dim)); }
+
+.home-phone-footer {
+  display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 32px; font-size: 12px; color: rgb(var(--c-ink-dim));
 }
 
-.mobile-home .home-hscroll::-webkit-scrollbar {
-  display: none;
+/* Floating "New carousel": only while the create card is scrolled away. */
+.home-fab {
+  position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 18px); z-index: 30;
+  display: inline-flex; align-items: center; gap: 8px; height: 52px; padding: 0 24px 0 18px; border-radius: 999px;
+  background: rgb(var(--c-accent)); color: rgb(var(--c-accent-ink)); font-size: 15px; font-weight: 600; white-space: nowrap;
+  box-shadow: inset 0 1px 0 rgb(var(--c-surface-ring) / .28), 0 16px 32px -10px rgb(var(--c-accent) / .65), 0 4px 12px rgba(0, 0, 0, .5);
+  opacity: 0; visibility: hidden; transform: translate(-50%, 18px) scale(.96);
+  transition: opacity 200ms ease-out, transform 220ms cubic-bezier(.22, 1, .36, 1), visibility 0s linear 220ms;
 }
-
-@keyframes home-fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes home-sheet-in {
-  from { transform: translateY(100%); }
-  to { transform: translateY(0); }
-}
-
-@keyframes home-rise-in {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.home-fade-in { animation: home-fade-in 180ms ease-out both; }
-.home-sheet-in { animation: home-sheet-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both; }
-.home-rise-in { animation: home-rise-in 220ms ease-out both; }
+.home-fab[data-visible='true'] { opacity: 1; visibility: visible; transform: translate(-50%, 0) scale(1); transition-delay: 0s; }
+.home-fab:active { background: rgb(var(--c-accent-hover)); }
+.home-fab[data-visible='true']:active { transform: translate(-50%, 0) scale(.97); }
 
 @media (prefers-reduced-motion: reduce) {
-  .home-fade-in,
-  .home-sheet-in,
-  .home-rise-in {
-    animation: none;
-  }
-
-  .mobile-home * {
-    transition-duration: 0.01ms !important;
-  }
+  .home-fab, .home-fab[data-visible='true'] { transform: translate(-50%, 0); }
 }

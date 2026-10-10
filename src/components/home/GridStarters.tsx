@@ -2,17 +2,14 @@ import { Loader2 } from 'lucide-react';
 import type { Format } from '@/types';
 import { GRID_TEMPLATES, type GridTemplate } from '@/lib/grids';
 import { fitBox } from './projectDisplay';
+import './home.css';
 
 /** A curated handful of layouts; the full set lives in the editor's Grids panel. */
 const STARTER_IDS = ['two-v', 'three-h', 'one-plus-two', 'four-grid', 'l-shape', 'one-plus-three', 'six-grid', 'nine-grid'];
 
 export const STARTER_TEMPLATES: GridTemplate[] = STARTER_IDS.flatMap((id) => GRID_TEMPLATES.find((template) => template.id === id) ?? []);
 
-/** Spacing (in canvas px) applied to the first slide when a project starts from a grid. */
-export const STARTER_GAP = 16;
-export const STARTER_MARGIN = 16;
-
-const THUMB_BOX = { width: 56, height: 72 };
+const THUMB_BOX = { width: 52, height: 68 };
 
 /** Cell diagram drawn in a 100-unit tall space so the gap reads at thumbnail size. */
 function GridThumb({ template, format, index }: { template: GridTemplate; format: Format; index: number }) {
@@ -24,8 +21,8 @@ function GridThumb({ template, format, index }: { template: GridTemplate; format
     <svg width={size.width} height={size.height} viewBox={`0 0 ${viewW} ${viewH}`} aria-hidden className="overflow-visible">
       <defs>
         <linearGradient id={`home-grid-fill-${index}`} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#9a82ff" />
-          <stop offset="1" stopColor="#6a49f2" />
+          <stop offset="0" style={{ stopColor: 'rgb(var(--c-accent-start))' }} />
+          <stop offset="1" style={{ stopColor: 'rgb(var(--c-accent-end))' }} />
         </linearGradient>
       </defs>
       {cells.map((cell, i) => (
@@ -50,41 +47,44 @@ interface GridStartersProps {
   pendingId: string | null;
   busy: boolean;
   onPick: (template: GridTemplate) => void;
+  /** 'phone' scrolls sideways; 'desktop' lays the tiles out as a grid. */
+  variant?: 'phone' | 'desktop';
 }
 
-export function GridStarters({ format, pendingId, busy, onPick }: GridStartersProps) {
+/** Photo-layout starters shared by both home screens; picking one creates a project with that grid applied. */
+export function GridStarters({ format, pendingId, busy, onPick, variant = 'phone' }: GridStartersProps) {
   return (
-    <section aria-labelledby="home-grids-title" className="mt-8">
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 id="home-grids-title" className="heading-lg">
-          Start from a grid
-        </h2>
-        <span className="truncate text-[12px] text-ink-faint">{format.name}</span>
+    <section aria-labelledby="home-grids-title" className="home-section home-starters" data-variant={variant}>
+      <div className="home-section-head">
+        <div className="min-w-0">
+          <h2 id="home-grids-title" className="home-section-title">Start from a grid</h2>
+          <p className="home-section-sub">Photo layouts, ready to fill.</p>
+        </div>
+        <span className="home-section-aside">{format.name}</span>
       </div>
-      <p className="mt-0.5 text-[13px] text-ink-faint">Photo layouts, ready to fill.</p>
 
-      <ul className="home-hscroll -mx-4 mt-3 flex snap-x snap-proximity gap-2.5 overflow-x-auto scroll-px-4 px-4 pb-1">
+      <ul className="home-starters-list home-hscroll">
         {STARTER_TEMPLATES.map((template, index) => {
           const pending = pendingId === template.id;
           return (
-            <li key={template.id} className="shrink-0 snap-start">
+            <li key={template.id}>
               <button
                 type="button"
                 disabled={busy}
                 aria-busy={pending}
                 aria-label={`Start with ${template.name} grid`}
                 onClick={() => onPick(template)}
-                className="group flex w-[82px] flex-col items-center gap-1.5 transition-transform duration-150 ease-out active:scale-[0.96] disabled:opacity-60 motion-reduce:active:scale-100"
+                className="home-starter"
               >
-                <span className="relative flex h-[96px] w-full items-center justify-center rounded-2xl border border-line bg-bg-panel transition-colors group-active:bg-bg-hover">
+                <span className="home-starter-well">
                   <GridThumb template={template} format={format} index={index} />
                   {pending && (
-                    <span className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/55">
+                    <span className="home-starter-busy">
                       <Loader2 size={18} className="animate-spin text-accent" aria-hidden />
                     </span>
                   )}
                 </span>
-                <span className="text-[12px] font-medium leading-tight text-ink-dim">{template.name}</span>
+                <span className="home-starter-label">{template.name}</span>
               </button>
             </li>
           );

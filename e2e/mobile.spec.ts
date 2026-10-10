@@ -46,7 +46,7 @@ test.describe('mobile editor', () => {
       await expect(page.getByRole('heading', { name: 'Open-SCRL', level: 1 })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Create carousel', exact: true })).toBeVisible();
       await expect(page.getByRole('heading', { name: 'No carousels yet' })).toBeVisible();
-      await expect(page.getByRole('heading', { name: 'New project' })).toHaveCount(0);
+      await expect(page.getByRole('heading', { name: 'Make something worth swiping.' })).toHaveCount(0);
       await expect(page.getByRole('button', { name: 'Create & open editor' })).toHaveCount(0);
     });
 
@@ -113,6 +113,36 @@ test.describe('mobile editor', () => {
       await expect(selectionBar(page).getByRole('button', { name: 'Duplicate', exact: true })).toBeVisible();
       await expect(selectionBar(page).getByRole('button', { name: 'Delete', exact: true })).toBeVisible();
       await expect(dock(page)).toHaveCount(0);
+    });
+
+    await test.step('No label is clipped, and More holds the arrange and lock actions', async () => {
+      const clipped = await selectionBar(page).evaluate((bar) =>
+        [...bar.querySelectorAll('button')].filter((button) => {
+          const label = button.querySelector('span');
+          if (!label) return false;
+          const box = label.getBoundingClientRect();
+          const room = button.getBoundingClientRect();
+          return box.left < room.left - 0.5 || box.right > room.right + 0.5;
+        }).map((button) => button.textContent),
+      );
+      expect(clipped).toEqual([]);
+
+      const more = selectionBar(page).getByRole('button', { name: 'More actions', exact: true });
+      const menu = page.getByRole('menu', { name: 'More actions', exact: true });
+      await more.tap();
+      for (const name of ['Forward', 'Backward', 'Lock']) await expect(menu.getByRole('menuitem', { name, exact: true })).toBeVisible();
+      const row = await menu.getByRole('menuitem', { name: 'Lock', exact: true }).boundingBox();
+      expect(row?.height).toBeGreaterThanOrEqual(44);
+      await page.keyboard.press('Escape');
+      await expect(menu).toHaveCount(0);
+      await expect(more).toBeFocused();
+
+      await more.tap();
+      await menu.getByRole('menuitem', { name: 'Lock', exact: true }).tap();
+      await expect(menu).toHaveCount(0);
+      await more.tap();
+      await menu.getByRole('menuitem', { name: 'Unlock', exact: true }).tap();
+      await expect(menu).toHaveCount(0);
     });
 
     await test.step('Duplicate adds a second layer', async () => {
@@ -762,10 +792,11 @@ test.describe('desktop layout', () => {
 
     await test.step('Desktop landing page, not the mobile home', async () => {
       await page.goto('/');
-      await expect(page.getByRole('heading', { name: 'New project' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Make something worth swiping.' })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Create & open editor' })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Create carousel', exact: true })).toHaveCount(0);
-      await expect(page.getByRole('heading', { name: 'Start from a grid' })).toHaveCount(0);
+      // Desktop shares the phone's grid starters.
+      await expect(page.getByRole('heading', { name: 'Start from a grid' })).toBeVisible();
     });
 
     await test.step('Desktop editor with the side tools, not the mobile dock', async () => {
