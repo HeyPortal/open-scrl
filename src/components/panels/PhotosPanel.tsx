@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, Film, GalleryHorizontal, GalleryHorizontalEnd, ImagePlus, Loader2, Trash2, Upload, X } from 'lucide-react';
+import { Check, Film, GalleryHorizontal, GalleryHorizontalEnd, ImagePlus, Loader2, MoreHorizontal, Trash2, Upload, X } from 'lucide-react';
 import type { AssetMeta } from '@/types';
 import { useAssets } from '@/store/assets';
 import { useEditor } from '@/store/editor';
@@ -62,7 +62,9 @@ function MediaThumbnail({
   );
 }
 
-export function PhotosPanel() {
+/** `sheet` is the touch layout used inside the mobile bottom sheet; `sidebar` is the desktop panel. */
+export function PhotosPanel({ layout = 'sidebar' }: { layout?: 'sidebar' | 'sheet' }) {
+  const sheet = layout === 'sheet';
   const activeProjectId = useEditor((s) => s.activeProjectId);
   const assetProjectId = useAssets((s) => s.projectId);
   const scopedAssets = useAssets((s) => s.assets);
@@ -98,6 +100,7 @@ export function PhotosPanel() {
   const duplicateLayer = useEditor((s) => s.duplicateLayer);
   const assignPhoto = useEditor((s) => s.assignPhoto);
   const selectedLayerId = useEditorSession((s) => s.selectedLayerId);
+  const selectLayer = useEditorSession((s) => s.selectLayer);
   const selectedLayer = useEditor((s) => selectedLayerId ? s.doc.layers[selectedLayerId] : undefined);
   const layers = useEditor((s) => s.doc.layers);
   const slides = useEditor((s) => s.doc.slides);
@@ -168,7 +171,7 @@ export function PhotosPanel() {
 
   return (
     <div
-      className="flex h-full flex-col"
+      className={sheet ? 'flex flex-col' : 'flex h-full flex-col'}
       onDragOver={(e) => {
         e.preventDefault();
       }}
@@ -179,29 +182,52 @@ export function PhotosPanel() {
         void handleFiles(e.dataTransfer.files);
       }}
     >
-      <PanelHeader title="Media" action={assets.length > 0 ? <span className="text-xs tabular-nums text-ink-faint">{assets.length}</span> : undefined} />
-      <div className="flex flex-col gap-2 px-3 pb-3">
-        <button
-          className="group flex w-full items-center gap-2.5 rounded-lg border border-dashed border-line-strong px-2.5 py-2 text-left transition-colors hover:border-accent hover:bg-accent-soft disabled:opacity-60"
-          onClick={() => { importAsSlides.current = false; inputRef.current?.click(); }}
-          disabled={busy}
-        >
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-accent text-white">
-            {busy ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <Upload size={16} aria-hidden />}
-          </span>
-          <span className="min-w-0">
-            <span className="block text-xs font-medium text-ink">{busy ? 'Importing…' : 'Import media'}</span>
-            <span className="block text-[11px] text-ink-faint">or drop photos, GIFs, and videos</span>
-          </span>
-        </button>
-        <button
-          className="flex items-center gap-1.5 self-start rounded px-0.5 text-[11px] font-medium text-ink-dim hover:text-ink disabled:opacity-60"
-          onClick={() => { importAsSlides.current = true; inputRef.current?.click(); }}
-          disabled={busy}
-          title="Import photos and give each one its own slide. Panoramas span as many slides as they need."
-        >
-          <GalleryHorizontalEnd size={13} aria-hidden /> Import as new slides
-        </button>
+      {!sheet && <PanelHeader title="Media" action={assets.length > 0 ? <span className="text-xs tabular-nums text-ink-faint">{assets.length}</span> : undefined} />}
+      <div className={sheet ? 'flex flex-col gap-2.5 px-4 pb-3 pt-1' : 'flex flex-col gap-2 px-3 pb-3'}>
+        {sheet ? (
+          <div className="flex gap-2">
+            <button
+              className="flex h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-xl bg-accent px-4 text-[15px] font-semibold text-white transition-colors active:bg-accent-hover disabled:opacity-60"
+              onClick={() => { importAsSlides.current = false; inputRef.current?.click(); }}
+              disabled={busy}
+            >
+              {busy ? <Loader2 size={18} className="animate-spin" aria-hidden /> : <Upload size={18} aria-hidden />}
+              {busy ? 'Importing…' : 'Import media'}
+            </button>
+            <button
+              className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-xl bg-bg-inset px-4 text-[14px] font-medium text-ink ring-1 ring-inset ring-line-strong transition-colors active:bg-bg-hover disabled:opacity-60"
+              onClick={() => { importAsSlides.current = true; inputRef.current?.click(); }}
+              disabled={busy}
+              title="Import photos and give each one its own slide. Panoramas span as many slides as they need."
+            >
+              <GalleryHorizontalEnd size={17} aria-hidden /> As slides
+            </button>
+          </div>
+        ) : (
+          <>
+            <button
+              className="group flex w-full items-center gap-2.5 rounded-lg border border-dashed border-line-strong px-2.5 py-2 text-left transition-colors hover:border-accent hover:bg-accent-soft disabled:opacity-60"
+              onClick={() => { importAsSlides.current = false; inputRef.current?.click(); }}
+              disabled={busy}
+            >
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-accent text-white">
+                {busy ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <Upload size={16} aria-hidden />}
+              </span>
+              <span className="min-w-0">
+                <span className="block text-xs font-medium text-ink">{busy ? 'Importing…' : 'Import media'}</span>
+                <span className="block text-[11px] text-ink-faint">or drop photos, GIFs, and videos</span>
+              </span>
+            </button>
+            <button
+              className="flex items-center gap-1.5 self-start rounded px-0.5 text-[11px] font-medium text-ink-dim hover:text-ink disabled:opacity-60"
+              onClick={() => { importAsSlides.current = true; inputRef.current?.click(); }}
+              disabled={busy}
+              title="Import photos and give each one its own slide. Panoramas span as many slides as they need."
+            >
+              <GalleryHorizontalEnd size={13} aria-hidden /> Import as new slides
+            </button>
+          </>
+        )}
         <input
           ref={inputRef}
           type="file"
@@ -223,7 +249,18 @@ export function PhotosPanel() {
             </button>
           </div>
         )}
-        {assets.length > 0 && (
+        {assets.length > 0 && (sheet ? (
+          <p className={`flex min-h-9 items-center gap-2 rounded-lg px-3 py-1.5 text-[12px] leading-snug ${targetSlot ? 'bg-accent-soft text-accent' : 'text-ink-faint'}`}>
+            <span className="min-w-0 flex-1">
+              {targetSlot
+                ? targetSlot.assetId
+                  ? <>Tap a photo to replace <strong>{targetSlot.name}</strong>, or its current photo to duplicate it.</>
+                  : <>Tap a photo to fill <strong>{targetSlot.name}</strong>.</>
+                : 'Tap a photo to add it to the slide.'}
+            </span>
+            {targetSlot && <button className="shrink-0 rounded-md px-2 py-1.5 font-semibold underline-offset-2 active:bg-accent-soft" onClick={() => selectLayer(null)}>Add new instead</button>}
+          </p>
+        ) : (
           <p className={`rounded-lg px-3 py-2 text-[11px] leading-relaxed ${targetSlot ? 'bg-accent-soft text-accent' : 'text-ink-faint'}`}>
             {targetSlot
               ? targetSlot.assetId
@@ -231,16 +268,16 @@ export function PhotosPanel() {
                 : <>Click a photo to fill <strong>{targetSlot.name}</strong>.</>
               : 'Click a photo to add it to the slide, or drag it onto a frame or the canvas.'}
           </p>
-        )}
+        ))}
       </div>
-      <div className="grid grid-cols-3 content-start gap-1.5 overflow-auto border-t border-line px-3 py-3 scrollbar-thin">
+      <div className={sheet ? 'grid grid-cols-[repeat(auto-fill,minmax(92px,1fr))] content-start gap-2 border-t border-line px-4 py-4' : 'grid grid-cols-3 content-start gap-1.5 overflow-auto border-t border-line px-3 py-3 scrollbar-thin'}>
         {assets.map((a) => {
           const current = targetSlot?.assetId === a.id;
           const span = spanOf(a);
           return (
             <div key={a.id} className="group relative" onContextMenu={(e) => { e.preventDefault(); assetMenu(a, e.clientX, e.clientY); }}>
               <button
-                className={`block aspect-square w-full overflow-hidden rounded-lg bg-bg-inset transition-shadow hover:ring-2 hover:ring-accent/60 ${current ? 'ring-2 ring-accent ring-offset-1 ring-offset-bg-panel' : ''}`}
+                className={`block aspect-square w-full overflow-hidden bg-bg-inset transition-shadow hover:ring-2 hover:ring-accent/60 ${sheet ? 'rounded-xl' : 'rounded-lg'} ${current ? 'ring-2 ring-accent ring-offset-1 ring-offset-bg-panel' : ''}`}
                 onClick={() => handleAssetClick(a)}
                 draggable
                 onDragStart={(e) => {
@@ -264,7 +301,7 @@ export function PhotosPanel() {
               )}
               {span > 1 && (
                 <button
-                  className="absolute bottom-1 right-1 flex items-center gap-0.5 rounded-md bg-black/70 px-1 py-0.5 text-[9px] font-semibold text-white opacity-80 transition-opacity hover:bg-accent hover:opacity-100 group-hover:opacity-100 focus-visible:opacity-100"
+                  className={`absolute bottom-1 right-1 flex items-center gap-0.5 rounded-md bg-black/70 font-semibold text-white opacity-80 transition-opacity hover:bg-accent hover:opacity-100 group-hover:opacity-100 focus-visible:opacity-100 ${sheet ? 'h-6 px-1.5 text-[11px]' : 'px-1 py-0.5 text-[9px]'}`}
                   onClick={() => spread(a)}
                   title={`Panorama — spread it across ${span} slides`}
                   aria-label={`Spread ${a.name} across ${span} slides`}
@@ -277,21 +314,32 @@ export function PhotosPanel() {
                   <Check size={10} strokeWidth={3} aria-hidden />
                 </span>
               )}
-              <button
-                className="absolute right-1 top-1 rounded bg-black/70 p-1 text-white/80 opacity-0 transition-opacity hover:text-red-300 group-hover:opacity-100 focus-visible:opacity-100"
-                onClick={() => remove(a.id)}
-                title="Delete"
-                aria-label={`Remove ${a.name} from this project`}
-              >
-                <Trash2 size={12} />
-              </button>
+              {sheet ? (
+                <button
+                  className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white active:bg-black/80"
+                  onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); assetMenu(a, r.right - 220, r.bottom + 4); }}
+                  aria-label={`More actions for ${a.name}`}
+                  aria-haspopup="menu"
+                >
+                  <MoreHorizontal size={16} aria-hidden />
+                </button>
+              ) : (
+                <button
+                  className="absolute right-1 top-1 rounded bg-black/70 p-1 text-white/80 opacity-0 transition-opacity hover:text-red-300 group-hover:opacity-100 focus-visible:opacity-100"
+                  onClick={() => remove(a.id)}
+                  title="Delete"
+                  aria-label={`Remove ${a.name} from this project`}
+                >
+                  <Trash2 size={12} />
+                </button>
+              )}
             </div>
           );
         })}
         {assets.length === 0 && (
-          <div className="col-span-3">
+          <div className="col-span-full">
             <EmptyState icon={<ImagePlus size={22} aria-hidden />} title="No media yet.">
-              Drop images, GIFs, or videos here or use the import button above. Files stay on this device.
+              {sheet ? 'Import images, GIFs, or videos with the button above. Files stay on this device.' : 'Drop images, GIFs, or videos here or use the import button above. Files stay on this device.'}
             </EmptyState>
           </div>
         )}

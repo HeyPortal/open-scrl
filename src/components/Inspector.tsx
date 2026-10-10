@@ -20,6 +20,7 @@ import {
   MousePointerClick,
   Plus,
   RotateCcw,
+  RotateCw,
   Square,
   Trash2,
   Type,
@@ -29,9 +30,11 @@ import { useEditorSession } from '@/editor/sessionStore';
 import type { ImageLayer, Layer, ShapeLayer, TextLayer } from '@/types';
 import { GRADIENT_SWATCHES, SOLID_SWATCHES, backgroundCss, backgroundLabel, sameBackground } from '@/lib/palette';
 import { RotationDial } from './RotationDial';
+import { normalizeDegrees } from './canvas/touchMath';
 import { ColorField, LinkedSliders, NumberField, Section, Slider } from './ui';
 import { useEditGesture, useLayerGesture } from './inspector/useLayerGesture';
 import { Switch } from './inspector/controls';
+import { TouchInspectorContext, useTouchInspector, type TouchInspectorHost } from './inspector/touch';
 import { PhotoSwapSection } from './inspector/PhotoSwapSection';
 import { SlidePhotoActions } from './inspector/SlidePhotoActions';
 import { ImageFrameSection, ShadowSection, TextFillSection, TextHighlightSection, TextOutlineSection } from './inspector/effects';
@@ -40,6 +43,7 @@ import { ALIGN_BUTTONS, SelectionInspector } from './inspector/SelectionInspecto
 import { groupMemberIds } from '@/core/document/selectors';
 import { getLiveGrid, hasLinkedSpacing } from '@/core/document/grid';
 import { linkedMax, maxGapFor, maxMargin } from '@/lib/grids';
+import { resolveFontFamily } from '@/render/fonts/families';
 
 const KIND_META = {
   image: { label: 'Photo', Icon: ImageIcon },
@@ -76,13 +80,13 @@ function LayerHeader({ layer }: { layer: Layer }) {
             }}
           />
         ) : (
-          <button className="block max-w-full truncate rounded px-0.5 text-left text-xs font-semibold text-ink hover:bg-bg-hover" title="Rename layer" onClick={() => setRenaming(true)}>
+          <button className="insp-rename block max-w-full truncate rounded px-0.5 text-left text-xs font-semibold text-ink hover:bg-bg-hover" title="Rename layer" onClick={() => setRenaming(true)}>
             {layer.name}
           </button>
         )}
         <p className="truncate px-0.5 text-[11px] tabular-nums text-ink-faint">
           {Math.round(layer.width)} × {Math.round(layer.height)}{layer.locked ? ' · Locked' : ''}{layer.visible ? '' : ' · Hidden'}
-          {layer.groupId && <> · <button type="button" className="font-medium text-accent hover:text-accent-hover" title="Select the whole group (Esc)" onClick={selectGroup}>In a group</button></>}
+          {layer.groupId && <> · <button type="button" className="insp-link font-medium text-accent hover:text-accent-hover" title="Select the whole group (Esc)" onClick={selectGroup}>In a group</button></>}
         </p>
       </div>
       <div className="flex shrink-0 items-center">
@@ -139,6 +143,9 @@ function ArrangeSection({ layer }: { layer: Layer }) {
   );
 }
 
+/** Turns by `delta` degrees and keeps the angle in [-180, 180), like the canvas does. */
+const quarterTurn = (rotation: number, delta: number) => normalizeDegrees(Math.round((rotation + delta) * 100) / 100);
+
 function LayoutSection({ layer, onPatch }: { layer: Layer; onPatch: (patch: Partial<Layer>) => void }) {
   const locked = layer.locked;
   const opacityPct = Math.round(layer.opacity * 100);
@@ -146,6 +153,7 @@ function LayoutSection({ layer, onPatch }: { layer: Layer; onPatch: (patch: Part
   const rotationGesture = useLayerGesture(layer.id, 'Rotate layer');
   const moveGesture = useLayerGesture(layer.id, 'Move layer');
   const sizeGesture = useLayerGesture(layer.id, 'Resize layer');
+  const touch = useTouchInspector();
 
   return (
     <Section title="Position & size" action={locked ? <span className="inline-flex items-center gap-1 text-[11px] text-ink-faint"><Lock size={11} aria-hidden />Locked</span> : undefined}>
@@ -156,7 +164,7 @@ function LayoutSection({ layer, onPatch }: { layer: Layer; onPatch: (patch: Part
         <NumberField prefix="H" ariaLabel="Height" value={layer.height} min={1} onChange={(v) => onPatch({ height: v })} disabled={locked || (layer.kind === 'text' && !layer.autoFit)} gesture={sizeGesture} />
       </div>
       <div className="flex items-center gap-2">
-        <div className="flex-1">
+        <div className="min-w-0 flex-1">
           <NumberField
             prefix={<RotateCcw size={11} className="-scale-x-100" aria-hidden />}
             ariaLabel="Rotation"
@@ -169,13 +177,23 @@ function LayoutSection({ layer, onPatch }: { layer: Layer; onPatch: (patch: Part
         </div>
         <RotationDial
           compact
-          size={32}
+          size={touch ? 44 : 32}
           value={layer.rotation}
           onChange={(v) => onPatch({ rotation: v })}
           disabled={locked}
           onInteractionStart={rotationGesture.begin}
           onInteractionEnd={(cancelled) => cancelled ? rotationGesture.cancel() : rotationGesture.end()}
         />
+        {touch && (
+          <>
+            <button type="button" className="icon-btn" title="Rotate 90° left" aria-label="Rotate 90° left" disabled={locked} onClick={() => onPatch({ rotation: quarterTurn(layer.rotation, -90) })}>
+              <RotateCcw size={14} aria-hidden />
+            </button>
+            <button type="button" className="icon-btn" title="Rotate 90° right" aria-label="Rotate 90° right" disabled={locked} onClick={() => onPatch({ rotation: quarterTurn(layer.rotation, 90) })}>
+              <RotateCw size={14} aria-hidden />
+            </button>
+          </>
+        )}
       </div>
       <Slider
         label="Opacity"
@@ -207,6 +225,7 @@ const FOCAL_POINTS = [
 function ImageInspector({ layer }: { layer: ImageLayer }) {
   const updateLayer = useEditor((s) => s.updateLayer);
   const setLeftPanel = useEditorSession((s) => s.setLeftPanel);
+  const touch = useTouchInspector();
   const patch = (next: Partial<ImageLayer>) => updateLayer(layer.id, next);
   const cropScale = Math.min(4, Math.max(1, layer.cropScale || 1));
   const cropGesture = useLayerGesture(layer.id, 'Change crop');
@@ -219,14 +238,17 @@ function ImageInspector({ layer }: { layer: ImageLayer }) {
       <Section
         title="Photo"
         action={
-          <button className="text-xs font-medium text-accent hover:text-accent-hover" onClick={() => setLeftPanel('photos')}>
-            {layer.assetId ? 'Replace' : 'Choose photo'}
-          </button>
+          // On a phone the side panel doesn't exist; the host opens its own photo picker, or the link is hidden.
+          touch && !touch.onReplacePhoto ? undefined : (
+            <button className="insp-link text-xs font-medium text-accent hover:text-accent-hover" onClick={touch ? touch.onReplacePhoto : () => setLeftPanel('photos')}>
+              {layer.assetId ? 'Replace' : 'Choose photo'}
+            </button>
+          )
         }
       >
         {!layer.assetId && (
           <p className="rounded-lg bg-accent-soft px-3 py-2 text-xs leading-relaxed text-accent">
-            This slot is empty. Pick an item in <strong>Media</strong> to fill it.
+            {touch ? 'This frame is empty. Choose a photo to fill it.' : <>This slot is empty. Pick an item in <strong>Media</strong> to fill it.</>}
           </p>
         )}
         <Slider
@@ -321,9 +343,9 @@ function TextInspector({ layer }: { layer: TextLayer }) {
         <textarea className="input min-h-[4.5rem] resize-y" rows={3} value={layer.text} onChange={(e) => u({ text: e.target.value })} aria-label="Text content" />
       </Section>
       <Section title="Typography">
-        <select className="input" value={layer.fontFamily} onChange={(e) => u({ fontFamily: e.target.value })} aria-label="Font" style={{ fontFamily: layer.fontFamily }}>
+        <select className="input" value={layer.fontFamily} onChange={(e) => u({ fontFamily: e.target.value })} aria-label="Font" style={{ fontFamily: resolveFontFamily(layer.fontFamily) }}>
           {FONTS.map((f) => (
-            <option key={f} style={{ fontFamily: f }}>{f}</option>
+            <option key={f} style={{ fontFamily: resolveFontFamily(f) }}>{f}</option>
           ))}
         </select>
         <div className="grid grid-cols-2 gap-2">
@@ -502,6 +524,7 @@ function SlideInspector({ onShowLayers }: { onShowLayers: () => void }) {
   const deleteSlide = useEditor((s) => s.deleteSlide);
   const addTextLayer = useEditor((s) => s.addTextLayer);
   const requestImport = useEditorSession((s) => s.requestImport);
+  const touch = useTouchInspector();
   if (!slide) return null;
   const index = slideOrder.indexOf(slideId);
   const quick = [
@@ -528,7 +551,7 @@ function SlideInspector({ onShowLayers }: { onShowLayers: () => void }) {
           <p className="text-[11px] text-ink-faint">{slideOrder.length} slide{slideOrder.length === 1 ? '' : 's'} · {slide.layerOrder.length} layer{slide.layerOrder.length === 1 ? '' : 's'}</p>
         </div>
       </div>
-      {empty && (
+      {empty && !touch && (
         <Section title="Start this slide">
           <div className="grid grid-cols-2 gap-1.5">
             {quickStart.map(({ label, Icon, run }) => (
@@ -540,7 +563,7 @@ function SlideInspector({ onShowLayers }: { onShowLayers: () => void }) {
         </Section>
       )}
       <GridSection slideId={slideId} />
-      <Section title="Background" action={<button className="text-[11px] font-medium text-accent hover:text-accent-hover" onClick={() => setLeftPanel('background')}>More</button>}>
+      <Section title="Background" action={touch ? undefined : <button className="text-[11px] font-medium text-accent hover:text-accent-hover" onClick={() => setLeftPanel('background')}>More</button>}>
         <div className="grid grid-cols-8 gap-1.5">
           {quick.map((bg) => {
             const active = sameBackground(slide.background, bg);
@@ -577,7 +600,7 @@ function SlideInspector({ onShowLayers }: { onShowLayers: () => void }) {
           </button>
         </div>
       </Section>
-      <div className="p-3">
+      {!touch && <div className="p-3">
         <div className="flex gap-2.5 rounded-lg border border-line p-3 text-[11px] leading-relaxed text-ink-faint">
           <MousePointerClick size={14} className="mt-0.5 shrink-0 text-ink-dim" aria-hidden />
           <p>
@@ -588,12 +611,20 @@ function SlideInspector({ onShowLayers }: { onShowLayers: () => void }) {
             . Press <kbd className="kbd">{isMac ? '⌘' : 'Ctrl'} K</kbd> for every command.
           </p>
         </div>
-      </div>
+      </div>}
     </div>
   );
 }
 
-export function Inspector({ onShowLayers }: { onShowLayers: () => void }) {
+export function Inspector({ onShowLayers, touch = null }: { onShowLayers: () => void; /** Set by the mobile inspector to use touch-friendly controls. */ touch?: TouchInspectorHost | null }) {
+  return (
+    <TouchInspectorContext.Provider value={touch}>
+      <InspectorBody onShowLayers={onShowLayers} />
+    </TouchInspectorContext.Provider>
+  );
+}
+
+function InspectorBody({ onShowLayers }: { onShowLayers: () => void }) {
   const selectedLayerId = useEditorSession((s) => s.selectedLayerId);
   const selectedIds = useEditorSession((s) => s.selectedLayerIds);
   const layer = useEditor((s) => selectedLayerId ? s.doc.layers[selectedLayerId] : undefined);

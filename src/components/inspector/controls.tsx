@@ -137,7 +137,7 @@ export function GradientEditor({ value, onChange, gesture, presets }: { value: G
       <div className="px-2">
         <div
           ref={bar}
-          className="relative h-6 cursor-copy rounded-md ring-1 ring-inset ring-white/15"
+          className="insp-gradient-bar relative h-6 cursor-copy rounded-md ring-1 ring-inset ring-white/15"
           style={{ background: gradientCss({ type: 'linear', angle: 90, stops }) }}
           onPointerDown={onBarDown}
           title="Click to add a color stop"
@@ -148,7 +148,7 @@ export function GradientEditor({ value, onChange, gesture, presets }: { value: G
               type="button"
               aria-label={`Color stop ${Math.round(s.offset * 100)}%`}
               aria-pressed={i === index}
-              className={`absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 cursor-grab rounded-full ring-2 transition-shadow active:cursor-grabbing ${i === index ? 'ring-white shadow-[0_0_0_4px_rgba(124,92,255,0.6)]' : 'ring-white/80 shadow-soft'}`}
+              className={`insp-gradient-stop absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 cursor-grab rounded-full ring-2 transition-shadow active:cursor-grabbing ${i === index ? 'ring-white shadow-[0_0_0_4px_rgba(124,92,255,0.6)]' : 'ring-white/80 shadow-soft'}`}
               style={{ left: `${s.offset * 100}%`, background: s.color }}
               onPointerDown={(e) => onStopDown(e, i)}
               onPointerMove={onStopMove}

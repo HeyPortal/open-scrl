@@ -96,7 +96,7 @@ function ProjectCard({ project, busy, isOpening, onOpen }: CardProps) {
         )}
       </div>
       <div className="flex flex-col gap-0.5 px-3 py-2.5">
-        <h3 className="truncate text-xs font-semibold text-ink">{project.name}</h3>
+        <h3 className="heading-sm truncate text-ink">{project.name}</h3>
         <p className="truncate text-[11px] text-ink-faint">
           {project.format.name} · {project.slideCount} slide{project.slideCount === 1 ? '' : 's'} · {formatDate(project.updatedAt)}
         </p>
@@ -117,7 +117,7 @@ function ProjectRow({ project, busy, isOpening, onOpen }: CardProps) {
       <span className="flex h-8 w-10 items-center justify-center rounded bg-bg">
         <Cover project={project} size={{ w: 30, h: 26 }} />
       </span>
-      <span className="truncate font-medium text-ink">{project.name}</span>
+      <span className="heading-sm truncate text-ink">{project.name}</span>
       <span className="truncate text-ink-dim">{project.format.name}</span>
       <span className="tabular-nums text-ink-dim">{project.slideCount}</span>
       <span className="truncate tabular-nums text-ink-faint">{formatDate(project.updatedAt)}</span>
@@ -188,7 +188,7 @@ export function LandingPage() {
           <span className="flex h-6 w-6 items-center justify-center rounded-md bg-accent text-white">
             <LayoutGrid size={13} strokeWidth={2.25} aria-hidden />
           </span>
-          <span className="text-[13px] font-semibold">Open-SCRL</span>
+          <span className="heading-md">Open-SCRL</span>
         </div>
         <span className="inline-flex items-center gap-1.5 text-[11px] text-ink-faint">
           <HardDrive size={12} aria-hidden />
@@ -201,7 +201,7 @@ export function LandingPage() {
           <form className="rounded-xl border border-line bg-bg-panel p-4" onSubmit={createProject}>
             <div className="grid gap-5 lg:grid-cols-[260px_minmax(0,1fr)]">
               <div className="flex flex-col">
-                <h1 className="text-sm font-semibold">New project</h1>
+                <h1 className="heading-lg">New project</h1>
                 <p className="mt-0.5 text-[11px] text-ink-faint">Pick a canvas size. You can change it later.</p>
                 <label className="mt-4 block">
                   <span className="field-label mb-1 block">Project name</span>
@@ -232,8 +232,8 @@ export function LandingPage() {
 
           <section className="mt-8">
             <div className="mb-3 flex flex-wrap items-center gap-2">
-              <h2 className="mr-auto flex items-baseline gap-2 text-sm font-semibold">
-                Your projects <span className="text-xs font-normal tabular-nums text-ink-faint">{projects.length}</span>
+              <h2 className="heading-lg mr-auto flex items-baseline gap-2">
+                Your projects <span className="font-sans text-xs font-normal tabular-nums tracking-normal text-ink-faint">{projects.length}</span>
               </h2>
               {projects.length > 0 && (
                 <>
@@ -263,7 +263,7 @@ export function LandingPage() {
                 <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-bg-inset text-ink-dim ring-1 ring-line-strong">
                   <Images size={18} aria-hidden />
                 </div>
-                <h3 className="text-xs font-semibold">No projects yet</h3>
+                <h3 className="heading-md">No projects yet</h3>
                 <p className="mt-1 max-w-sm text-[11px] leading-relaxed text-ink-faint">
                   Create your first project above. Projects you make will appear here.
                 </p>

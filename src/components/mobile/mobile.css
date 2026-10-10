@@ -1,0 +1,198 @@
+/*
+ * Mobile editor chrome. Loaded only with the lazy mobile shell, so none of this
+ * reaches the desktop bundle. Sizes are driven by CSS variables so the shell,
+ * bottom sheet and panels agree on the available height.
+ */
+
+.mobile-root {
+  --mobile-topbar-h: calc(52px + env(safe-area-inset-top));
+  --mobile-dock-h: calc(60px + env(safe-area-inset-bottom));
+  --mobile-strip-h: 72px;
+  --sheet-half: min(46dvh, 420px);
+  --sheet-full: calc(100dvh - var(--mobile-topbar-h) - var(--mobile-dock-h) - 120px);
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  color: #ededf0;
+  background: #0f0f12;
+  overscroll-behavior: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+html:has(.mobile-root),
+body:has(.mobile-root) {
+  overscroll-behavior: none;
+}
+
+.mobile-root input,
+.mobile-root select,
+.mobile-root textarea {
+  /* 16px stops iOS Safari from zooming the page when a field gets focus. */
+  font-size: 16px;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.mobile-topbar {
+  height: var(--mobile-topbar-h);
+  padding-top: env(safe-area-inset-top);
+}
+
+.mobile-dock {
+  height: var(--mobile-dock-h);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.mobile-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.mobile-canvas-col {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Short touch screens (phones on their side): the sheet becomes a side panel and chrome shrinks. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .mobile-root {
+    --mobile-topbar-h: calc(44px + env(safe-area-inset-top));
+    --mobile-dock-h: calc(52px + env(safe-area-inset-bottom));
+    --mobile-strip-h: 56px;
+    --sheet-half: 100%;
+    --sheet-full: 100%;
+  }
+  .mobile-main {
+    flex-direction: row;
+  }
+  .mobile-sheet-slot {
+    display: flex;
+    flex: 0 0 min(46vw, 380px);
+    min-height: 0;
+  }
+  .mobile-root .mobile-sheet {
+    flex: 1 1 auto;
+    border-top: 0;
+    border-left: 1px solid #34343c;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .mobile-dock span {
+    font-size: 10px;
+  }
+}
+
+/* Touch sizing for the shared sidebar primitives ---------------------------- */
+
+/* Grow small icon buttons' hit area without moving anything. */
+.mobile-root .icon-btn {
+  position: relative;
+}
+.mobile-root .icon-btn::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+}
+
+.mobile-root .input:not(textarea) {
+  min-height: 40px;
+}
+
+.mobile-root .segmented-btn {
+  min-height: 36px;
+  font-size: 13px;
+}
+
+/* Sliders: a thicker track and a thumb a finger can hit. */
+.mobile-root .range {
+  height: 32px;
+}
+.mobile-root .range::-webkit-slider-runnable-track {
+  height: 6px;
+}
+.mobile-root .range::-moz-range-track,
+.mobile-root .range::-moz-range-progress {
+  height: 6px;
+}
+.mobile-root .range::-webkit-slider-thumb {
+  width: 24px;
+  height: 24px;
+  margin-top: -9px;
+}
+.mobile-root .range::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+}
+
+.mobile-sheet-body .btn:not(.btn-sm) {
+  min-height: 44px;
+  font-size: 14px;
+}
+.mobile-sheet-body .btn-sm {
+  min-height: 36px;
+  font-size: 13px;
+}
+.mobile-sheet-body .field-label {
+  font-size: 12px;
+}
+
+/* The context menu renders in a portal outside .mobile-root. */
+body:has(.mobile-root) .menu {
+  min-width: 220px;
+  padding: 6px;
+  border-radius: 14px;
+}
+body:has(.mobile-root) .menu-item {
+  height: 44px;
+  padding: 0 12px;
+  font-size: 15px;
+  border-radius: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mobile-root *,
+  .mobile-root *::before,
+  .mobile-root *::after {
+    scroll-behavior: auto !important;
+  }
+  .mobile-root *:not(.animate-spin),
+  .mobile-root *:not(.animate-spin)::before,
+  .mobile-root *:not(.animate-spin)::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* A sheet slides up when it first opens. */
+.mobile-sheet-slot > .mobile-sheet {
+  animation: mobile-sheet-in 200ms ease-out;
+}
+@keyframes mobile-sheet-in {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}

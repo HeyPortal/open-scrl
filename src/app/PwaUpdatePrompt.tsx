@@ -49,7 +49,8 @@ function subscribeEditor(listener: () => void): () => void {
   return () => { unsubscribeDocument(); unsubscribeActivity(); };
 }
 
-export function PwaUpdatePrompt({ flush }: { flush: () => Promise<void> }) {
+/** `mobile` lifts the prompt above the editor's tool dock, which would otherwise cover it. */
+export function PwaUpdatePrompt({ flush, mobile = false }: { flush: () => Promise<void>; mobile?: boolean }) {
   const [controller] = useState(() => new UpdateController({
     snapshot: () => {
       const state = useDocumentStore.getState();
@@ -68,9 +69,18 @@ export function PwaUpdatePrompt({ flush }: { flush: () => Promise<void> }) {
     return () => { unobserve(); stop(); };
   }, [controller]);
   if (state.status === 'idle' || state.status === 'waiting') return null;
-  return <div role="status" className="fixed bottom-5 left-1/2 z-50 flex max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-3 rounded-lg border border-line bg-bg-panel p-3 text-xs text-ink shadow-lift">
-    <span>{state.status === 'error' ? state.error : state.status === 'updating' ? 'Finishing your work before updating…' : 'A new version of Open-SCRL is ready.'}</span>
-    <button className="btn btn-sm btn-primary shrink-0" disabled={state.status === 'updating'} onClick={() => controller.requestUpdate()}>{state.status === 'updating' ? 'Updating…' : state.status === 'error' ? 'Retry update' : 'Reload to update'}</button>
-    {state.status !== 'updating' && <button className="btn btn-sm shrink-0" onClick={() => controller.dismiss()}>Later</button>}
+  const updating = state.status === 'updating';
+  const message = state.status === 'error' ? state.error : updating ? 'Finishing your work before updating…' : 'A new version of Open-SCRL is ready.';
+  const action = mobile ? 'btn h-11 flex-1 rounded-lg px-4 text-sm' : 'btn btn-sm shrink-0';
+  // On phones the prompt is a full-width card (message above, 44px actions below) so the copy never
+  // squeezes into a narrow column beside the buttons; on desktop it stays one compact row.
+  return <div role="status" className={mobile
+    ? 'fixed bottom-[calc(env(safe-area-inset-bottom)+76px)] left-[max(0.75rem,env(safe-area-inset-left))] right-[max(0.75rem,env(safe-area-inset-right))] z-50 mx-auto flex max-w-md flex-col gap-3 rounded-lg border border-line bg-bg-panel p-3 text-sm text-ink shadow-lift'
+    : 'fixed bottom-5 left-1/2 z-50 flex max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-3 rounded-lg border border-line bg-bg-panel p-3 text-xs text-ink shadow-lift'}>
+    <span className="min-w-0 break-words">{message}</span>
+    <div className={mobile ? 'flex gap-2' : 'contents'}>
+      <button className={`${action} btn-primary`} disabled={updating} onClick={() => controller.requestUpdate()}>{updating ? 'Updating…' : state.status === 'error' ? 'Retry update' : 'Reload to update'}</button>
+      {!updating && <button className={`${action} ${mobile ? 'btn-secondary' : ''}`} onClick={() => controller.dismiss()}>Later</button>}
+    </div>
   </div>;
 }

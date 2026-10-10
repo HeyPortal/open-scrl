@@ -18,8 +18,9 @@
 ![The Open-SCRL web editor with a Florida carousel open.](docs/images/web-editor.webp)
 
 A free, open-source alternative to [SCRL](https://scrl.com), available as a web app and a
-native Mac app. Lay your photos out across a row of slides, then export one file per slide
-in posting order. It's early, so expect rough edges.
+native Mac app. The web app has a touch-first layout on phones ([details](./docs/mobile.md)).
+Lay your photos out across a row of slides, then export one file per slide in posting order.
+It's early, so expect rough edges.
 
 ![The six slides exported from the sample project.](docs/images/export-strip.webp)
 

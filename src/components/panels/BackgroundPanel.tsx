@@ -48,7 +48,10 @@ function AssetTile({ asset, active, onClick }: { asset: AssetMeta; active: boole
   );
 }
 
-export function BackgroundPanel() {
+/** `sheet` is the touch layout used inside the mobile bottom sheet; `sidebar` is the desktop panel. */
+export function BackgroundPanel({ layout = 'sidebar' }: { layout?: 'sidebar' | 'sheet' }) {
+  const sheet = layout === 'sheet';
+  const px = sheet ? 'px-4' : 'px-3';
   const setBackground = useEditor((s) => s.setBackground);
   const setBackgroundForAllSlides = useEditor((s) => s.setBackgroundForAllSlides);
   const selectedSlideId = useEditorSession((s) => s.selectedSlideId);
@@ -87,9 +90,11 @@ export function BackgroundPanel() {
   const image = current.kind === 'image' ? current : null;
 
   return (
-    <div className="flex h-full flex-col overflow-auto scrollbar-thin">
-      <PanelHeader title="Background" hint={`Changes apply to slide ${Math.max(1, slideIndex + 1)}.`} />
-      <div className="px-3 pb-3">
+    <div className={sheet ? 'flex flex-col' : 'flex h-full flex-col overflow-auto scrollbar-thin'}>
+      {sheet
+        ? <p className="px-4 pb-3 text-[12px] leading-relaxed text-ink-faint">Changes apply to slide {Math.max(1, slideIndex + 1)}.</p>
+        : <PanelHeader title="Background" hint={`Changes apply to slide ${Math.max(1, slideIndex + 1)}.`} />}
+      <div className={`${px} pb-3`}>
         <Segmented label="Background type" value={mode} onChange={choose} options={[
           { value: 'solid', label: 'Color' },
           { value: 'gradient', label: 'Gradient' },
@@ -99,24 +104,24 @@ export function BackgroundPanel() {
       </div>
 
       {mode === 'solid' && (
-        <div className="border-t border-line px-3 py-3.5">
+        <div className={`border-t border-line ${px} py-3.5`}>
           <div className="grid grid-cols-6 gap-2">
             {SOLID_SWATCHES.map((c) => <SolidSwatch key={c} color={c} active={sameBackground(current, { kind: 'solid', color: c })} onClick={() => setBackground({ kind: 'solid', color: c })} />)}
           </div>
-          <div className="mt-3">
+          <div className={`mt-3 ${sheet ? '[&_label]:h-11 [&_label]:rounded-xl [&_label]:px-2.5' : ''}`}>
             <ColorField value={current.kind === 'solid' ? current.color : '#ffffff'} onChange={(color) => setBackground({ kind: 'solid', color })} label="Custom background color" />
           </div>
         </div>
       )}
 
       {mode === 'gradient' && (
-        <div className="border-t border-line px-3 py-3.5">
+        <div className={`border-t border-line ${px} py-3.5`}>
           <GradientEditor value={gradient} onChange={(g) => setBackground(gradientBackground(g))} gesture={gesture} presets={GRADIENT_PRESETS} />
         </div>
       )}
 
       {mode === 'image' && (
-        <div className="space-y-3 border-t border-line px-3 py-3.5">
+        <div className={`space-y-3 border-t border-line ${px} py-3.5`}>
           {image && (
             <>
               <div className="relative h-20 overflow-hidden rounded-lg ring-1 ring-inset ring-white/10" style={{ background: image.color }}>
@@ -146,14 +151,14 @@ export function BackgroundPanel() {
       )}
 
       {mode === 'transparent' && (
-        <div className="border-t border-line px-3 py-3.5">
+        <div className={`border-t border-line ${px} py-3.5`}>
           <div className="h-20 rounded-lg ring-1 ring-inset ring-white/10" style={{ background: backgroundCss({ kind: 'transparent' }) }} aria-hidden />
           <p className="mt-2.5 text-[11px] leading-relaxed text-ink-faint">Slides export as PNG with a transparent background. Video slides use white, since MP4 has no transparency.</p>
         </div>
       )}
 
       {slide && slideCount > 1 && (
-        <div className="mt-auto border-t border-line p-4">
+        <div className={`mt-auto border-t border-line ${sheet ? 'px-4 py-4' : 'p-4'}`}>
           <button className="btn btn-secondary w-full" onClick={() => setBackgroundForAllSlides(slide.background)}>
             Apply to all {slideCount} slides
           </button>

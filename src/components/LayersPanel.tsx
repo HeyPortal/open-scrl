@@ -70,11 +70,14 @@ const rowIds = (row: Row) => (row.type === 'group' ? row.members.map((l) => l.id
 /** Additive click: ⌘ on a Mac, Ctrl elsewhere. */
 const isToggle = (e: { metaKey: boolean; ctrlKey: boolean }) => (isMac ? e.metaKey : e.ctrlKey);
 
-function RowShell({ id, selected, partly, depth, onClick, onContextMenu, children, label }: {
+type PanelLayout = 'sidebar' | 'sheet';
+
+function RowShell({ id, selected, partly, depth, onClick, onContextMenu, children, label, layout }: {
   id: string;
   selected: boolean;
   partly?: boolean;
   depth: number;
+  layout: PanelLayout;
   onClick: (e: React.MouseEvent) => void;
   onContextMenu: (e: React.MouseEvent) => void;
   children: (handle: ReactNode, hoverOnly: string) => ReactNode;
@@ -82,21 +85,23 @@ function RowShell({ id, selected, partly, depth, onClick, onContextMenu, childre
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   const style = { transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 10 : undefined };
-  const hoverOnly = 'hidden group-hover:flex group-focus-within:flex';
+  const sheet = layout === 'sheet';
+  // Touch has no hover, so the selected row keeps its actions in view.
+  const hoverOnly = sheet ? (selected ? 'flex' : 'hidden') : 'hidden group-hover:flex group-focus-within:flex';
   const handle = (
     <button
       {...attributes}
       {...listeners}
-      className="flex h-7 w-5 shrink-0 cursor-grab touch-none items-center justify-center text-ink-faint hover:text-ink active:cursor-grabbing"
+      className={`flex shrink-0 cursor-grab touch-none items-center justify-center text-ink-faint hover:text-ink active:cursor-grabbing ${sheet ? 'h-11 w-7' : 'h-7 w-5'}`}
       aria-label={`Reorder ${label}`}
     >
-      <GripVertical size={13} />
+      <GripVertical size={sheet ? 16 : 13} />
     </button>
   );
   return (
-    <div ref={setNodeRef} style={style} className="px-1.5">
+    <div ref={setNodeRef} style={style} className={sheet ? 'px-2' : 'px-1.5'}>
       <div
-        className={`group relative flex h-8 items-center gap-1.5 rounded-md pl-0.5 pr-0.5 text-xs transition-colors ${
+        className={`group relative flex items-center gap-1.5 pl-0.5 pr-0.5 transition-colors ${sheet ? 'min-h-[52px] rounded-xl text-[14px]' : 'h-8 rounded-md text-xs'} ${
           selected ? 'bg-accent-soft' : partly ? 'bg-accent/[0.07] hover:bg-bg-hover' : 'hover:bg-bg-hover'
         } ${isDragging ? 'bg-bg-overlay shadow-lift' : ''}`}
         style={{ paddingLeft: depth ? 14 : undefined }}
@@ -112,34 +117,43 @@ function RowShell({ id, selected, partly, depth, onClick, onContextMenu, childre
   );
 }
 
-function ToggleButtons({ locked, visible, hoverOnly, onLock, onVisible }: { locked: boolean; visible: boolean; hoverOnly: string; onLock: () => void; onVisible: () => void }) {
+function ToggleButtons({ locked, visible, hoverOnly, onLock, onVisible, layout }: { locked: boolean; visible: boolean; hoverOnly: string; onLock: () => void; onVisible: () => void; layout: PanelLayout }) {
+  const sheet = layout === 'sheet';
+  const size = sheet ? '!h-10 !w-10' : '!h-6 !w-6';
+  const icon = sheet ? 18 : 13;
   return (
     <>
       <button
-        className={`icon-btn !h-6 !w-6 ${locked ? '!text-ink' : `${hoverOnly} text-ink-faint`}`}
+        className={`icon-btn ${size} ${locked ? '!text-ink' : `${sheet ? '' : hoverOnly} text-ink-faint`}`}
         title={locked ? 'Unlock' : 'Lock'}
+        aria-label={locked ? 'Unlock' : 'Lock'}
         onClick={(e) => { e.stopPropagation(); onLock(); }}
       >
-        {locked ? <Lock size={13} /> : <LockOpen size={13} />}
+        {locked ? <Lock size={icon} /> : <LockOpen size={icon} />}
       </button>
       <button
-        className={`icon-btn !h-6 !w-6 ${visible ? '' : '!text-ink'}`}
+        className={`icon-btn ${size} ${visible ? '' : '!text-ink'}`}
         title={visible ? 'Hide' : 'Show'}
+        aria-label={visible ? 'Hide' : 'Show'}
         onClick={(e) => { e.stopPropagation(); onVisible(); }}
       >
-        {visible ? <Eye size={13} /> : <EyeOff size={13} />}
+        {visible ? <Eye size={icon} /> : <EyeOff size={icon} />}
       </button>
     </>
   );
 }
 
-function LayerRow({ row, selected, partly, onSelect, onEdit }: {
+function LayerRow({ row, selected, partly, onSelect, onEdit, layout }: {
   row: Extract<Row, { type: 'layer' }>;
   selected: boolean;
   partly: boolean;
   onSelect: (e: React.MouseEvent, row: Row) => void;
   onEdit: () => void;
+  layout: PanelLayout;
 }) {
+  const sheet = layout === 'sheet';
+  const size = sheet ? '!h-10 !w-10' : '!h-6 !w-6';
+  const icon = sheet ? 18 : 13;
   const layer = row.layer;
   const toggleVisible = useEditor((s) => s.toggleVisible);
   const toggleLocked = useEditor((s) => s.toggleLocked);
@@ -158,6 +172,7 @@ function LayerRow({ row, selected, partly, onSelect, onEdit }: {
       selected={selected}
       partly={partly}
       depth={row.groupId ? 1 : 0}
+      layout={layout}
       onClick={(e) => onSelect(e, row)}
       onContextMenu={(e) => {
         e.preventDefault();
@@ -169,11 +184,11 @@ function LayerRow({ row, selected, partly, onSelect, onEdit }: {
         <>
           {handle}
           <span
-            className={`flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded ${
+            className={`flex shrink-0 items-center justify-center overflow-hidden ${sheet ? 'h-9 w-9 rounded-lg' : 'h-6 w-6 rounded'} ${
               selected ? 'bg-accent text-white' : 'bg-bg-inset text-ink-dim'
             } ${thumb ? 'ring-1 ring-inset ring-white/10' : ''}`}
           >
-            {thumb ? <img src={thumb} alt="" className="h-full w-full object-cover" draggable={false} /> : <Icon size={13} aria-hidden />}
+            {thumb ? <img src={thumb} alt="" className="h-full w-full object-cover" draggable={false} /> : <Icon size={sheet ? 17 : 13} aria-hidden />}
           </span>
           {editing ? (
             <input
@@ -188,7 +203,7 @@ function LayerRow({ row, selected, partly, onSelect, onEdit }: {
                 if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
                 if (e.key === 'Escape') setEditing(false);
               }}
-              className="input h-6 min-w-0 flex-1 px-1.5"
+              className={`input min-w-0 flex-1 px-1.5 ${sheet ? '' : 'h-6'}`}
               aria-label="Layer name"
             />
           ) : (
@@ -202,33 +217,37 @@ function LayerRow({ row, selected, partly, onSelect, onEdit }: {
           )}
 
           <div className={`shrink-0 items-center ${hoverOnly}`}>
-            <button className="icon-btn !h-6 !w-6" title="Duplicate" onClick={(e) => { e.stopPropagation(); duplicateLayers([layer.id]); }}>
-              <Copy size={13} />
+            <button className={`icon-btn ${size}`} title="Duplicate" aria-label="Duplicate" onClick={(e) => { e.stopPropagation(); duplicateLayers([layer.id]); }}>
+              <Copy size={icon} />
             </button>
-            <button className="icon-btn !h-6 !w-6 danger-hover" title="Delete" onClick={(e) => { e.stopPropagation(); deleteLayers([layer.id]); }}>
-              <Trash2 size={13} />
+            <button className={`icon-btn ${size} danger-hover`} title="Delete" aria-label="Delete" onClick={(e) => { e.stopPropagation(); deleteLayers([layer.id]); }}>
+              <Trash2 size={icon} />
             </button>
             {selected && (
-              <button className="icon-btn !h-6 !w-6" title="Edit properties" onClick={(e) => { e.stopPropagation(); onEdit(); }}>
-                <SlidersHorizontal size={13} />
+              <button className={`icon-btn ${size}`} title="Edit properties" aria-label="Edit properties" onClick={(e) => { e.stopPropagation(); onEdit(); }}>
+                <SlidersHorizontal size={icon} />
               </button>
             )}
           </div>
-          <ToggleButtons locked={layer.locked} visible={layer.visible} hoverOnly={hoverOnly} onLock={() => toggleLocked(layer.id)} onVisible={() => toggleVisible(layer.id)} />
+          <ToggleButtons layout={layout} locked={layer.locked} visible={layer.visible} hoverOnly={hoverOnly} onLock={() => toggleLocked(layer.id)} onVisible={() => toggleVisible(layer.id)} />
         </>
       )}
     </RowShell>
   );
 }
 
-function GroupRow({ row, selected, partly, collapsed, onToggleCollapsed, onSelect }: {
+function GroupRow({ row, selected, partly, collapsed, onToggleCollapsed, onSelect, layout }: {
   row: Extract<Row, { type: 'group' }>;
   selected: boolean;
   partly: boolean;
   collapsed: boolean;
   onToggleCollapsed: () => void;
   onSelect: (e: React.MouseEvent, row: Row) => void;
+  layout: PanelLayout;
 }) {
+  const sheet = layout === 'sheet';
+  const size = sheet ? '!h-10 !w-10' : '!h-6 !w-6';
+  const icon = sheet ? 18 : 13;
   const updateLayers = useEditor((s) => s.updateLayers);
   const ungroupLayers = useEditor((s) => s.ungroupLayers);
   const deleteLayers = useEditor((s) => s.deleteLayers);
@@ -245,6 +264,7 @@ function GroupRow({ row, selected, partly, collapsed, onToggleCollapsed, onSelec
       selected={selected}
       partly={partly}
       depth={0}
+      layout={layout}
       onClick={(e) => onSelect(e, row)}
       onContextMenu={(e) => {
         e.preventDefault();
@@ -256,35 +276,40 @@ function GroupRow({ row, selected, partly, collapsed, onToggleCollapsed, onSelec
         <>
           {handle}
           <button
-            className="-ml-1 flex h-6 w-4 shrink-0 items-center justify-center text-ink-faint hover:text-ink"
+            className={`-ml-1 flex shrink-0 items-center justify-center text-ink-faint hover:text-ink ${sheet ? 'h-10 w-7' : 'h-6 w-4'}`}
             aria-label={collapsed ? 'Expand group' : 'Collapse group'}
             aria-expanded={!collapsed}
             onClick={(e) => { e.stopPropagation(); onToggleCollapsed(); }}
           >
-            <ChevronRight size={12} className={`transition-transform ${collapsed ? '' : 'rotate-90'}`} aria-hidden />
+            <ChevronRight size={sheet ? 16 : 12} className={`transition-transform ${collapsed ? '' : 'rotate-90'}`} aria-hidden />
           </button>
-          <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded ${selected ? 'bg-accent text-white' : 'bg-bg-inset text-ink-dim'}`}>
-            <GroupIcon size={13} aria-hidden />
+          <span className={`flex shrink-0 items-center justify-center ${sheet ? 'h-9 w-9 rounded-lg' : 'h-6 w-6 rounded'} ${selected ? 'bg-accent text-white' : 'bg-bg-inset text-ink-dim'}`}>
+            <GroupIcon size={sheet ? 17 : 13} aria-hidden />
           </span>
           <span className={`min-w-0 flex-1 truncate pl-1 ${visible ? 'text-ink' : 'text-ink-faint line-through'} ${selected ? 'font-medium' : ''}`}>
             Group <span className="tabular-nums text-ink-faint">· {row.members.length}</span>
           </span>
           <div className={`shrink-0 items-center ${hoverOnly}`}>
-            <button className="icon-btn !h-6 !w-6" title="Ungroup" onClick={(e) => { e.stopPropagation(); ungroupLayers(ids); }}>
-              <Ungroup size={13} />
+            <button className={`icon-btn ${size}`} title="Ungroup" aria-label="Ungroup" onClick={(e) => { e.stopPropagation(); ungroupLayers(ids); }}>
+              <Ungroup size={icon} />
             </button>
-            <button className="icon-btn !h-6 !w-6 danger-hover" title="Delete group" onClick={(e) => { e.stopPropagation(); deleteLayers(ids); }}>
-              <Trash2 size={13} />
+            <button className={`icon-btn ${size} danger-hover`} title="Delete group" aria-label="Delete group" onClick={(e) => { e.stopPropagation(); deleteLayers(ids); }}>
+              <Trash2 size={icon} />
             </button>
           </div>
-          <ToggleButtons locked={locked} visible={visible} hoverOnly={hoverOnly} onLock={() => setAll({ locked: !locked })} onVisible={() => setAll({ visible: !visible })} />
+          <ToggleButtons layout={layout} locked={locked} visible={visible} hoverOnly={hoverOnly} onLock={() => setAll({ locked: !locked })} onVisible={() => setAll({ visible: !visible })} />
         </>
       )}
     </RowShell>
   );
 }
 
-export function LayersPanel({ onEditLayer }: { onEditLayer: () => void }) {
+/**
+ * `sheet` is the touch layout used in the mobile bottom sheet: taller rows and visible actions.
+ * `additive` makes every tap add to or remove from the selection, standing in for ⌘/Ctrl-click.
+ */
+export function LayersPanel({ onEditLayer, layout = 'sidebar', additive = false }: { onEditLayer: () => void; layout?: PanelLayout; additive?: boolean }) {
+  const sheet = layout === 'sheet';
   const doc = useEditor((s) => s.doc);
   const selectedSlideId = useEditorSession((s) => s.selectedSlideId);
   const slide = useMemo(() => materializeSlide(doc, selectedSlideId || doc.slideOrder[0]), [doc, selectedSlideId]);
@@ -318,7 +343,7 @@ export function LayersPanel({ onEditLayer }: { onEditLayer: () => void }) {
       }
     }
     anchor.current = primary;
-    if (isToggle(e)) {
+    if (isToggle(e) || additive) {
       const on = ids.every((id) => selected.has(id));
       selectLayers(on ? selectedIds.filter((id) => !ids.includes(id)) : [...selectedIds, ...ids], on ? undefined : primary);
       return;
@@ -390,25 +415,27 @@ export function LayersPanel({ onEditLayer }: { onEditLayer: () => void }) {
 
   return (
     <div className="py-2 text-ink">
-      <p className="px-3 pb-2 pt-1 text-[11px] leading-relaxed text-ink-faint">
-        Top of the list is in front. Drag to reorder, {isMac ? '⌘' : 'Ctrl'}- or Shift-click to select several, right-click for more.
+      <p className={`pb-2 pt-1 leading-relaxed text-ink-faint ${sheet ? 'px-4 text-[12px]' : 'px-3 text-[11px]'}`}>
+        {sheet
+          ? 'Top of the list is in front. Drag the handle to reorder, or turn on Select to pick several layers.'
+          : <>Top of the list is in front. Drag to reorder, {isMac ? '⌘' : 'Ctrl'}- or Shift-click to select several, right-click for more.</>}
       </p>
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setDraggingGroup(null)}>
         <SortableContext items={rows.map((r) => r.key)} strategy={verticalListSortingStrategy}>
           <div className="flex flex-col gap-0.5" role="listbox" aria-multiselectable aria-label="Layers">
             {rows.length === 0 && (
               <EmptyState icon={<Layers size={22} aria-hidden />} title="Empty slide">
-                Add photos, text, or shapes from the tools on the left.
+                {sheet ? 'Add photos, text, or shapes from the tools below.' : 'Add photos, text, or shapes from the tools on the left.'}
               </EmptyState>
             )}
             {rows.map((row) => {
               if (row.type === 'group') {
                 const ids = rowIds(row);
                 const all = ids.every((id) => selected.has(id));
-                return <GroupRow key={row.key} row={row} selected={all} partly={!all && ids.some((id) => selected.has(id))} collapsed={folded.has(row.groupId)} onToggleCollapsed={() => toggleCollapsed(row.groupId)} onSelect={onSelect} />;
+                return <GroupRow key={row.key} layout={layout} row={row} selected={all} partly={!all && ids.some((id) => selected.has(id))} collapsed={folded.has(row.groupId)} onToggleCollapsed={() => toggleCollapsed(row.groupId)} onSelect={onSelect} />;
               }
               const groupSelected = !!row.groupId && topFirst.filter((l) => l.groupId === row.groupId).every((l) => selected.has(l.id));
-              return <LayerRow key={row.key} row={row} selected={selected.has(row.layer.id) && !groupSelected} partly={groupSelected} onSelect={onSelect} onEdit={onEditLayer} />;
+              return <LayerRow key={row.key} layout={layout} row={row} selected={selected.has(row.layer.id) && !groupSelected} partly={groupSelected} onSelect={onSelect} onEdit={onEditLayer} />;
             })}
           </div>
         </SortableContext>

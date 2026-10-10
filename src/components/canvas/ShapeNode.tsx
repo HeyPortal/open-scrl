@@ -16,9 +16,13 @@ interface Props {
   onTransform: (e: Konva.KonvaEventObject<Event>) => void;
   onTransformEnd: (e: Konva.KonvaEventObject<Event>) => void;
   groupRef: (n: Konva.Group | null) => void;
+  /** Mobile canvas: selects on tap or drag, not on touchstart, so a pinch never changes the selection. */
+  touch?: boolean;
+  /** Extra reach of the hit area on each side, in canvas units, so thin layers stay tappable. */
+  hitPad?: { x: number; y: number };
 }
 
-export function ShapeNode({ layer, onSelect, onClick, onDblClick, outline, onDragStart, onDragMove, onDragEnd, onTransform, onTransformEnd, groupRef }: Props) {
+export function ShapeNode({ layer, onSelect, onClick, onDblClick, outline, onDragStart, onDragMove, onDragEnd, onTransform, onTransformEnd, groupRef, touch, hitPad }: Props) {
   return (
     <Group
       ref={groupRef}
@@ -33,7 +37,7 @@ export function ShapeNode({ layer, onSelect, onClick, onDblClick, outline, onDra
       visible={layer.visible}
       draggable={!layer.locked}
       onMouseDown={onSelect}
-      onTouchStart={onSelect}
+      onTouchStart={touch ? undefined : onSelect}
       onTap={onSelect}
       onClick={onClick}
       onDblClick={onDblClick}
@@ -54,12 +58,20 @@ export function ShapeNode({ layer, onSelect, onClick, onDblClick, outline, onDra
           paintShapeContent(ctx, layer);
         }}
         hitFunc={(context, shape) => {
+          if (hitPad && (hitPad.x > 0 || hitPad.y > 0)) {
+            // A layer too thin to hit with a finger: its whole box, grown to a tappable size.
+            context.beginPath();
+            context.rect(-hitPad.x, -hitPad.y, layer.width + hitPad.x * 2, layer.height + hitPad.y * 2);
+            context.closePath();
+            context.fillShape(shape);
+            return;
+          }
           // Hit-test the visible outline so clicks pass through an ellipse's empty corners.
           context._context.fillStyle = shape.colorKey;
           context._context.fill(shapePath(layer));
         }}
       />
-      <SelectionOutline width={layer.width} height={layer.height} show={outline} />
+      <SelectionOutline width={layer.width} height={layer.height} show={outline} touch={touch} />
     </Group>
   );
 }

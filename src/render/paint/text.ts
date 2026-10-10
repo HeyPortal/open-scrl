@@ -2,6 +2,7 @@ import type { Bounds, TextLayer } from '@/types';
 import { layoutText } from '@/core/scene/textLayout';
 import { canvasGradient } from './gradient';
 import type { PathSink } from './masks';
+import { resolveFontFamily } from '@/render/fonts/families';
 
 type Context2D = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
@@ -29,7 +30,7 @@ const cache = new Map<string, TextLayoutResult>();
 const CACHE_LIMIT = 300;
 
 export const textFont = (layer: Pick<TextLayer, 'italic' | 'fontWeight' | 'fontFamily'>, size: number) =>
-  `${layer.italic ? 'italic ' : ''}${layer.fontWeight} ${size}px ${layer.fontFamily}`;
+  `${layer.italic ? 'italic ' : ''}${layer.fontWeight} ${size}px ${resolveFontFamily(layer.fontFamily)}`;
 
 const glyphCount = (text: string) => [...text].length;
 

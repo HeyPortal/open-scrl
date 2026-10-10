@@ -140,7 +140,7 @@ export function ShortcutsDialog() {
   return (
     <Dialog label="Keyboard shortcuts" onClose={close} className="max-w-[980px]">
       <div className="flex items-center justify-between border-b border-line px-4 py-3">
-        <h2 className="text-sm font-semibold">Keyboard shortcuts</h2>
+        <h2 className="heading-md">Keyboard shortcuts</h2>
         <button className="icon-btn" onClick={close} title="Close" aria-label="Close">
           <X size={15} />
         </button>

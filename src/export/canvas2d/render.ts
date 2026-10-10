@@ -2,6 +2,7 @@ import type { ProjectDocumentV2 } from '@/types';
 import { compileScene } from '@/core/scene/compileScene';
 import { getSlideViewport } from '@/core/document/coordinates';
 import { paintBackground, paintLayer } from '@/render/paint/layers';
+import { loadInterFonts } from '@/render/fonts/inter';
 
 export interface RenderOptions { format: 'png' | 'jpeg'; quality: number; pixelRatio: number }
 export interface ExportProgress { phase: 'compile' | 'decode' | 'render' | 'encode'; current: number; total: number }
@@ -28,6 +29,9 @@ export async function renderSlides(
   signal?: AbortSignal,
   onProgress?: (progress: ExportProgress) => void,
 ): Promise<Blob[]> {
+  if (Object.values(doc.layers).some((layer) => layer.kind === 'text' && (layer.fontFamily === 'Inter' || layer.fontFamily === 'Inter Variable'))) {
+    await loadInterFonts();
+  }
   const scenes = slideIndexes.map((index) => {
     const viewport = getSlideViewport(doc, doc.slideOrder[index]);
     return viewport ? compileScene(doc, viewport) : [];

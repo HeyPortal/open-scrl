@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode, type WheelEvent } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode, type WheelEvent } from 'react';
 import { Bookmark, ChevronLeft, ChevronRight, Grid3x3, Heart, Maximize2, MessageCircle, Minimize2, MoreHorizontal, Send, SquareStack, X } from 'lucide-react';
 import { useEditor } from '@/store/editor';
 import { useEditorSession } from '@/editor/sessionStore';
 import { useEditorView } from '@/editor/viewStore';
+import { useMobileLayout } from '@/app/useMobileLayout';
 import { slideScene } from '@/render/preview';
 import { SlidePreviewCanvas } from '../SlidePreviewCanvas';
 import { Segmented } from '../inspector/controls';
@@ -12,6 +13,8 @@ type Mode = 'feed' | 'grid';
 /** Phone screen proportions (iPhone-class, ~19.5:9) and bezel. */
 const SCREEN_RATIO = 2.165;
 const BEZEL = 11;
+/** Bottom padding of the phone stage (`pb-6`). */
+const STAGE_PADDING_BOTTOM = 24;
 /** Instagram's profile grid shows each post's cover at 3:4. */
 const GRID_RATIO = 3 / 4;
 
@@ -270,6 +273,20 @@ export function PhonePreview() {
   const [fullscreen, setFullscreen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const story = format.width / format.height < 0.7;
+  const mobile = useMobileLayout();
+  // iPhone Safari reports false here, so the Full screen button is hidden instead of doing nothing.
+  const canFullscreen = document.fullscreenEnabled;
+  const stage = useRef<HTMLDivElement>(null);
+  const [stageHeight, setStageHeight] = useState(0);
+
+  // On phones the header and footer include safe-area insets, so the screen is fitted to the measured stage.
+  useLayoutEffect(() => {
+    const el = stage.current;
+    if (!mobile || !el || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => setStageHeight(el.clientHeight));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [mobile]);
 
   useEffect(() => {
     const onResize = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
@@ -300,26 +317,34 @@ export function PhonePreview() {
   };
 
   const chrome = fullscreen ? 24 : 120;
-  const screenHeight = Math.min(844, viewport.h - chrome - BEZEL * 2);
+  const fitHeight = mobile && stageHeight ? stageHeight - STAGE_PADDING_BOTTOM - BEZEL * 2 : viewport.h - chrome - BEZEL * 2;
+  const screenHeight = Math.min(844, fitHeight);
   const screenWidth = Math.round(screenHeight / SCREEN_RATIO);
+
+  // Phone chrome follows `mobile`, which also covers short touch screens in landscape (wider than 767px).
+  const headerClass = mobile
+    ? 'flex shrink-0 items-center justify-between gap-2 pb-2 pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] pt-[max(0.5rem,env(safe-area-inset-top))]'
+    : 'flex h-14 shrink-0 items-center justify-between gap-4 px-5';
 
   return (
     <div ref={root} className="fixed inset-0 z-[1060] flex flex-col bg-[#09090b]/95 backdrop-blur-md" role="dialog" aria-modal="true" aria-label="Phone preview">
       {!fullscreen && (
-        <div className="flex h-14 shrink-0 items-center justify-between gap-4 px-5">
-          <div className="flex items-center gap-3">
-            <h2 className="text-[13px] font-semibold text-ink">Preview</h2>
-            <div className="w-[190px]">
+        <div className={headerClass}>
+          <div className={mobile ? 'flex min-w-0 items-center gap-2' : 'flex items-center gap-3'}>
+            <h2 className={`${mobile ? 'shrink-0 ' : ''}heading-md text-ink`}>Preview</h2>
+            <div className={mobile ? 'w-[150px] min-w-0 [&_.segmented-btn]:whitespace-nowrap [&_.segmented-btn]:px-1' : 'w-[190px]'}>
               <Segmented label="Preview" value={mode} onChange={setMode} options={[{ value: 'feed', label: story ? 'Story' : 'Feed' }, { value: 'grid', label: 'Profile grid' }]} />
             </div>
           </div>
-          <div className="flex items-center gap-1">
-            <button type="button" className="btn btn-ghost btn-sm" onClick={() => void toggleFullscreen()} title="Full screen (F)"><Maximize2 size={14} aria-hidden /> Full screen</button>
-            <button type="button" className="icon-btn" onClick={() => close(false)} title="Close preview (Esc)" aria-label="Close preview"><X size={16} aria-hidden /></button>
+          <div className={mobile ? 'flex shrink-0 items-center gap-1.5' : 'flex items-center gap-1'}>
+            {canFullscreen && (
+              <button type="button" className={mobile ? 'btn btn-ghost btn-sm h-11 w-11 px-0' : 'btn btn-ghost btn-sm'} onClick={() => void toggleFullscreen()} title="Full screen (F)" aria-label="Full screen"><Maximize2 size={14} aria-hidden /><span className={mobile ? 'hidden' : undefined}> Full screen</span></button>
+            )}
+            <button type="button" className={mobile ? 'icon-btn h-11 w-11' : 'icon-btn'} onClick={() => close(false)} title="Close preview (Esc)" aria-label="Close preview"><X size={16} aria-hidden /></button>
           </div>
         </div>
       )}
-      <div className="flex min-h-0 flex-1 items-center justify-center gap-10 pb-6">
+      <div ref={stage} className="flex min-h-0 flex-1 items-center justify-center gap-10 pb-6">
         <div className="relative shrink-0 rounded-[54px] bg-[#1b1b1f] shadow-[0_40px_120px_-30px_rgba(0,0,0,0.9),inset_0_0_0_1px_rgba(255,255,255,0.08)]" style={{ padding: BEZEL }}>
           <div className="relative overflow-hidden rounded-[44px] bg-white" style={{ width: screenWidth, height: screenHeight }}>
             {mode === 'grid'
@@ -335,7 +360,7 @@ export function PhonePreview() {
       {fullscreen && (
         <button type="button" className="btn btn-ghost btn-sm absolute right-4 top-4" onClick={() => void toggleFullscreen()} title="Exit full screen (Esc)"><Minimize2 size={14} aria-hidden /> Exit</button>
       )}
-      {!fullscreen && mode === 'feed' && count > 1 && <p className="pb-4 text-center text-[11px] text-ink-faint">Drag, swipe with two fingers, or use ← → to flip through slides.</p>}
+      {!fullscreen && mode === 'feed' && count > 1 && <p className={`text-center text-[11px] text-ink-faint ${mobile ? 'pb-[max(1rem,env(safe-area-inset-bottom))]' : 'pb-4'}`}>{mobile ? 'Swipe to move between slides' : 'Drag, swipe with two fingers, or use ← → to flip through slides.'}</p>}
     </div>
   );
 }

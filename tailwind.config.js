@@ -29,7 +29,12 @@ export default {
         },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+        // Fontsource registers the self-hosted Inter as 'Inter Variable'. Plain 'Inter' is deliberately
+        // not registered: resolveFontFamily maps that portable document name to the bundled face.
+        sans: ['"Inter Variable"', 'Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+        // Serif for titles and headings only (see .heading-* in index.css). The fallbacks are ordinary
+        // text serifs, which run wider than the condensed Instrument Serif.
+        display: ['"Instrument Serif"', 'ui-serif', 'Georgia', '"Times New Roman"', 'serif'],
       },
       boxShadow: {
         soft: '0 1px 2px rgba(0, 0, 0, 0.4)',

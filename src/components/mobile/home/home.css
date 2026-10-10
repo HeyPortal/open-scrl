@@ -1,0 +1,52 @@
+/* Mobile home screen: shared behaviour and small keyframes. */
+.mobile-home {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  font-size: 15px;
+}
+
+.mobile-home button,
+.mobile-home a,
+.mobile-home label {
+  touch-action: manipulation;
+}
+
+.mobile-home .home-hscroll {
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mobile-home .home-hscroll::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes home-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes home-sheet-in {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes home-rise-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.home-fade-in { animation: home-fade-in 180ms ease-out both; }
+.home-sheet-in { animation: home-sheet-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.home-rise-in { animation: home-rise-in 220ms ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .home-fade-in,
+  .home-sheet-in,
+  .home-rise-in {
+    animation: none;
+  }
+
+  .mobile-home * {
+    transition-duration: 0.01ms !important;
+  }
+}

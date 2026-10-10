@@ -30,7 +30,7 @@ export function ShadowSection({ layer }: { layer: Layer }) {
               const active = sameShadow(p.shadow, shadow);
               return (
                 <button key={p.label} type="button" aria-pressed={active} onClick={() => updateLayer(layer.id, { shadow: p.shadow })}
-                  className={`h-7 rounded-md text-[11px] font-medium transition-colors ${active ? 'bg-accent-soft text-accent ring-1 ring-inset ring-accent' : 'bg-bg-inset text-ink-dim hover:bg-bg-hover hover:text-ink'}`}>
+                  className={`insp-chip h-7 rounded-md text-[11px] font-medium transition-colors ${active ? 'bg-accent-soft text-accent ring-1 ring-inset ring-accent' : 'bg-bg-inset text-ink-dim hover:bg-bg-hover hover:text-ink'}`}>
                   {p.label}
                 </button>
               );
@@ -115,7 +115,7 @@ export function ImageFrameSection({ layer }: { layer: ImageLayer }) {
   return (
     <>
       <Section title="Shape" action={
-        <button type="button" className="inline-flex items-center gap-1 text-xs font-medium text-ink-dim hover:text-ink" title="Reset crop, shape and corners"
+        <button type="button" className="insp-link inline-flex items-center gap-1 text-xs font-medium text-ink-dim hover:text-ink" title="Reset crop, shape and corners"
           onClick={() => updateLayer(layer.id, { mask: 'rect', cornerRadius: 0, cropOffsetX: 0, cropOffsetY: 0, cropScale: 1 })}>
           <RotateCcw size={12} aria-hidden /> Reset photo
         </button>

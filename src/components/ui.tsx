@@ -6,8 +6,8 @@ import { round } from '@/lib/nano';
 export function PanelHeader({ title, hint, action }: { title: string; hint?: ReactNode; action?: ReactNode }) {
   return (
     <div className="px-3 pb-2.5 pt-3">
-      <div className="flex h-5 items-center justify-between gap-2">
-        <h2 className="text-[13px] font-semibold text-ink">{title}</h2>
+      <div className="flex h-7 items-center justify-between gap-2">
+        <h2 className="heading-md text-ink">{title}</h2>
         {action}
       </div>
       {hint && <p className="mt-1 text-[11px] leading-relaxed text-ink-faint">{hint}</p>}
@@ -250,7 +250,7 @@ export function EmptyState({ icon, title, children }: { icon: ReactNode; title: 
   return (
     <div className="flex flex-col items-center px-5 py-8 text-center">
       <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-bg-inset text-ink-dim ring-1 ring-line-strong">{icon}</div>
-      <p className="text-xs font-semibold text-ink">{title}</p>
+      <p className="heading-sm text-ink">{title}</p>
       {children && <div className="mt-1 text-[11px] leading-relaxed text-ink-faint">{children}</div>}
     </div>
   );
