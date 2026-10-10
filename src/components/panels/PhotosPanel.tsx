@@ -115,9 +115,11 @@ export function PhotosPanel() {
   /** Imports files; `asSlides` gives each one its own full-bleed slide (panoramas span several). */
   const handleFiles = async (files: FileList | null, asSlides = false) => {
     if (!files || files.length === 0) return;
+    const importingProjectId = useEditor.getState().activeProjectId;
     setBusy(true);
     try {
       const imported = await importFiles(files);
+      if (useEditor.getState().activeProjectId !== importingProjectId) return;
       if (asSlides && imported.length) {
         addMediaAsSlides(imported);
         const count = imported.reduce((n, a) => n + spanOf(a), 0);
@@ -126,7 +128,7 @@ export function PhotosPanel() {
       }
       const panorama = imported.find((a) => spanOf(a) > 1);
       if (panorama) {
-        addToast(`“${panorama.name}” is a panorama.`, 'info', { label: `Spread across ${spanOf(panorama)} slides`, run: () => spread(panorama) });
+        addToast(`“${panorama.name}” is a panorama.`, 'info', { label: `Spread across ${spanOf(panorama)} slides`, run: () => { if (useEditor.getState().activeProjectId === importingProjectId) spread(panorama); } });
       }
     } finally {
       setBusy(false);

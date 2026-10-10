@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import type Konva from 'konva';
 import type { TextLayer } from '@/types';
 import { useEditor } from '@/store/editor';
+import { editorActivity } from '@/editor/activity';
 
 interface Props {
   layer: TextLayer;
@@ -15,13 +16,19 @@ interface Props {
 export function TextEditor({ layer, stage, offsetX = 0, scale: scaleProp, viewportOffset, onClose }: Props) {
   const updateLayer = useEditor((s) => s.updateLayer);
   const ref = useRef<HTMLTextAreaElement | null>(null);
+  const releaseActivity = useRef<(() => void) | null>(null);
+  const closed = useRef(false);
+  const projectId = useEditor((s) => s.activeProjectId);
+  const closeActivity = () => { closed.current = true; releaseActivity.current?.(); releaseActivity.current = null; };
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    closed.current = false;
+    releaseActivity.current = editorActivity.begin();
     const el = ref.current;
-    if (!el) return;
-    el.focus();
-    el.select();
-  }, []);
+    el?.focus();
+    el?.select();
+    return () => { closed.current = true; releaseActivity.current?.(); releaseActivity.current = null; };
+  }, [projectId, layer.id]);
 
   const scale = scaleProp ?? stage.scaleX();
   const stageBox = stage.container().getBoundingClientRect();
@@ -34,11 +41,15 @@ export function TextEditor({ layer, stage, offsetX = 0, scale: scaleProp, viewpo
       ref={ref}
       defaultValue={layer.text}
       onBlur={(e) => {
-        updateLayer(layer.id, { text: e.target.value });
-        onClose();
+        if (closed.current) return;
+        try {
+          if (useEditor.getState().activeProjectId === projectId) updateLayer(layer.id, { text: e.target.value });
+          onClose();
+        } finally { closeActivity(); }
       }}
       onKeyDown={(e) => {
         if (e.key === 'Escape') {
+          closeActivity();
           onClose();
         }
       }}

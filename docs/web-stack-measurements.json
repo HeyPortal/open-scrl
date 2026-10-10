@@ -1,0 +1,583 @@
+{
+  "date": "2026-10-09",
+  "baseCommit": "e9f4f31c668293b69c106fc006709d3f9d350c82",
+  "branch": "feature/modernize-web-stack",
+  "host": {
+    "node": "24.21.0",
+    "npm": "11.19.0",
+    "platform": "Linux",
+    "nativeBrowserViewport": {
+      "width": 1280,
+      "height": 800
+    },
+    "devicePixelRatio": 2
+  },
+  "developmentEditing": [
+    {
+      "stage": "baseline",
+      "konva": "9.3.22",
+      "slides": 20,
+      "layers": 201,
+      "samples": 60,
+      "command": {
+        "medianMs": 0.4,
+        "p95Ms": 0.5
+      },
+      "explicitDraw": {
+        "medianMs": 0.9,
+        "p95Ms": 1.4
+      },
+      "frameCompletion": {
+        "medianMs": 37,
+        "p95Ms": 71
+      },
+      "initial": {
+        "hash": "e127b4a8",
+        "width": 1440,
+        "height": 1312
+      },
+      "final": {
+        "hash": "e127b4a8",
+        "width": 1440,
+        "height": 1312
+      },
+      "canvasCount": 3,
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36"
+    },
+    {
+      "stage": "React with Konva 9",
+      "konva": "9.3.22",
+      "slides": 20,
+      "layers": 201,
+      "samples": 60,
+      "command": {
+        "medianMs": 0.4,
+        "p95Ms": 0.6
+      },
+      "explicitDraw": {
+        "medianMs": 1,
+        "p95Ms": 1.4
+      },
+      "frameCompletion": {
+        "medianMs": 50.8,
+        "p95Ms": 80.4
+      },
+      "initial": {
+        "hash": "e127b4a8",
+        "width": 1440,
+        "height": 1312
+      },
+      "final": {
+        "hash": "e127b4a8",
+        "width": 1440,
+        "height": 1312
+      },
+      "canvasCount": 3,
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36"
+    },
+    {
+      "stage": "React with Konva 10",
+      "konva": "10.7.1",
+      "slides": 20,
+      "layers": 201,
+      "samples": 60,
+      "command": {
+        "medianMs": 0.4,
+        "p95Ms": 0.6
+      },
+      "explicitDraw": {
+        "medianMs": 0.9,
+        "p95Ms": 1.4
+      },
+      "frameCompletion": {
+        "medianMs": 26.9,
+        "p95Ms": 75.4
+      },
+      "initial": {
+        "hash": "e127b4a8",
+        "width": 1440,
+        "height": 1312
+      },
+      "final": {
+        "hash": "e127b4a8",
+        "width": 1440,
+        "height": 1312
+      },
+      "canvasCount": 3,
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36"
+    }
+  ],
+  "builds": [
+    {
+      "name": "baseline",
+      "trial": 1,
+      "seconds": 11.378,
+      "exitCode": 0
+    },
+    {
+      "name": "final",
+      "trial": 1,
+      "seconds": 7.248,
+      "exitCode": 0
+    },
+    {
+      "name": "baseline",
+      "trial": 2,
+      "seconds": 10.343,
+      "exitCode": 0
+    },
+    {
+      "name": "final",
+      "trial": 2,
+      "seconds": 7.148,
+      "exitCode": 0
+    },
+    {
+      "name": "baseline",
+      "trial": 3,
+      "seconds": 10.457,
+      "exitCode": 0
+    },
+    {
+      "name": "final",
+      "trial": 3,
+      "seconds": 7.454,
+      "exitCode": 0
+    }
+  ],
+  "bundles": {
+    "baseline": {
+      "entry": "index-CgpXzbQ3.js",
+      "preloads": [],
+      "entryAndPreloadsGzipBytes": 91596,
+      "assets": [
+        {
+          "file": "EditorShell-41AOjGYv.js",
+          "bytes": 616466,
+          "gzipBytes": 186869
+        },
+        {
+          "file": "_commonjsHelpers-CqkleIqs.js",
+          "bytes": 116,
+          "gzipBytes": 126
+        },
+        {
+          "file": "asset.worker-m9zv6xcS.js",
+          "bytes": 1432,
+          "gzipBytes": 819
+        },
+        {
+          "file": "export.worker-Gq8WcZh4.js",
+          "bytes": 25646,
+          "gzipBytes": 9414
+        },
+        {
+          "file": "heic2any-CvApKO8q.js",
+          "bytes": 1352853,
+          "gzipBytes": 341212
+        },
+        {
+          "file": "index-BPJhwBcX.js",
+          "bytes": 7632,
+          "gzipBytes": 2890
+        },
+        {
+          "file": "index-CgpXzbQ3.js",
+          "bytes": 289580,
+          "gzipBytes": 91596
+        },
+        {
+          "file": "index-DSHFrBFu.css",
+          "bytes": 47340,
+          "gzipBytes": 8220
+        },
+        {
+          "file": "index-tWTlrN44.js",
+          "bytes": 7583,
+          "gzipBytes": 2856
+        },
+        {
+          "file": "zip-DJXclur-.js",
+          "bytes": 142909,
+          "gzipBytes": 65900
+        }
+      ]
+    },
+    "final": {
+      "entry": "index-DTJzh5nj.js",
+      "preloads": [
+        "rolldown-runtime-hePW80VL.js"
+      ],
+      "entryAndPreloadsGzipBytes": 99115,
+      "assets": [
+        {
+          "file": "EditorShell-CpRwB7am.js",
+          "bytes": 608428,
+          "gzipBytes": 182573
+        },
+        {
+          "file": "asset.worker-BG3Ej5bj.js",
+          "bytes": 1749,
+          "gzipBytes": 1019
+        },
+        {
+          "file": "export.worker-zXAm4dUQ.js",
+          "bytes": 25914,
+          "gzipBytes": 9298
+        },
+        {
+          "file": "heic2any-DvPMtcY9.js",
+          "bytes": 1352148,
+          "gzipBytes": 340466
+        },
+        {
+          "file": "index-DTJzh5nj.js",
+          "bytes": 317381,
+          "gzipBytes": 98687
+        },
+        {
+          "file": "index-pvbExxA7.css",
+          "bytes": 46551,
+          "gzipBytes": 8208
+        },
+        {
+          "file": "lib-DMRxUD_c.js",
+          "bytes": 6808,
+          "gzipBytes": 2463
+        },
+        {
+          "file": "lib-TFeceyLW.js",
+          "bytes": 6904,
+          "gzipBytes": 2480
+        },
+        {
+          "file": "rolldown-runtime-hePW80VL.js",
+          "bytes": 716,
+          "gzipBytes": 428
+        },
+        {
+          "file": "virtual_pwa-register-CKy-R7f4.js",
+          "bytes": 1210,
+          "gzipBytes": 617
+        },
+        {
+          "file": "workbox-window.prod.es5-Bd17z0YL.js",
+          "bytes": 5653,
+          "gzipBytes": 2199
+        },
+        {
+          "file": "zip-DbUngtYS.js",
+          "bytes": 167378,
+          "gzipBytes": 74067
+        }
+      ]
+    }
+  },
+  "productionEditing": [
+    {
+      "name": "baseline",
+      "trial": 1,
+      "mode": "production",
+      "konva": "9.3.22",
+      "samples": 60,
+      "input": {
+        "medianMs": 0.2,
+        "p95Ms": 0.4
+      },
+      "explicitDraw": {
+        "medianMs": 0.8,
+        "p95Ms": 1
+      },
+      "frameCompletion": {
+        "medianMs": 16.7,
+        "p95Ms": 18.7
+      },
+      "initial": {
+        "hash": "9290b812",
+        "width": 1440,
+        "height": 1312
+      },
+      "final": {
+        "hash": "9290b812",
+        "width": 1440,
+        "height": 1312
+      },
+      "startX": 165,
+      "finalX": 165,
+      "observedXrange": [
+        165,
+        166
+      ],
+      "zoom": 0.5,
+      "visibility": "visible"
+    },
+    {
+      "name": "final",
+      "trial": 1,
+      "mode": "production",
+      "konva": "10.7.1",
+      "samples": 60,
+      "input": {
+        "medianMs": 0.2,
+        "p95Ms": 0.4
+      },
+      "explicitDraw": {
+        "medianMs": 0.8,
+        "p95Ms": 1.1
+      },
+      "frameCompletion": {
+        "medianMs": 16.6,
+        "p95Ms": 20.4
+      },
+      "initial": {
+        "hash": "9290b812",
+        "width": 1440,
+        "height": 1312
+      },
+      "final": {
+        "hash": "9290b812",
+        "width": 1440,
+        "height": 1312
+      },
+      "startX": 165,
+      "finalX": 165,
+      "observedXrange": [
+        165,
+        166
+      ],
+      "zoom": 0.5,
+      "visibility": "visible"
+    },
+    {
+      "name": "baseline",
+      "trial": 2,
+      "mode": "production",
+      "konva": "9.3.22",
+      "samples": 60,
+      "input": {
+        "medianMs": 0.3,
+        "p95Ms": 0.4
+      },
+      "explicitDraw": {
+        "medianMs": 0.8,
+        "p95Ms": 1
+      },
+      "frameCompletion": {
+        "medianMs": 16.7,
+        "p95Ms": 17.2
+      },
+      "initial": {
+        "hash": "9290b812",
+        "width": 1440,
+        "height": 1312
+      },
+      "final": {
+        "hash": "9290b812",
+        "width": 1440,
+        "height": 1312
+      },
+      "startX": 165,
+      "finalX": 165,
+      "observedXrange": [
+        165,
+        166
+      ],
+      "zoom": 0.5,
+      "visibility": "visible"
+    },
+    {
+      "name": "final",
+      "trial": 2,
+      "mode": "production",
+      "konva": "10.7.1",
+      "samples": 60,
+      "input": {
+        "medianMs": 0.3,
+        "p95Ms": 0.4
+      },
+      "explicitDraw": {
+        "medianMs": 0.8,
+        "p95Ms": 1.2
+      },
+      "frameCompletion": {
+        "medianMs": 16.4,
+        "p95Ms": 20.3
+      },
+      "initial": {
+        "hash": "9290b812",
+        "width": 1440,
+        "height": 1312
+      },
+      "final": {
+        "hash": "9290b812",
+        "width": 1440,
+        "height": 1312
+      },
+      "startX": 165,
+      "finalX": 165,
+      "observedXrange": [
+        165,
+        166
+      ],
+      "zoom": 0.5,
+      "visibility": "visible"
+    },
+    {
+      "name": "baseline",
+      "trial": 3,
+      "mode": "production",
+      "konva": "9.3.22",
+      "samples": 60,
+      "input": {
+        "medianMs": 0.2,
+        "p95Ms": 0.4
+      },
+      "explicitDraw": {
+        "medianMs": 0.7,
+        "p95Ms": 0.9
+      },
+      "frameCompletion": {
+        "medianMs": 17,
+        "p95Ms": 20.1
+      },
+      "initial": {
+        "hash": "9290b812",
+        "width": 1440,
+        "height": 1312
+      },
+      "final": {
+        "hash": "9290b812",
+        "width": 1440,
+        "height": 1312
+      },
+      "startX": 165,
+      "finalX": 165,
+      "observedXrange": [
+        165,
+        166
+      ],
+      "zoom": 0.5,
+      "visibility": "visible"
+    },
+    {
+      "name": "final",
+      "trial": 3,
+      "mode": "production",
+      "konva": "10.7.1",
+      "samples": 60,
+      "input": {
+        "medianMs": 0.3,
+        "p95Ms": 0.5
+      },
+      "explicitDraw": {
+        "medianMs": 1,
+        "p95Ms": 1.4
+      },
+      "frameCompletion": {
+        "medianMs": 19.8,
+        "p95Ms": 24.6
+      },
+      "initial": {
+        "hash": "9290b812",
+        "width": 1440,
+        "height": 1312
+      },
+      "final": {
+        "hash": "9290b812",
+        "width": 1440,
+        "height": 1312
+      },
+      "startX": 165,
+      "finalX": 165,
+      "observedXrange": [
+        165,
+        166
+      ],
+      "zoom": 0.5,
+      "visibility": "visible"
+    }
+  ],
+  "verification": {
+    "verify": {
+      "exitCode": 0,
+      "unitTests": 260,
+      "unitFiles": 42,
+      "seconds": 24.56
+    },
+    "e2e": {
+      "exitCode": 0,
+      "browser": "Chromium",
+      "tests": 23,
+      "seconds": 41.6
+    },
+    "pwa": {
+      "exitCode": 0,
+      "browser": "Chromium",
+      "tests": 5,
+      "seconds": 21
+    }
+  },
+  "nativeBrowser": {
+    "konva": "10.7.1",
+    "heic": {
+      "fixtureSource": "https://raw.githubusercontent.com/alexcorvi/heic2any/master/demo/1.heic",
+      "inputBytes": 41389,
+      "result": {
+        "name": "heic-fixture.jpg",
+        "mime": "image/jpeg",
+        "width": 1440,
+        "height": 960
+      },
+      "adapterHttpStatus": 200,
+      "assetWorkerHttpStatus": 200,
+      "browserErrors": []
+    },
+    "phonePreview": {
+      "opened": true,
+      "closedWithEscape": true
+    },
+    "h264": {
+      "supported": false,
+      "message": "This device cannot encode an Instagram-compatible H.264 MP4."
+    },
+    "serviceWorker": {
+      "controller": true,
+      "active": "activated",
+      "standalone": false,
+      "optionalToolsCached": [
+        "export.worker",
+        "heic2any",
+        "zip"
+      ]
+    },
+    "artworkPng": {
+      "byteIdenticalAcrossStages": true,
+      "sha256": "52e305049b5f0cba6dbb32ac52ae193fbbb2a9155de05a088c4d61e86e193c70"
+    }
+  },
+  "limitations": [
+    "Firefox/WebKit could not launch due to missing host libraries",
+    "Actual H.264 encoding unavailable",
+    "Operating-system installation UI not exercised",
+    "Service-worker update fixture keeps application chunks unchanged",
+    "Sol independent cross-review rounds stopped at provider usage limits"
+  ],
+  "followUpAcceptance": {
+    "date": "2026-10-10",
+    "unitTests": 268,
+    "unitTestFiles": 42,
+    "chromiumDevelopmentTests": 32,
+    "chromiumDevelopmentSeconds": 49.3,
+    "chromiumProductionPwaTests": 9,
+    "chromiumProductionPwaSeconds": 33.3,
+    "commandsExitCode": 0,
+    "bundle": {
+      "date": "2026-10-10",
+      "entryGzipBytes": 98755,
+      "editorGzipBytes": 183198,
+      "entry": "assets/index-BHMY_i-C.js",
+      "editor": "EditorShell-DDviJlU8.js"
+    },
+    "notes": "Fresh gates after final interaction/import/controller safety fixes. Build and editing timing comparisons above remain the 2026-10-09 checkpoint."
+  }
+}
