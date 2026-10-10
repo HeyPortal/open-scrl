@@ -23,6 +23,7 @@ Lay your photos out across a row of slides, then export one file per slide in po
 The web editor uses Studio’s dark stage, floating tool and Properties cards,
 coral selection controls, and slide timeline on desktop, with touch sheets
 on phones. It's early, so expect rough edges.
+Create a carousel or pick up a saved project from the [home screen](docs/images/web-home.webp).
 
 ![The six slides exported from the sample project.](docs/images/export-strip.webp)
 
@@ -61,7 +62,7 @@ in the browser and waits for unfinished edits before offering an update.
 
 ## Mac app
 
-![The same project in Open-SCRL for Mac.](docs/images/mac-editor.webp)
+![A Florida carousel in Open-SCRL for Mac.](docs/images/mac-editor.webp)
 
 A separate SwiftUI app in [`macos/`](./macos). Projects are `.openscrl` files, and it adds
 Photos import, AirDrop sharing, and Blend Photos for seamless joins between pictures.
@@ -95,7 +96,10 @@ every release.
 
 ## Credits
 
-Screenshot photos are from Unsplash, all taken in Florida, by
+The web screenshots use Florida photos from Wikimedia Commons, with
+[photographer credits, source links, and licenses](docs/screenshot-credits.md).
+
+The Mac screenshot uses Florida photos from Unsplash by
 [John Maldonado](https://unsplash.com/photos/cATp9I27xsU),
 [Jota](https://unsplash.com/photos/q5kqK2HHdfw),
 [PhotoHound](https://unsplash.com/photos/zNR0WdLZ6vU),
@@ -109,4 +113,5 @@ Screenshot photos are from Unsplash, all taken in Florida, by
 
 ## License
 
-[MIT](./LICENSE). Not affiliated with SCRL or Instagram.
+[MIT](./LICENSE); [screenshot imagery has separate licenses](docs/screenshot-credits.md).
+Not affiliated with SCRL or Instagram.
