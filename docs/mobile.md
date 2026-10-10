@@ -8,6 +8,8 @@ The mobile layout is used when the browser window is 767 px wide or narrower, or
 
 ## Home screen
 
+An Open-SCRL loading screen appears while the app and its bundled fonts get ready, including on a slower first visit.
+
 - **New carousel**: pick a canvas size (IG Portrait, IG Square, IG Story / Reels, IG Landscape, TikTok, or Pinterest), type a name, and tap **Create carousel**. A blank name keeps the project called Untitled.
 - **Start from a grid**: eight photo layouts, such as a 2 × 2 grid or a 1 + 2 layout. Tapping one creates a project in the chosen size with that grid already placed.
 - **Your projects**: each row shows the name, canvas size, slide count, and when it was last edited. Tap a row to open it. A search box appears once you have more than three projects.
@@ -56,7 +58,11 @@ On the canvas, one finger selects one layer at a time. To select several, open *
 - **Double-tap** a text layer to edit it in place. The box grows with the text. Tap **Done** above it, or tap outside it, to finish. Touch has no Escape key, so **Done** is the way out.
 - **Double-tap** empty canvas while zoomed in to return to the fit view. At fit zoom, a double-tap does nothing extra.
 
+Touch selection follows the current position, rotation, and stacking order of the visible layers. A title above a photo remains selectable, including after moving layers or reopening a project. Layers moved across slide boundaries can be selected, dragged, and edited where they appear; selecting them keeps the canvas on the slide you are viewing.
+
 The browser's own pinch-zoom is turned off on the canvas, so pinching only changes the canvas.
+
+After an interrupted touch, you can select or move a layer again without refreshing the page. A handle resize interrupted by the browser keeps its last visible size.
 
 ## Slides
 

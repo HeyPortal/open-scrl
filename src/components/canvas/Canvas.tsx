@@ -28,7 +28,7 @@ import { MobileTextEditor } from './MobileTextEditor';
 import { SlideHeaders } from './SlideHeaders';
 import { SlideBackground } from './SlideBackground';
 import { SELECTION_COLOR } from './SelectionOutline';
-import { contentPointAt, scrollForAnchor, zoomLimits, type ViewGeometry } from './touchMath';
+import { contentPointAt, scrollForAnchor, slideIndexAtCentre, zoomLimits, type ViewGeometry } from './touchMath';
 import { useTouchGestures, type GestureHost } from './useTouchGestures';
 import { addPhotosAt, describeFill, dragCarriesAsset, dragCarriesFiles, locateDrop, readDroppedAssetId, readDroppedFiles, type DropLocation } from './mediaDrop';
 
@@ -119,6 +119,10 @@ export function Canvas({ width, height, variant = 'desktop' }: { width: number; 
   const userZoom = useRef<number | null>(null);
   const pendingScroll = useRef<{ left: number; top: number } | null>(null);
   const focusKey = useRef('');
+  // A layer keeps its document owner when it crosses a seam. Refits should keep
+  // showing the slide being viewed, rather than returning to that owner.
+  const mobileViewSlide = useRef('');
+  const focusGeometryKey = useRef('');
   const lastSize = useRef({ width, height });
   const gestureHost = useRef<GestureHost | null>(null);
   const drag = useRef<DragSession | null>(null);
@@ -248,11 +252,18 @@ export function Canvas({ width, height, variant = 'desktop' }: { width: number; 
   useLayoutEffect(() => {
     const el = scrollRef.current; if (!el) return;
     const index = doc.slideOrder.indexOf(selectedSlideId); if (index < 0) return;
-    // Mobile: a pinched view only re-centres when the focused slide changes, not while zooming or resizing.
+    // Selection can change the active slide to a layer's document owner. Canvas
+    // picks mark that change as quiet; only navigation requests move the view.
     const key = `${selectedSlideId}:${slideFocusRequest}:${index}`;
-    if (mobile && isCustomZoom() && focusKey.current === key) return;
+    const geometryKey = `${originX}:${fmt.width}:${zoom}:${width}`;
+    const quiet = focusKey.current === key;
+    if (mobile && quiet && isCustomZoom()) { focusGeometryKey.current = geometryKey; return; }
+    if (mobile && quiet && focusGeometryKey.current === geometryKey) return;
+    if (!quiet) mobileViewSlide.current = selectedSlideId;
     focusKey.current = key;
-    const center = originX + (index + .5) * fmt.width * zoom;
+    focusGeometryKey.current = geometryKey;
+    const viewIndex = mobile ? doc.slideOrder.indexOf(mobileViewSlide.current) : index;
+    const center = originX + ((viewIndex < 0 ? index : viewIndex) + .5) * fmt.width * zoom;
     el.scrollTo({ left: Math.max(0, center - el.clientWidth / 2), behavior: 'auto' });
     if (raf.current !== null) { cancelAnimationFrame(raf.current); raf.current = null; }
     const position = { left: el.scrollLeft, top: el.scrollTop };
@@ -261,7 +272,7 @@ export function Canvas({ width, height, variant = 'desktop' }: { width: number; 
     pendingFocusDraw.current = nextOffset;
     setViewportOffset(nextOffset);
     updateVisible();
-  }, [centeredY, doc.slideOrder, fmt.width, isCustomZoom, mobile, originX, selectedSlideId, slideFocusRequest, updateVisible, zoom]);
+  }, [centeredY, doc.slideOrder, fmt.width, isCustomZoom, mobile, originX, selectedSlideId, slideFocusRequest, updateVisible, width, zoom]);
 
   useLayoutEffect(() => {
     const pending = pendingFocusDraw.current;
@@ -274,23 +285,28 @@ export function Canvas({ width, height, variant = 'desktop' }: { width: number; 
 
   // Mobile touch gestures live in useTouchGestures; this is the part of the canvas they drive.
   useLayoutEffect(() => {
+    const geometry = { width, height, deckWidth, centreWidth, slideHeight: fmt.height, padding: PADDING };
+    const rememberViewSlide = (z: number, left: number) => {
+      mobileViewSlide.current = doc.slideOrder[slideIndexAtCentre(geometry, z, left, fmt.width, doc.slideOrder.length)];
+    };
     gestureHost.current = !mobile ? null : {
-      view: () => ({ zoom: useEditorSession.getState().zoom, offset: viewRef.current.offset, geometry: { width, height, deckWidth, centreWidth, slideHeight: fmt.height, padding: PADDING }, fitZoom: targetZoom, limits: zoomRange, slideWidth: fmt.width, slideOrder: doc.slideOrder }),
+      view: () => ({ zoom: useEditorSession.getState().zoom, offset: viewRef.current.offset, geometry, fitZoom: targetZoom, limits: zoomRange, slideWidth: fmt.width, slideOrder: doc.slideOrder }),
       applyView: (next, scroll) => {
         const el = scrollRef.current; if (!el) return;
+        rememberViewSlide(next, scroll.left);
         userZoom.current = next;
         if (Math.abs(next - useEditorSession.getState().zoom) < 1e-9) { el.scrollLeft = scroll.left; el.scrollTop = scroll.top; scheduleScrollSync(); }
         else { pendingScroll.current = scroll; setZoom(next); }
       },
-      scrollTo: (left, top) => { const el = scrollRef.current; if (!el) return; el.scrollLeft = left; el.scrollTop = top; scheduleScrollSync(); },
+      scrollTo: (left, top) => { const el = scrollRef.current; if (!el) return; el.scrollLeft = left; el.scrollTop = top; rememberViewSlide(zoom, el.scrollLeft); scheduleScrollSync(); },
       resetZoom: () => {
         userZoom.current = null;
-        const session = useEditorSession.getState(); const el = scrollRef.current; const index = doc.slideOrder.indexOf(session.selectedSlideId);
+        const session = useEditorSession.getState(); const el = scrollRef.current; const index = doc.slideOrder.indexOf(mobileViewSlide.current || session.selectedSlideId);
         if (Math.abs(session.zoom - targetZoom) > 1e-9) setZoom(targetZoom);
         else if (el && index >= 0) el.scrollTo({ left: Math.max(0, originX + (index + .5) * fmt.width * zoom - el.clientWidth / 2) });
       },
       isCustomZoom,
-      selectSlideQuiet: (slideId) => { focusKey.current = `${slideId}:${slideFocusRequest}:${doc.slideOrder.indexOf(slideId)}`; selectSlide(slideId); },
+      selectSlideQuiet: (slideId) => { mobileViewSlide.current = slideId; focusKey.current = `${slideId}:${slideFocusRequest}:${doc.slideOrder.indexOf(slideId)}`; selectSlide(slideId); },
       layerNode: (id) => layerNodes.current.get(id),
       pageX,
       cancelDrag: () => { if (drag.current) drag.current.cancelled = true; },
@@ -519,6 +535,20 @@ export function Canvas({ width, height, variant = 'desktop' }: { width: number; 
     } finally { groupTransform.current = null; endActivity('transform'); }
   };
 
+  const pickCanvasLayer = (layerId: string, additive: boolean) => {
+    if (mobile) {
+      const d = useEditor.getState().doc;
+      const owner = findLayerSlideId(d, layerId);
+      const v = gestureHost.current?.view();
+      const el = scrollRef.current;
+      if (owner && v && el) {
+        mobileViewSlide.current = d.slideOrder[slideIndexAtCentre(v.geometry, v.zoom, el.scrollLeft, v.slideWidth, d.slideOrder.length)];
+        focusKey.current = `${owner}:${useEditorSession.getState().slideFocusRequest}:${d.slideOrder.indexOf(owner)}`;
+      }
+    }
+    pickLayer(layerId, additive);
+  };
+
   const renderNode = (slideId: string, layer: DocLayer) => {
     const slide = slideModel(slideId); const offset = pageX(slideId);
     const onSelect = (e: Konva.KonvaEventObject<PointerEvt>) => {
@@ -526,7 +556,7 @@ export function Canvas({ width, height, variant = 'desktop' }: { width: number; 
       if (mobile && e.type === 'tap' && clickWouldNarrow(layer.id)) { narrowTo(layer.id); return; }
       const additive = isAdditive(e.evt);
       pendingNarrow.current = !additive && 'button' in e.evt && e.evt.button === 0 && clickWouldNarrow(layer.id) ? layer.id : null;
-      pickLayer(layer.id, additive);
+      pickCanvasLayer(layer.id, additive);
       if (!additive && layer.kind === 'image' && !layer.assetId) setLeftPanel('photos');
     };
     // A click (no drag) on a layer inside a larger selection narrows the selection to it.
@@ -540,10 +570,7 @@ export function Canvas({ width, height, variant = 'desktop' }: { width: number; 
       let fresh = false;
       if (mobile && !useEditorSession.getState().selectedLayerIds.includes(layer.id)) {
         // Touch selects on tap or when a drag starts, never on touchstart (which would hijack a pinch).
-        // Picking a layer on another slide re-centres the view, so that one only selects.
-        const sameSlide = findLayerSlideId(useEditor.getState().doc, layer.id) === useEditorSession.getState().selectedSlideId;
-        pickLayer(layer.id, false); fresh = true;
-        if (!sameSlide) { e.target.stopDrag(); return; }
+        pickCanvasLayer(layer.id, false); fresh = true;
       }
       const d = useEditor.getState().doc; const ids = useEditorSession.getState().selectedLayerIds;
       if (!ids.includes(layer.id)) { e.target.stopDrag(); return; }

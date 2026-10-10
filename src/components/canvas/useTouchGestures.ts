@@ -1,8 +1,9 @@
-import { useEffect, useRef, type MutableRefObject, type RefObject } from 'react';
+import { useLayoutEffect, useRef, type MutableRefObject, type RefObject } from 'react';
 import Konva from 'konva';
 import { useEditor } from '@/store/editor';
 import { useEditorSession } from '@/editor/sessionStore';
 import { findLayerSlideId } from '@/core/document/selectors';
+import { createMobileHitTest } from './mobileHitTest';
 import {
   angleBetween, clamp, contentPointAt, distance, easeOutCubic, layerTwoFinger, midpoint, pickSettleSlide, pinchView, pointInLayer,
   sampleVelocity, scaleLimits, shortestTurn, slideIndexAtCentre, slideScrollLeft, snapZoom,
@@ -97,10 +98,15 @@ export function useTouchGestures(
 ) {
   const lastTouch = useRef(0);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const stage = stageRef.current;
     const container = stage?.container();
     if (!enabled || !stage || !container) return;
+
+    // The gesture hook and Konva's native handlers must resolve the same live Shape.
+    const bitmapHitTest = stage.getIntersection;
+    const mobileHitTest = createMobileHitTest(stage, (id) => useEditor.getState().doc.layers[id]);
+    stage.getIntersection = mobileHitTest;
 
     let mode: Mode = 'idle';
     let ids: [number, number] = [-1, -1];
@@ -116,8 +122,8 @@ export function useTouchGestures(
 
     const host = () => hostRef.current!;
     const local = (t: Touch): Point => {
-      const rect = container.getBoundingClientRect();
-      return { x: t.clientX - rect.left, y: t.clientY - rect.top };
+      const rect = stage.content.getBoundingClientRect();
+      return { x: (t.clientX - rect.left) / (rect.width / stage.content.clientWidth || 1), y: (t.clientY - rect.top) / (rect.height / stage.content.clientHeight || 1) };
     };
     const find = (list: TouchList, id: number) => {
       for (let i = 0; i < list.length; i++) if (list[i].identifier === id) return list[i];
@@ -311,11 +317,32 @@ export function useTouchGestures(
       mode = 'idle';
     };
 
+    // Konva's Transformer only listens for touchend, and its drag cleanup
+    // requires a matching changed touch. An interrupted stream can leave
+    // either active, which suppresses the whole layer's hit canvas.
+    const finishNativeGesture = () => {
+      let finished = false;
+      for (const transformer of stage.find<Konva.Transformer>('Transformer')) {
+        if (!transformer.isTransforming()) continue;
+        transformer.stopTransform();
+        finished = true;
+      }
+      for (const element of [...Konva.DD._dragElements.values()]) {
+        if (element.node.getStage() !== stage) continue;
+        element.node.stopDrag();
+        finished = true;
+      }
+      if (finished) stage.draw();
+    };
+
     const onStart = (e: TouchEvent) => {
       lastTouch.current = Date.now();
       stopTween();
       if (e.touches.length === 1) {
         reset();
+        // A new first finger also recovers a gesture whose terminal event was
+        // lost while the browser or OS interrupted the previous touch.
+        finishNativeGesture();
         blurTextFields();
         const touch = e.touches[0];
         const hit = stage.getIntersection(local(touch));
@@ -348,8 +375,9 @@ export function useTouchGestures(
     const onEnd = (e: TouchEvent) => {
       const remaining = e.touches.length;
       const cancelled = e.type === 'touchcancel';
-      // Konva ends a layer drag on touchcancel as it does on touchend; this runs before it reports dragend.
-      if (cancelled) host().cancelDrag();
+      // Cancel a move before stopping its native drag so the preview rolls
+      // back. A handle resize finishes at its last visible size.
+      if (cancelled) { host().cancelDrag(); finishNativeGesture(); }
       if (mode === 'candidate') {
         if (remaining > 0) return;
         mode = 'idle';
@@ -398,6 +426,7 @@ export function useTouchGestures(
       container.removeEventListener('touchcancel', onEnd, options);
       container.removeEventListener('gesturestart', prevent);
       container.removeEventListener('gesturechange', prevent);
+      if (stage.getIntersection === mobileHitTest) stage.getIntersection = bitmapHitTest;
     };
   }, [enabled, stageRef, scrollRef, hostRef]);
 

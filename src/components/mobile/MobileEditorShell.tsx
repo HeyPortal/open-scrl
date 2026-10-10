@@ -118,6 +118,9 @@ export default function MobileEditorShell() {
       observer.disconnect();
     };
   }, [measure]);
+  // Sheets and the selection bar change the canvas height. Measure before paint
+  // so the first tap after closing a sheet uses the visible layer positions.
+  useLayoutEffect(measure, [measure, sheet, hasSelection]);
 
   // Hardware keyboards (iPad, Bluetooth) get the same shortcuts as desktop.
   useEffect(() => {
