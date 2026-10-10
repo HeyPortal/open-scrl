@@ -11,6 +11,9 @@ interface Seed { name: string; format?: string; slides?: number }
 
 /** Creates saved projects through the app's own store (as the editor would) and returns to the home screen. */
 async function seedProjects(page: Page, projects: Seed[]) {
+  // App loads the project index after its fonts are ready. Seeding before
+  // that load completes lets its stale snapshot replace the new summaries.
+  await expect(page.getByRole('button', { name: /^(Create & open editor|Create carousel)$/ })).toBeVisible();
   await page.evaluate(async (list) => {
     const editorModule = '/src/store/editor.ts';
     const formatModule = '/src/lib/format.ts';
