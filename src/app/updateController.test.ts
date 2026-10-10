@@ -195,4 +195,128 @@ describe('application update guard', () => {
     expect(h.activate).not.toHaveBeenCalled();
     expect(h.controller.getSnapshot().status).not.toBe('ready');
   });
+
+  it('saves the new project after a switch even when its revision is the same', async () => {
+    const h = harness();
+    const save = deferred();
+    h.flush.mockReturnValueOnce(save.promise);
+    h.controller.notifyUpdate();
+    await settle();
+    h.change({ version: 'another-project:1' });
+    save.resolve();
+    await settle();
+    expect(h.flush).toHaveBeenCalledTimes(2);
+    expect(h.controller.getSnapshot().status).toBe('ready');
+    expect(h.activate).not.toHaveBeenCalled();
+  });
+
+  it('does not notify listeners when a disposed save rejects', async () => {
+    const h = harness();
+    const save = deferred();
+    const listener = vi.fn();
+    h.flush.mockReturnValueOnce(save.promise);
+    h.controller.subscribe(listener);
+    h.controller.notifyUpdate();
+    await settle();
+    h.stop();
+    listener.mockClear();
+    save.reject(new Error('Late save failure'));
+    await settle();
+    expect(listener).not.toHaveBeenCalled();
+    expect(h.activate).not.toHaveBeenCalled();
+    expect(h.reload).not.toHaveBeenCalled();
+  });
+
+  it('does not let an old rejected save overwrite a restarted controller', async () => {
+    const h = harness();
+    const oldSave = deferred();
+    h.flush.mockReturnValueOnce(oldSave.promise);
+    h.controller.notifyUpdate();
+    await settle();
+    h.stop();
+    const stop = h.controller.start();
+    h.controller.notifyUpdate();
+    await settle();
+    expect(h.flush).toHaveBeenCalledTimes(2);
+    expect(h.controller.getSnapshot().status).toBe('ready');
+    oldSave.reject(new Error('Old lifecycle failed'));
+    await settle();
+    expect(h.controller.getSnapshot().status).toBe('ready');
+    h.controller.requestUpdate();
+    await settle();
+    expect(h.activate).toHaveBeenCalledOnce();
+    h.controller.notifyActivated();
+    await settle();
+    expect(h.reload).toHaveBeenCalledOnce();
+    stop();
+  });
+
+  it('ignores the previous cleanup when a newer lifecycle has started', async () => {
+    const h = harness();
+    const stop = h.controller.start();
+    h.stop();
+    h.controller.notifyUpdate();
+    await settle();
+    expect(h.controller.getSnapshot().status).toBe('ready');
+    h.change({ busy: true });
+    expect(h.controller.getSnapshot().status).toBe('waiting');
+    h.change({ busy: false });
+    await settle();
+    expect(h.controller.getSnapshot().status).toBe('ready');
+    stop();
+  });
+
+  it('withdraws a prompt when work begins during a pending save', async () => {
+    const h = harness();
+    const save = deferred();
+    h.flush.mockReturnValueOnce(save.promise);
+    h.controller.notifyUpdate();
+    await settle();
+    h.change({ busy: true, version: 'project:2' });
+    save.resolve();
+    await settle();
+    expect(h.controller.getSnapshot().status).toBe('waiting');
+    expect(h.flush).toHaveBeenCalledOnce();
+    h.change({ busy: false });
+    await settle();
+    expect(h.flush).toHaveBeenCalledTimes(2);
+    expect(h.controller.getSnapshot().status).toBe('ready');
+  });
+
+  it('saves work begun while activation is pending before the controlling event reloads', async () => {
+    const h = harness();
+    const activation = deferred();
+    h.activate.mockReturnValueOnce(activation.promise);
+    h.controller.notifyUpdate();
+    await settle();
+    h.controller.requestUpdate();
+    await settle();
+    h.change({ busy: true, version: 'project:2' });
+    h.controller.notifyActivated();
+    activation.resolve();
+    await settle();
+    expect(h.reload).not.toHaveBeenCalled();
+    expect(h.controller.getSnapshot().status).toBe('updating');
+    h.change({ busy: false });
+    await settle();
+    expect(h.flush).toHaveBeenCalledTimes(3);
+    expect(h.reload).toHaveBeenCalledOnce();
+  });
+
+  it.each(['resolves', 'rejects'])('keeps Later dismissed when a pending save %s with another edit queued', async (outcome) => {
+    const h = harness();
+    const save = deferred();
+    h.flush.mockReturnValueOnce(save.promise);
+    h.controller.notifyUpdate();
+    await settle();
+    h.controller.dismiss();
+    h.change({ version: 'project:2' });
+    if (outcome === 'resolves') save.resolve();
+    else save.reject(new Error('Save failed after dismissal'));
+    await settle();
+    expect(h.controller.getSnapshot().status).toBe('idle');
+    expect(h.flush).toHaveBeenCalledOnce();
+    expect(h.activate).not.toHaveBeenCalled();
+    expect(h.reload).not.toHaveBeenCalled();
+  });
 });

@@ -48,7 +48,8 @@ Primary references: [React Konva releases](https://github.com/konvajs/react-konv
 The baseline passed `npm run verify`: 243 tests in 39 files, type checking,
 lint, production build, and the bundle budget. Its Chromium browser suite
 passed 20 tests. Both React and Konva checkpoints passed the same 243 unit tests
-and the expanded 23-test Chromium suite. The final integrated stack passed:
+and the expanded 23-test Chromium suite. The initial integrated stack checkpoint
+on 2026-10-09 passed:
 
 - `npm run verify`: exit 0; 260 tests in 42 files, type checking, lint,
   production build, and bundle budget.
@@ -89,6 +90,39 @@ its existing unsupported-encoder message. The MP4 browser test permits either
 the MP4/PNG ZIP contract or that capability error. Actual H.264 encoding remains
 unverified on this host.
 
+### Additional edge acceptance — 2026-10-10
+
+Independent review and new browser tests found and fixed pending gestures/text
+being invisible to the update guard, a deletion during resize leaving activity
+busy, and an import completing after a project switch placing slides into the
+destination. Panorama toast actions also check their original project before
+placing slides. Activity spans now cover commits and cancellation; controller
+lifecycle generations prevent an old save/activation from changing a restarted
+controller. Later stays dismissed even when a pending save rejects.
+
+Fresh checks after the final source fix all returned exit 0:
+
+- `npm run verify`: 268 tests in 42 files, type checking, lint, build, and
+  96.4 KiB gzip entry budget check.
+- `SCRL_E2E_PORT=5195 npm run test:e2e -- --workers 2`: 32 Chromium tests in
+  49.3 s. Six added tests exercise held resize with Escape/Delete/Select All,
+  text cancellation, and project switching during a transform/text draft.
+  Three added import tests cover switched-project association, partial failure
+  followed by another import, and a surviving panorama toast action.
+- `PWA_PORT=5196 npm run test:pwa`: nine production Chromium tests in 33.3 s,
+  including real activation held until a drag, resize, or text draft begins.
+  They verify no early reload, then persisted geometry/text after completion.
+  Later/failed-import recovery is covered too. Each activation race also passed
+  in an earlier focused run; no flakiness was observed in those two runs.
+- T3 native production browser: live Konva 10.7.1; Escape discarded an in-place
+  text draft and retained the original text. The temporary added text was undone.
+
+The import test failed before its fix and passed afterwards. The cancellation
+test reproduced the deletion activity leak before the final attachment fix.
+Early activation-test failures were incorrect title locators; accessible button
+roles fixed those tests. Final logs supersede those preliminary runs. The
+cross-browser, codec, installation, and hashed-deployment limits below remain.
+
 Run the normal browser suite with `npm run test:e2e`. A dedicated port avoids
 reusing a different worktree's dev server:
 
@@ -105,6 +139,11 @@ here. On a supported host, install them with
 `npx playwright install --with-deps chromium firefox webkit`.
 
 ## Measurement protocol
+
+These comparison trials describe the 2026-10-09 stack checkpoint. The
+2026-10-10 interaction-safety fixes increase its entry from 98,687 to 98,755
+gzip bytes and EditorShell from 182,573 to 183,198 gzip bytes. Build/editing
+timing comparisons were not repeated for those follow-up fixes.
 
 Build and bundle observations use the same baseline checkout and upgraded
 checkout on this Linux host. Three sequential, alternating baseline/final
@@ -181,12 +220,13 @@ Git under `/tmp/open-scrl-modernize/`.
 
 GPT-6.1 Sol engineers implemented the runtime and tooling in isolated
 checkouts; the coordinator integrated the lockfile, performed compatibility
-review, and owns acceptance. Their requested independent cross-review rounds
-both stopped at a provider usage limit. The tooling engineer had completed a
-static React-stage review before that limit. The coordinator then reviewed
-both final patches directly, including update races, cleanup, job lifetimes,
-import caller placement, actual worker/chunk URLs, required peers, and the
-runtime version assertion. No reproduced blocker remains.
+review, and owns acceptance. Initial cross-review rounds stopped at a provider
+usage limit. On 2026-10-10 both engineers completed independent reviews of
+each other's runtime/tooling changes and the follow-up interaction fixes.
+They identified missing activity tracking for pending gestures/text, unsafe
+import placement after switching projects, and cancellation paths that could
+leave activity busy. The coordinator integrated the fixes and lifecycle
+generation guard; real browser regressions exercise their event ordering.
 
 Claude Haiku 5.5 supplied registry/release evidence, reproduced HEIC failure,
 checked cross-browser prerequisites, and audited the final logs and metadata.
@@ -194,8 +234,11 @@ The coordinator corrected preliminary auditor claims about Konva peers and
 missing logs against the installed package and explicit final log paths.
 Unreproduced double-start/activation-stall concerns do not establish a defect:
 the application balances effect cleanup, and real lifecycle tests pass.
-Future lifecycle failures or a deployment deleting old chunks still need
-their own reproduction. The current architecture is retained.
+The follow-up audit confirmed installed package versions. Its interim log
+inventory preceded full browser acceptance; parameterized test counts and
+historical baseline figures were checked against actual runner output by the
+coordinator. A deployment deleting old chunks still needs its own test.
+The current architecture is retained.
 
 ## Remaining environment limits
 

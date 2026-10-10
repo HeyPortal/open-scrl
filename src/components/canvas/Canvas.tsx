@@ -5,6 +5,7 @@ import { useEditor } from '@/store/editor';
 import { useAssets } from '@/store/assets';
 import { MAX_ZOOM, MIN_ZOOM, useEditorSession } from '@/editor/sessionStore';
 import { useEditorView } from '@/editor/viewStore';
+import { editorActivity } from '@/editor/activity';
 import { clickWouldNarrow, enterGroup, narrowTo, pickLayer } from '@/editor/selectionActions';
 import { useToasts } from '@/store/toasts';
 import { useContextMenu } from '@/components/Menu';
@@ -64,6 +65,7 @@ interface GroupTransform {
 
 export function Canvas({ width, height }: { width: number; height: number }) {
   const doc = useEditor((s) => s.doc);
+  const activeProjectId = useEditor((s) => s.activeProjectId);
   const selectedSlideId = useEditorSession((s) => s.selectedSlideId);
   const slideFocusRequest = useEditorSession((s) => s.slideFocusRequest);
   const selectedId = useEditorSession((s) => s.selectedLayerId);
@@ -92,6 +94,19 @@ export function Canvas({ width, height }: { width: number; height: number }) {
   const drag = useRef<DragSession | null>(null);
   const groupTransform = useRef<GroupTransform | null>(null);
   const pendingNarrow = useRef<string | null>(null);
+  type CanvasActivity = `drag:${string}` | 'transform' | 'touch' | 'marquee';
+  const activity = useRef(new Map<CanvasActivity, () => void>());
+  const cancelling = useRef(false);
+  const cancelGestures = useRef<(() => void) | null>(null);
+  const marqueeCleanup = useRef<(() => void) | null>(null);
+  const beginActivity = useCallback((kind: CanvasActivity) => {
+    if (!activity.current.has(kind)) activity.current.set(kind, editorActivity.begin());
+  }, []);
+  const endActivity = useCallback((kind: CanvasActivity) => {
+    const release = activity.current.get(kind);
+    activity.current.delete(kind);
+    release?.();
+  }, []);
   const [visibleRange, setVisibleRange] = useState({ start: 0, end: 0 });
   const [viewportOffset, setViewportOffset] = useState({ x: PADDING, y: PADDING });
   const [guides, setGuides] = useState<SnapGuide[]>([]);
@@ -106,6 +121,34 @@ export function Canvas({ width, height }: { width: number; height: number }) {
   useLayoutEffect(() => { viewRef.current = { offset: viewportOffset, zoom }; }, [viewportOffset, zoom]);
   const fmt = doc.format;
   const assetsById = useMemo(() => new Map(assets.map((asset) => [asset.id, asset])), [assets]);
+
+  useLayoutEffect(() => {
+    cancelling.current = false;
+    const cancel = () => {
+      cancelling.current = true;
+      drag.current = null; groupTransform.current = null; touch.current = null;
+      marqueeCleanup.current?.(); marqueeCleanup.current = null;
+      // Stopping Konva emits end events; cancelled sessions must not commit.
+      transformerRef.current?.stopTransform();
+      const current = useEditor.getState().doc;
+      for (const [id, node] of layerNodes.current) {
+        node.stopDrag();
+        const layer = current.layers[id];
+        if (layer) node.setAttrs({ ...centerOf(layer), rotation: layer.rotation, scaleX: 1, scaleY: 1 });
+      }
+      const ids = useEditorSession.getState().selectedLayerIds.filter((id) => current.layers[id]);
+      const bounds = unionBounds(ids.map((id) => rotatedBounds(current.layers[id])));
+      const slideId = selectionSlideId(current, ids);
+      if (bounds && slideId) proxyRef.current?.setAttrs({ x: current.slideOrder.indexOf(slideId) * current.format.width + bounds.x, y: bounds.y, width: bounds.width, height: bounds.height, rotation: 0, scaleX: 1, scaleY: 1 });
+      transformerRef.current?.forceUpdate();
+      for (const release of activity.current.values()) release();
+      activity.current.clear();
+    };
+    const blur = () => { cancel(); cancelling.current = false; setGuides([]); setResizeSeams([]); setMarquee(null); };
+    cancelGestures.current = blur;
+    window.addEventListener('blur', blur);
+    return () => { window.removeEventListener('blur', blur); cancelGestures.current = null; cancel(); };
+  }, [activeProjectId]);
 
   const deckWidth = doc.slideOrder.length * fmt.width;
   const fitZoom = useMemo(() => !width || !height ? .5 : Math.max(MIN_ZOOM, Math.min((width-PADDING*2)/fmt.width,(height-PADDING*2)/fmt.height)), [width,height,fmt.width,fmt.height]);
@@ -192,6 +235,8 @@ export function Canvas({ width, height }: { width: number; height: number }) {
       const node = selectedId ? layerNodes.current.get(selectedId) : undefined;
       if (node && !active?.locked) nodes = [node];
     }
+    const previous = tr.nodes();
+    if (tr.isTransforming() && (!nodes.length || previous.length !== nodes.length || previous.some((node, index) => node !== nodes[index]))) cancelGestures.current?.();
     tr.nodes(nodes); tr.getLayer()?.batchDraw();
   }, [active?.locked, selectedId, selectionBox, visibleRange]);
 
@@ -233,6 +278,7 @@ export function Canvas({ width, height }: { width: number; height: number }) {
     if (!additive || session.selectedSlideId !== slideId) { selectSlide(slideId); selectLayer(null); }
     // Track the box in deck coordinates so it stays anchored if the canvas scrolls.
     const start = { x: (sx - viewportOffset.x) / zoom, y: (sy - viewportOffset.y) / zoom };
+    beginActivity('marquee');
     let dragging = false;
     const move = (ev: MouseEvent) => {
       const x = ev.clientX - rect.left, y = ev.clientY - rect.top;
@@ -249,12 +295,14 @@ export function Canvas({ width, height }: { width: number; height: number }) {
       const current = useEditorSession.getState().selectedLayerIds;
       if (next.length !== current.length || next.some((id, i) => id !== current[i])) useEditorSession.getState().selectLayers(next);
     };
-    const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); setMarquee(null); };
+    const clean = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); marqueeCleanup.current = null; endActivity('marquee'); };
+    const up = () => { clean(); setMarquee(null); };
+    marqueeCleanup.current = clean;
     window.addEventListener('mousemove', move);
     window.addEventListener('mouseup', up);
   };
 
-  const onTouchStart=(event:Konva.KonvaEventObject<TouchEvent>)=>{const touches=event.evt.touches;const el=scrollRef.current;if(!el)return;if(touches.length===1&&event.target!==event.target.getStage())return;const x=[...touches].reduce((n,p)=>n+p.clientX,0)/touches.length;const y=[...touches].reduce((n,p)=>n+p.clientY,0)/touches.length;const distance=touches.length>1?Math.hypot(touches[0].clientX-touches[1].clientX,touches[0].clientY-touches[1].clientY):0;touch.current={x,y,distance,zoom,left:el.scrollLeft,top:el.scrollTop};};
+  const onTouchStart=(event:Konva.KonvaEventObject<TouchEvent>)=>{const touches=event.evt.touches;const el=scrollRef.current;if(!el)return;if(touches.length===1&&event.target!==event.target.getStage())return;beginActivity('touch');const x=[...touches].reduce((n,p)=>n+p.clientX,0)/touches.length;const y=[...touches].reduce((n,p)=>n+p.clientY,0)/touches.length;const distance=touches.length>1?Math.hypot(touches[0].clientX-touches[1].clientX,touches[0].clientY-touches[1].clientY):0;touch.current={x,y,distance,zoom,left:el.scrollLeft,top:el.scrollTop};};
   const onTouchMove=(event:Konva.KonvaEventObject<TouchEvent>)=>{const start=touch.current;const el=scrollRef.current;const touches=event.evt.touches;if(!start||!el||!touches.length)return;event.evt.preventDefault();const x=[...touches].reduce((n,p)=>n+p.clientX,0)/touches.length;const y=[...touches].reduce((n,p)=>n+p.clientY,0)/touches.length;if(touches.length>1&&start.distance>0){const distance=Math.hypot(touches[0].clientX-touches[1].clientX,touches[0].clientY-touches[1].clientY);setZoom(Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,start.zoom*distance/start.distance)));}el.scrollLeft=start.left-(x-start.x);el.scrollTop=start.top-(y-start.y);scheduleScrollSync();};
 
   const clearDropHover = useCallback(() => setDropHover(null), []);
@@ -368,18 +416,23 @@ export function Canvas({ width, height }: { width: number; height: number }) {
   };
   const onGroupTransformEnd = () => {
     const st = groupTransform.current; const proxy = proxyRef.current;
-    if (!st || !proxy) return;
-    applyGroupTransform(true);
-    groupTransform.current = null;
-    // Snap the nodes and the box to the committed document; React only re-applies changed props.
-    const next = useEditor.getState().doc;
-    for (const id of st.layers.keys()) {
-      const l = next.layers[id]; const node = layerNodes.current.get(id);
-      if (l && node) node.setAttrs({ ...centerOf(l), rotation: l.rotation, scaleX: 1, scaleY: 1 });
+    if (!st || !proxy) {
+      // A detached single node cannot emit the later node transformend event.
+      if (!transformerRef.current?.nodes().length || cancelling.current) endActivity('transform');
+      return;
     }
-    const bounds = unionBounds(selectedIds.filter((id) => next.layers[id]).map((id) => rotatedBounds(next.layers[id])));
-    proxy.setAttrs({ rotation: 0, scaleX: 1, scaleY: 1, ...(bounds ? { x: st.offset + bounds.x, y: bounds.y, width: bounds.width, height: bounds.height } : {}) });
-    transformerRef.current?.forceUpdate();
+    try {
+      applyGroupTransform(true);
+      // Snap the nodes and the box to the committed document; React only re-applies changed props.
+      const next = useEditor.getState().doc;
+      for (const id of st.layers.keys()) {
+        const l = next.layers[id]; const node = layerNodes.current.get(id);
+        if (l && node) node.setAttrs({ ...centerOf(l), rotation: l.rotation, scaleX: 1, scaleY: 1 });
+      }
+      const bounds = unionBounds(selectedIds.filter((id) => next.layers[id]).map((id) => rotatedBounds(next.layers[id])));
+      proxy.setAttrs({ rotation: 0, scaleX: 1, scaleY: 1, ...(bounds ? { x: st.offset + bounds.x, y: bounds.y, width: bounds.width, height: bounds.height } : {}) });
+      transformerRef.current?.forceUpdate();
+    } finally { groupTransform.current = null; endActivity('transform'); }
   };
 
   const renderNode = (slideId: string, layer: DocLayer) => {
@@ -404,6 +457,7 @@ export function Canvas({ width, height }: { width: number; height: number }) {
       const movable = ids.filter((id) => d.layers[id] && !d.layers[id].locked);
       const union = unionBounds(movable.map((id) => rotatedBounds(d.layers[id])));
       if (!union) { e.target.stopDrag(); return; }
+      beginActivity(`drag:${layer.id}`);
       const selected = new Set(ids);
       drag.current = {
         anchorId: layer.id, ids: movable, union, offset, dx: 0, dy: 0,
@@ -423,12 +477,15 @@ export function Canvas({ width, height }: { width: number; height: number }) {
       setGuideOffsetX(st.offset); setGuides(result.guides);
     };
     const onDragEnd = () => {
-      const st = drag.current; drag.current = null; setGuides([]);
-      if (!st || (Math.abs(st.dx) < 1e-6 && Math.abs(st.dy) < 1e-6)) return;
-      useEditor.getState().moveLayers(st.ids, st.dx, st.dy);
+      const st = drag.current;
+      if (st?.anchorId === layer.id) { drag.current = null; setGuides([]); }
+      try {
+        if (!st || st.anchorId !== layer.id || cancelling.current || (Math.abs(st.dx) < 1e-6 && Math.abs(st.dy) < 1e-6)) return;
+        useEditor.getState().moveLayers(st.ids, st.dx, st.dy);
+      } finally { endActivity(`drag:${layer.id}`); }
     };
     const onTransform = (e: Konva.KonvaEventObject<Event>) => { if(layer.locked)return;const moving=localMoving(e.target,layer,true);const result=snap(slide,layer,moving);e.target.position({x:result.x+moving.width/2,y:result.y+moving.height/2});setGuideOffsetX(offset);setGuides(result.guides);if(layer.kind==='image'){const seams=findCrossedSlideSeams({x:offset+result.x,y:result.y,width:moving.width,height:moving.height},fmt.width,doc.slideOrder.length);setResizeSeams(seams.map((x)=>({x,y:result.y,height:moving.height})));}else setResizeSeams([]); };
-    const onTransformEnd = (e: Konva.KonvaEventObject<Event>) => { setResizeSeams([]);if(layer.locked)return;const node=e.target;const moving=localMoving(node,layer,true);const result=snap(slide,layer,moving);node.scale({x:1,y:1});updateLayer(layer.id,{x:result.x,y:result.y,width:moving.width,height:moving.height,rotation:node.rotation()});setGuides([]); };
+    const onTransformEnd = (e: Konva.KonvaEventObject<Event>) => { try { setResizeSeams([]);if(layer.locked||cancelling.current)return;const node=e.target;const moving=localMoving(node,layer,true);const result=snap(slide,layer,moving);node.scale({x:1,y:1});updateLayer(layer.id,{x:result.x,y:result.y,width:moving.width,height:moving.height,rotation:node.rotation()});setGuides([]); } finally { endActivity('transform'); } };
     const ref = (node: Konva.Node|null) => { if(node)layerNodes.current.set(layer.id,node);else layerNodes.current.delete(layer.id); };
     const outline = selectedSet.has(layer.id);
     const props={onSelect,onClick,onDragStart,onDragMove,onDragEnd,onTransform,onTransformEnd,outline};
@@ -445,7 +502,7 @@ export function Canvas({ width, height }: { width: number; height: number }) {
   return <div ref={workspaceRef} className="workspace relative h-full w-full overflow-hidden select-none" onDragEnter={onMediaDragOver} onDragOver={onMediaDragOver} onDragLeave={onMediaDragLeave} onDrop={onMediaDrop}>
     <div ref={scrollRef} data-testid="canvas-scroll" onScroll={scheduleScrollSync} className="absolute inset-0 overflow-auto scrollbar-thin"><div style={{width:spacerWidth,height:spacerHeight}} /></div>
     <div className="absolute inset-0 pointer-events-auto overflow-hidden">
-      <Stage ref={stageRef} width={Math.max(1,width)} height={Math.max(1,height)} onWheel={onWheel} onContextMenu={(e)=>{e.evt.preventDefault();openContextMenu(e.evt.clientX,e.evt.clientY,layerMenu(),'Canvas actions');}} onMouseDown={(e)=>{if(e.target!==e.target.getStage())return;if(e.evt.button===0)startMarquee(e.evt);else selectPageAtPointer();}} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={()=>{if(touch.current)selectPageAtPointer();touch.current=null;}}>
+      <Stage ref={stageRef} width={Math.max(1,width)} height={Math.max(1,height)} onWheel={onWheel} onContextMenu={(e)=>{e.evt.preventDefault();openContextMenu(e.evt.clientX,e.evt.clientY,layerMenu(),'Canvas actions');}} onMouseDown={(e)=>{if(e.target!==e.target.getStage())return;if(e.evt.button===0)startMarquee(e.evt);else selectPageAtPointer();}} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={(e)=>{if(touch.current)selectPageAtPointer();touch.current=null;if(!e.evt.touches.length)endActivity('touch');}} onTouchCancel={()=>{touch.current=null;endActivity('touch');}}>
         <KLayer listening={false}><Group x={viewportOffset.x} y={viewportOffset.y} scaleX={zoom} scaleY={zoom}>
           {/* One shadow under the whole strip, so neighboring slides don't shade each other at the seams. */}
           <Rect x={stripStart} width={stripWidth} height={fmt.height} fill="#ffffff" shadowColor="#000000" shadowOpacity={0.55} shadowBlur={32/zoom} shadowOffsetY={8/zoom}/>
@@ -457,7 +514,7 @@ export function Canvas({ width, height }: { width: number; height: number }) {
           <Transformer ref={transformerRef} rotateEnabled anchorSize={10} anchorCornerRadius={3} anchorStroke={SELECTION_COLOR} anchorFill="#ffffff" borderStroke={SELECTION_COLOR} borderStrokeWidth={1.5} borderDash={multi?[4,3]:undefined} keepRatio={multi||active?.kind==='image'} flipEnabled={!multi} ignoreStroke
             enabledAnchors={!multi&&active?.kind==='text'&&!active.autoFit?['middle-left','middle-right']:undefined}
             boundBoxFunc={(oldBox,newBox)=>multi&&(Math.abs(newBox.width)<MIN_LAYER_SIZE*zoom||Math.abs(newBox.height)<MIN_LAYER_SIZE*zoom)?oldBox:newBox}
-            onTransformStart={onGroupTransformStart} onTransform={()=>applyGroupTransform(false)} onTransformEnd={onGroupTransformEnd}/>
+            onTransformStart={()=>{beginActivity('transform');onGroupTransformStart();}} onTransform={()=>applyGroupTransform(false)} onTransformEnd={onGroupTransformEnd}/>
         </Group></KLayer>
         <KLayer listening={false}><Group x={viewportOffset.x} y={viewportOffset.y} scaleX={zoom} scaleY={zoom}>
           {wideMode&&visibleSlides.slice(1).map(({index})=><Line key={`seam-${index}`} points={[index*fmt.width,0,index*fmt.width,fmt.height]} stroke="#ffffff" opacity={0.45} strokeWidth={1/zoom} dash={[6/zoom,5/zoom]}/>)}
@@ -473,7 +530,7 @@ export function Canvas({ width, height }: { width: number; height: number }) {
     {marquee&&<div className="pointer-events-none absolute rounded-[2px] border border-accent" style={{left:marquee.x,top:marquee.y,width:marquee.width,height:marquee.height,background:'rgba(124,92,255,0.12)'}} data-testid="marquee"/>}
     <SlideHeaders containerRef={workspaceRef} slides={visibleSlides} count={doc.slideOrder.length} selectedSlideId={selectedSlideId} offset={viewportOffset} slideWidth={fmt.width*zoom} slideHeight={fmt.height*zoom} numbersOnly={wideMode}/>
     {editingTextId&&active?.kind==='text'&&stageRef.current&&(
-      <TextEditor layer={active} stage={stageRef.current} offsetX={pageX(doc.slideOrder.find((sid)=>doc.slides[sid].layerOrder.includes(active.id))??selectedSlideId)} scale={zoom} viewportOffset={{x:originX-scrollPosition.current.left,y:centeredY-scrollPosition.current.top}} onClose={()=>setEditingTextId(null)}/>
+      <TextEditor key={`${activeProjectId}:${active.id}`} layer={active} stage={stageRef.current} offsetX={pageX(doc.slideOrder.find((sid)=>doc.slides[sid].layerOrder.includes(active.id))??selectedSlideId)} scale={zoom} viewportOffset={{x:originX-scrollPosition.current.left,y:centeredY-scrollPosition.current.top}} onClose={()=>setEditingTextId(null)}/>
     )}
   </div>;
 }

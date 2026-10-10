@@ -561,5 +561,23 @@
     "Operating-system installation UI not exercised",
     "Service-worker update fixture keeps application chunks unchanged",
     "Sol independent cross-review rounds stopped at provider usage limits"
-  ]
+  ],
+  "followUpAcceptance": {
+    "date": "2026-10-10",
+    "unitTests": 268,
+    "unitTestFiles": 42,
+    "chromiumDevelopmentTests": 32,
+    "chromiumDevelopmentSeconds": 49.3,
+    "chromiumProductionPwaTests": 9,
+    "chromiumProductionPwaSeconds": 33.3,
+    "commandsExitCode": 0,
+    "bundle": {
+      "date": "2026-10-10",
+      "entryGzipBytes": 98755,
+      "editorGzipBytes": 183198,
+      "entry": "assets/index-BHMY_i-C.js",
+      "editor": "EditorShell-DDviJlU8.js"
+    },
+    "notes": "Fresh gates after final interaction/import/controller safety fixes. Build and editing timing comparisons above remain the 2026-10-09 checkpoint."
+  }
 }

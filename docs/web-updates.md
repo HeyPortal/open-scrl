@@ -1,8 +1,8 @@
 # Web app updates and offline tools
 
 The web app downloads a new version in the background and offers **Reload to
-update** after media imports, exports, and canvas gestures finish and the latest
-document saves. Choosing **Later** keeps the current page open. Reload checks
+update** after media imports, exports, canvas gestures, and in-place text edits
+finish and the latest document saves. Choosing **Later** keeps the current page open. Reload checks
 again for new work and saves again before activating the update. If another tab
 activates an update, this tab still waits for its work and offers its own reload.
 

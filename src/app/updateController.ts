@@ -33,6 +33,7 @@ export class UpdateController {
   private disposed = false;
   private reloaded = false;
   private rerun = false;
+  private generation = 0;
   private unsubscribe: (() => void) | undefined;
 
   constructor(dependencies: UpdateDependencies) {
@@ -47,7 +48,11 @@ export class UpdateController {
   };
 
   start(): () => void {
+    const generation = ++this.generation;
+    this.unsubscribe?.();
     this.disposed = false;
+    this.preparing = false;
+    this.rerun = false;
     this.unsubscribe = this.dependencies.subscribe(() => {
       if (this.preparing) this.rerun = true;
       // A ready prompt must disappear immediately when a new job/edit begins.
@@ -55,7 +60,11 @@ export class UpdateController {
       void this.prepare();
     });
     return () => {
+      if (generation !== this.generation) return;
+      this.generation++;
       this.disposed = true;
+      this.preparing = false;
+      this.rerun = false;
       this.unsubscribe?.();
       this.unsubscribe = undefined;
     };
@@ -109,18 +118,21 @@ export class UpdateController {
       return;
     }
     this.preparing = true;
+    const generation = this.generation;
+    const stale = () => this.disposed || generation !== this.generation;
     this.setState(this.accepted ? 'updating' : 'waiting');
     try {
-      while (!this.disposed && !this.dismissed) {
+      while (!stale() && !this.dismissed) {
         this.rerun = false;
         const before = this.dependencies.snapshot();
         if (!before.ready || before.busy) return;
         await this.dependencies.flush();
+        if (stale() || this.dismissed) return;
         // Import callers can place the returned photos in a later microtask.
         // Give those commands and React's autosave effect time to run, then
         // compare the current revision instead of relying on UI save status.
         await (this.dependencies.settle?.() ?? new Promise<void>((resolve) => window.setTimeout(resolve, 0)));
-        if (this.disposed || this.dismissed) return;
+        if (stale() || this.dismissed) return;
         const after = this.dependencies.snapshot();
         if (!after.ready || after.busy) return;
         if (after.saveError) {
@@ -140,21 +152,25 @@ export class UpdateController {
         if (!this.activationRequested) {
           this.activationRequested = true;
           await this.dependencies.activate();
+          if (stale() || this.dismissed) return;
           // A controlling event may arrive before activation resolves.
           if (this.activated) continue;
         }
         return;
       }
     } catch {
+      if (stale() || this.dismissed) return;
       this.accepted = false;
       this.activationRequested = false;
       this.rerun = false;
       this.setState('error', 'The update could not be prepared. Save your changes and try again.');
     } finally {
-      this.preparing = false;
-      if (this.rerun && !this.disposed) {
-        this.rerun = false;
-        void this.prepare();
+      if (!stale()) {
+        this.preparing = false;
+        if (this.rerun) {
+          this.rerun = false;
+          void this.prepare();
+        }
       }
     }
   }
