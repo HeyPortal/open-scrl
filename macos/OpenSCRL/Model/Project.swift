@@ -144,6 +144,8 @@ struct ImageProperties: Hashable, Sendable {
     /// Border width; 0 means no border.
     var strokeWidth: Double = 0
     var seamBlend: SeamBlend?
+    /// Web decorative frame metadata; preserved for schema compatibility.
+    var frameStyle: String?
 }
 
 struct TextProperties: Hashable, Sendable {
