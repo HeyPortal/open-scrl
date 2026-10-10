@@ -1,8 +1,11 @@
 import type { Format } from '@/types';
 import type { ProjectSummary } from '@/store/editor';
 
-/** Cover gradient angles. Colours come from the theme tokens, so a cover never hard-codes a hue. */
-const COVER_ANGLES = [135, 200, 60, 250, 20, 310];
+/** Six cover palettes. Colours come from theme tokens, so a cover never hard-codes a hue. */
+const COVERS = [
+  [135, 'lilac', 'blue'], [200, 'blue', 'teal'], [60, 'pink', 'lilac'],
+  [250, 'teal', 'lilac'], [20, 'lilac', 'pink'], [310, 'teal', 'blue'],
+] as const;
 
 /** FNV-1a, 32-bit: deterministic and well mixed, so ids that differ by one character land on unrelated covers. */
 function hash32(text: string) {
@@ -16,8 +19,8 @@ function hash32(text: string) {
 
 /** Stable decorative cover per project, used until (or instead of) a real preview of its first slide. */
 export function coverFor(id: string) {
-  const angle = COVER_ANGLES[hash32(id) % COVER_ANGLES.length];
-  return `linear-gradient(${angle}deg, rgb(var(--c-accent-start) / .5), rgb(var(--c-accent-end) / .28) 55%, rgb(var(--c-bg-hover)))`;
+  const [angle, start, end] = COVERS[hash32(id) % COVERS.length];
+  return `linear-gradient(${angle}deg, rgb(var(--c-brand-${start}) / .5), rgb(var(--c-brand-${end}) / .28) 55%, rgb(var(--c-bg-hover)))`;
 }
 
 /** Largest box with the format's aspect ratio that fits inside maxW x maxH. */

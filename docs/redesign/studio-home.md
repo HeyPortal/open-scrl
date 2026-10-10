@@ -2,7 +2,7 @@
 
 The home screen (desktop `LandingPage`, phone `MobileHome`) is the first thing people see. It should feel like
 the front of a creative studio, in the same visual language as the Studio editor: a dark stage with a faint
-grid, floating glass islands, coral `#ff6a3d` accent, Instrument Serif titles (19px and up, weight 400, never
+grid, floating glass islands, lilac `#ae99ff` controls and blue, teal and pink previews, Instrument Serif titles (19px and up, weight 400, never
 bold; see AGENTS.md "Fonts") and Inter for everything else.
 
 Functionality does not change. Everything the current home screens can do stays reachable: name and format for
@@ -15,14 +15,14 @@ Grid starters may be added to desktop because they reuse an existing phone featu
 
 ## Desktop
 
-1. **Header island.** Floating glass pill across the top (inset like the editor islands): logo tile and
-   "Open-SCRL" in serif on the left; on the right a quiet privacy chip ("Saved on this device") and a coral
+1. **Header island.** Floating glass pill across the top (inset like the editor islands): Mac app icon and
+   "Open-SCRL" in serif on the left; on the right a quiet privacy chip ("Saved on this device") and a lilac
    "New carousel" button that scrolls to and focuses the create panel.
 2. **Hero / create panel.** One wide glass panel:
    - Left column: serif headline (about 44–52px), for example "Make something worth swiping.", one line of
-     supporting text, the project-name field and the coral "Create & open editor" button.
+     supporting text, the project-name field and the lilac "Create & open editor" button.
    - Right column: the format picker as large tactile cards. Each shows a proportional frame (the real aspect
-     ratio, softly lit), platform name and pixel size. The selected card gets a coral rim and glow. Six formats
+     ratio, softly lit), platform name and pixel size. Frames use lilac/blue, blue/teal and pink/lilac palettes; the selected card gets a lilac rim and glow. Six formats
      fit in a 3×2 grid.
    - Under the panel, a "Start from a grid" row of grid-starter tiles (reuse the phone's `GridStarters`
      behavior and the chosen format).
@@ -30,14 +30,14 @@ Grid starters may be added to desktop because they reuse an existing phone featu
    preview on the left, serif name, format · slide count, relative "Edited 2 hours ago", and an "Open" button.
 4. **All projects.** A sticky glass toolbar row with the serif section title and count pill, search, sort and the
    grid/list toggle. Grid cards have a 4:5 preview well on the dark stage, serif name, and a two-line meta
-   (format · slides, then relative edited time). Hover lifts the card with a coral hairline. The list view is
+   (format · slides, then relative edited time). Hover lifts the card with a lilac hairline. The list view is
    a single glass panel of 56px rows.
 5. **Previews.** Prefer a real preview of each project's first slide, rendered lazily only for cards on screen
    and cached in memory, using the existing storage and preview-rendering code (for example `readProject` and
    `SlidePreviewCanvas`). It must stay out of the initial chunk and must not slow first paint. If that is not
    practical without changing storage or the document schema, keep the generated covers, framed in the real
    aspect ratio, and say so.
-6. **Empty state.** No projects: an illustrated stack of three tilted frames with a coral glow, "Your first
+6. **Empty state.** No projects: an illustrated stack of three tilted frames with a lilac glow, "Your first
    carousel starts here", and the create button. No search match: a compact message with a "Clear search" link.
 7. **Footer.** One quiet line: open source, MIT, files never leave the device.
 
@@ -46,11 +46,11 @@ Grid starters may be added to desktop because they reuse an existing phone featu
 1. **Top bar.** Glass bar with logo and serif title that compacts on scroll (keep the current collapsing
    behavior), safe-area aware.
 2. **Create card.** Serif "New carousel", horizontally snapping format cards with proportional frames, name field,
-   coral full-width "Create carousel" button. 44px minimum targets.
+   lilac full-width "Create carousel" button. 44px minimum targets.
 3. **Start from a grid.** The existing grid starters, restyled as glass tiles.
 4. **Continue editing.** Feature card for the most recent project (preview, name, meta, relative time).
 5. **Your projects.** Search, then rows with a preview thumbnail, serif name, format · slides and relative time.
-6. **Floating "New" button.** When the create card has scrolled out of view, a coral pill "New carousel"
+6. **Floating "New" button.** When the create card has scrolled out of view, a lilac pill "New carousel"
    floats above the bottom safe area and scrolls back to the create card.
 7. Empty state like desktop, scaled down.
 

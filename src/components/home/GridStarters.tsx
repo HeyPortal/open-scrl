@@ -10,6 +10,7 @@ const STARTER_IDS = ['two-v', 'three-h', 'one-plus-two', 'four-grid', 'l-shape',
 export const STARTER_TEMPLATES: GridTemplate[] = STARTER_IDS.flatMap((id) => GRID_TEMPLATES.find((template) => template.id === id) ?? []);
 
 const THUMB_BOX = { width: 52, height: 68 };
+const CELL_COLORS = ['--c-brand-lilac', '--c-brand-blue', '--c-brand-teal', '--c-brand-pink'];
 
 /** Cell diagram drawn in a 100-unit tall space so the gap reads at thumbnail size. */
 function GridThumb({ template, format, index }: { template: GridTemplate; format: Format; index: number }) {
@@ -19,12 +20,6 @@ function GridThumb({ template, format, index }: { template: GridTemplate; format
   const cells = template.cells(viewW, viewH, 4);
   return (
     <svg width={size.width} height={size.height} viewBox={`0 0 ${viewW} ${viewH}`} aria-hidden className="overflow-visible">
-      <defs>
-        <linearGradient id={`home-grid-fill-${index}`} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" style={{ stopColor: 'rgb(var(--c-accent-start))' }} />
-          <stop offset="1" style={{ stopColor: 'rgb(var(--c-accent-end))' }} />
-        </linearGradient>
-      </defs>
       {cells.map((cell, i) => (
         <rect
           key={i}
@@ -33,8 +28,8 @@ function GridThumb({ template, format, index }: { template: GridTemplate; format
           width={cell.w}
           height={cell.h}
           rx={4}
-          fill={`url(#home-grid-fill-${index})`}
-          opacity={0.55 + ((i * 7) % 4) * 0.15}
+          style={{ fill: `rgb(var(${CELL_COLORS[(index + i) % CELL_COLORS.length]}))` }}
+          opacity={0.75 + ((i * 7) % 3) * 0.1}
         />
       ))}
     </svg>

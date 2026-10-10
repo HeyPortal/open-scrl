@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-/** Three tilted frames with a coral glow, drawn with theme tokens only. */
+/** Three tilted frames with a lilac glow, drawn with theme tokens only. */
 function Frames() {
   return (
     <div className="home-empty-art" aria-hidden>
@@ -15,7 +15,7 @@ function Frames() {
 }
 
 interface HomeEmptyProps {
-  /** Small coral line above the title; also part of the heading's accessible name. */
+  /** Small lilac line above the title; also part of the heading's accessible name. */
   eyebrow: string;
   title: string;
   children: ReactNode;

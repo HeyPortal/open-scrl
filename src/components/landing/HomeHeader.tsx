@@ -1,11 +1,12 @@
-import { HardDrive, LayoutGrid, Plus } from 'lucide-react';
+import { HardDrive, Plus } from 'lucide-react';
+import { AppLogo } from '../AppLogo';
 
 /** Floating glass island across the top: brand, privacy note and a shortcut to the create panel. */
 export function HomeHeader({ onNew }: { onNew: () => void }) {
   return (
     <header className="home-header studio-glass">
       <div className="home-brand">
-        <span className="home-logo" aria-hidden><LayoutGrid size={16} strokeWidth={2.25} /></span>
+        <AppLogo className="home-logo" />
         <span className="home-brand-name">Open-SCRL</span>
       </div>
       <div className="home-header-actions">

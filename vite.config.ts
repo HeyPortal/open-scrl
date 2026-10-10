@@ -9,13 +9,13 @@ export default defineConfig({
     VitePWA({
       registerType: 'prompt',
       injectRegister: null,
-      includeAssets: ['favicon.svg'],
+      includeAssets: ['favicon.png', 'app-icon.png', 'apple-touch-icon.png'],
       manifest: {
         name: 'Open-SCRL',
         short_name: 'Open-SCRL',
         description: 'Open-source photo grid + Instagram carousel maker',
-        theme_color: '#0f0f12',
-        background_color: '#0f0f12',
+        theme_color: '#0a0a0c',
+        background_color: '#0a0a0c',
         display: 'standalone',
         start_url: '/',
         icons: [

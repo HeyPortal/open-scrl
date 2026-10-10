@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, HardDrive, LayoutGrid, Plus } from 'lucide-react';
+import { AlertTriangle, HardDrive, Plus } from 'lucide-react';
+import { AppLogo } from '../AppLogo';
 import type { Format } from '@/types';
 import { FORMATS } from '@/lib/format';
 import { useEditor } from '@/store/editor';
@@ -78,7 +79,7 @@ export default function MobileHome() {
       {/* Compact bar: fades in over the content once the large title scrolls away. */}
       <div aria-hidden className="home-topbar" data-collapsed={collapsed}>
         <div className="home-topbar-inner">
-          <span className="home-logo home-logo-sm"><LayoutGrid size={14} strokeWidth={2.25} /></span>
+          <AppLogo className="home-logo home-logo-sm" size={26} />
           <span className="home-brand-name">Open-SCRL</span>
         </div>
       </div>
@@ -92,7 +93,7 @@ export default function MobileHome() {
         <div className="home-phone-content">
           <header className="home-phone-header">
             <div className="home-phone-brand">
-              <span className="home-logo home-logo-lg"><LayoutGrid size={22} strokeWidth={2.25} aria-hidden /></span>
+              <AppLogo className="home-logo home-logo-lg" size={44} />
               <h1 className="home-phone-title">Open-SCRL</h1>
             </div>
             <p>Carousels &amp; photo grids, saved on this device</p>

@@ -23,7 +23,10 @@ The footer reads "Projects are stored locally in this browser." Clearing the sit
 
 ## Editor layout
 
-The top bar, slide strip, dock, selection bar and sheets are dark glass islands on a dotted stage, with coral actions and selection outlines. They stay in flow so the canvas measures the space available.
+The top bar, slide strip, dock, selection bar and sheets are dark glass islands
+on a dotted stage, with lilac actions and selection outlines. They stay in flow
+so the canvas measures the space available. The home screen uses the Mac app
+icon with blue, teal and pink format previews and grid diagrams.
 
 - **Top bar**: the back chevron returns to the home screen. The project name opens the **Project** sheet, which renames the project, sets the canvas format, and has **Back to projects**. A dot after the name shows while changes are saving or after a save has failed. **Undo** and **Redo** are icon buttons, and **Export** opens the export sheet.
 - **Canvas**: the slides sit side by side with the selected one centered. A counter such as "2 / 5" appears below the canvas when there is room.

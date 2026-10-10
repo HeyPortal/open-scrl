@@ -59,7 +59,7 @@
 }
 
 /* Import drop zone ------------------------------------------------------------------------------------------
-   Big (empty library): a dark glass well with a coral glow. Compact (library has media): one slim dashed row so
+   Big (empty library): a dark glass well with a lilac glow. Compact (library has media): one slim dashed row so
    the photo grid stays above the fold. Both brighten while files are dragged anywhere over the panel. */
 .media-dropzone button { cursor: pointer; }
 .media-dropzone button:disabled { cursor: progress; opacity: .6; }

@@ -19,7 +19,7 @@
 .studio-mobile-shell .mobile-topbar { margin-top: 8px; padding-right: 4px; }
 .studio-mobile-shell .mobile-dock { margin-bottom: 8px; border-radius: 20px; }
 .studio-mobile-shell .mobile-dock [role='tab'] { min-height: 44px; }
-/* The active tool sits on a soft coral pill behind its icon instead of a bar on the island edge. Icon and label are lifted above the pill. */
+/* The active tool sits on a soft lilac pill behind its icon instead of a bar on the island edge. Icon and label are lifted above the pill. */
 .studio-mobile-shell .mobile-dock [role='tab'] > span[aria-hidden] {
   top: calc(50% - 24px); left: 50%; width: 56px; height: 32px;
   border-radius: 999px;

@@ -46,7 +46,8 @@
 /* Create card */
 .home-create {
   padding: 18px; border-radius: 26px;
-  background: radial-gradient(100% 90% at 100% 0%, rgb(var(--c-accent) / .11), transparent 60%), rgb(var(--c-bg-panel));
+  background: radial-gradient(100% 90% at 100% 0%, rgb(var(--c-brand-lilac) / .11), transparent 60%),
+    radial-gradient(100% 80% at 0% 100%, rgb(var(--c-brand-teal) / .07), transparent 60%), rgb(var(--c-bg-panel));
   box-shadow: inset 0 0 0 1px rgb(var(--c-line) / var(--c-line-alpha)), inset 0 1px 0 rgb(var(--c-surface-ring) / .06), var(--shadow-panel);
 }
 .home-create .home-formats {

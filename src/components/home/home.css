@@ -60,12 +60,10 @@
 
 /* Logo tile ----------------------------------------------------------------------------------- */
 .home-logo {
-  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 30px; height: 30px; border-radius: 9px;
-  background: linear-gradient(150deg, rgb(var(--c-accent-start)), rgb(var(--c-accent-end))); color: rgb(var(--c-accent-ink));
-  box-shadow: inset 0 1px 0 rgb(var(--c-surface-ring) / .35), 0 8px 18px -8px rgb(var(--c-accent) / .9);
+  display: block; flex-shrink: 0; width: 30px; height: 30px; object-fit: contain;
 }
-.home-logo-sm { width: 26px; height: 26px; border-radius: 8px; }
-.home-logo-lg { width: 44px; height: 44px; border-radius: 13px; }
+.home-logo-sm { width: 26px; height: 26px; }
+.home-logo-lg { width: 44px; height: 44px; }
 
 /* Preview wells and frames ---------------------------------------------------------------------
    A well is a miniature stage and a size container; the frame inside it takes the largest box with
@@ -96,10 +94,13 @@
 
 /* Format cards (create panel / create card) -------------------------------------------------- */
 .home-format {
+  --format-start: var(--c-brand-lilac); --format-end: var(--c-brand-blue);
   position: relative; display: flex; flex-direction: column; align-items: center; min-width: 0; padding: 8px 8px 12px;
   border-radius: 14px; background: rgb(var(--c-bg-inset) / .55); text-align: center;
   transition: background-color 160ms ease-out, box-shadow 160ms ease-out, transform 160ms ease-out;
 }
+.home-format:nth-child(3n + 2) { --format-start: var(--c-brand-blue); --format-end: var(--c-brand-teal); }
+.home-format:nth-child(3n) { --format-start: var(--c-brand-pink); --format-end: var(--c-brand-lilac); }
 .home-format:hover { background: rgb(var(--c-bg-hover) / .7); }
 .home-format[aria-checked='true'] { background: rgb(var(--c-accent) / .1); }
 .home-format-well {
@@ -110,12 +111,12 @@
 }
 .home-format-frame {
   display: block; border-radius: 4px;
-  background: linear-gradient(165deg, rgb(var(--c-ink) / .26), rgb(var(--c-ink) / .08));
+  background: linear-gradient(165deg, rgb(var(--format-start) / .7), rgb(var(--format-end) / .4));
   box-shadow: inset 0 0 0 1px rgb(var(--c-ink) / .2), 0 10px 20px -8px rgba(0, 0, 0, .75);
   transition: background 160ms ease-out, box-shadow 160ms ease-out;
 }
 .home-format[aria-checked='true'] .home-format-frame {
-  background: linear-gradient(165deg, rgb(var(--c-accent-start)), rgb(var(--c-accent-end)));
+  background: linear-gradient(165deg, rgb(var(--format-start)), rgb(var(--format-end)));
   box-shadow: inset 0 1px 0 rgb(var(--c-surface-ring) / .35), 0 0 26px -2px rgb(var(--c-accent) / .6);
 }
 .home-format-check {
@@ -204,9 +205,9 @@
   background: rgb(var(--c-bg-panel));
   box-shadow: inset 0 0 0 1.5px rgb(var(--c-accent) / .65), 0 18px 34px -12px rgba(0, 0, 0, .9);
 }
-.home-empty-frame i { display: block; border-radius: 5px; background: rgb(var(--c-accent) / .38); }
-.home-empty-frame i:nth-child(2) { background: rgb(var(--c-ink) / .14); }
-.home-empty-frame i.wide { grid-column: span 2; background: rgb(var(--c-accent) / .2); }
+.home-empty-frame i { display: block; border-radius: 5px; background: rgb(var(--c-brand-lilac) / .6); }
+.home-empty-frame i:nth-child(2) { background: rgb(var(--c-brand-teal) / .6); }
+.home-empty-frame i.wide { grid-column: span 2; background: rgb(var(--c-brand-pink) / .5); }
 .home-empty-heading { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 0; }
 .home-empty-title { display: block; font-size: 30px; line-height: 1.1; color: rgb(var(--c-ink)); }
 .home-empty-text { max-width: 320px; margin: 8px 0 20px; font-size: 14px; line-height: 1.5; color: rgb(var(--c-ink-dim)); }

@@ -21,7 +21,7 @@ A free, open-source alternative to [SCRL](https://scrl.com), available as a web 
 desktop and phones and a native Mac app.
 Lay your photos out across a row of slides, then export one file per slide in posting order.
 The web editor uses Studio’s dark stage, floating tool and Properties cards,
-coral selection controls, and slide timeline on desktop, with touch sheets
+lilac selection controls, and slide timeline on desktop, with touch sheets
 on phones. It's early, so expect rough edges.
 Create a carousel or pick up a saved project from the [home screen](docs/images/web-home.webp).
 

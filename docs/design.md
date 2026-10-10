@@ -1,8 +1,10 @@
 # Studio web design
 
 Studio is the web app’s design on desktop and phones: a deep dark dotted
-stage, coral accent, floating glass panels, Inter controls and Instrument
-Serif titles. The home screens use the same palette.
+stage, lilac controls, floating glass panels, Inter controls and Instrument
+Serif titles. Blue, teal and pink join lilac in format previews, grid starters,
+empty-state artwork and fallback project covers. Selection and focus stay
+lilac; canvas alignment guides use blue.
 
 `src/index.css` imports `src/styles/studio/` directly. `tokens.css` defines
 all global `:root` values and `color-scheme: dark`; `chrome.css`, `panels.css`,
@@ -12,7 +14,14 @@ Tailwind retains `bg`, `ink`, `accent`, `accent-ink`, `line`, `canvas-bg`,
 Alpha-bearing colors multiply the token’s base opacity by utility opacity.
 Keep the single `canvasTheme` object aligned with these CSS tokens; Konva
 uses its stable values without reading computed CSS during rendering.
-Document colors, presets, project covers and simulated feeds are content.
+Document colors, presets and simulated feeds are content; changing the shell
+palette must not recolor them. Fallback project covers use brand tokens.
+
+`AppLogo` uses `public/app-icon.png`, the same artwork as the Mac app and
+GitHub README (`docs/images/logo.png`). The loading screen, favicon, Apple
+touch icon and PWA icons share it. Regenerate those PNGs from the README
+icon when the branding changes. The maskable PWA icon includes dark padding
+so the artwork fits inside the central safe circle.
 
 `App.tsx` keeps independent lazy desktop, phone editor and phone home
 entries. The desktop editor has a command island for project name, format,

@@ -1,4 +1,5 @@
-import { Check, ChevronDown, CloudOff, Download, GalleryHorizontal, House, LayoutGrid, Loader2, Minus, Package, Plus, Redo2, Search, Smartphone, Undo2 } from 'lucide-react';
+import { Check, ChevronDown, CloudOff, Download, GalleryHorizontal, House, Loader2, Minus, Package, Plus, Redo2, Search, Smartphone, Undo2 } from 'lucide-react';
+import { AppLogo } from '@/components/AppLogo';
 import { buildActions, formatBinding, isMac } from '@/app/actions';
 import { DropdownMenu, type MenuEntry } from '@/components/Menu';
 import { useEditor } from '@/store/editor';
@@ -30,7 +31,7 @@ export function StudioCommands() {
   const future = useEditor((s) => s.future.length);
   return <header className="studio-command-island studio-glass" aria-label="Project commands">
     <DropdownMenu label="Main menu" title="Main menu" className="studio-menu-button" items={() => studioActionItems(['go-projects', 'new-project', 'rename-project', '-', 'import-media', 'add-text', 'add-rect', 'add-ellipse', '-', 'palette', 'shortcuts', '-', 'export-carousel', 'export-slide'])}>
-      <LayoutGrid size={20} aria-hidden /><ChevronDown size={11} aria-hidden />
+      <AppLogo size={24} /><ChevronDown size={11} aria-hidden />
     </DropdownMenu>
     <button className="icon-btn" title="Projects" aria-label="Projects" onClick={() => runStudioAction('go-projects')}><House size={16} aria-hidden /></button>
     <input data-project-name className="input studio-project-name" aria-label="Project name" placeholder="Untitled" value={name} onChange={(e) => useEditor.getState().setDocName(e.target.value)} />
