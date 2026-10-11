@@ -10,6 +10,8 @@ import { command, type EditorCommand } from '@/core/document/commands';
 import { getSlideLayers, materializeSlide, expandToGroups, groupMemberIds, selectionUnits } from '@/core/document/selectors';
 import { scaleLayer, slideSpanFor, unionBounds, type AlignEdge, type DistributeAxis } from '@/core/document/geometry';
 import { measureTextHeight } from '@/render/paint/text';
+import { ensureLayerFonts } from '@/render/fonts/families';
+import { useToasts } from '@/store/toasts';
 import { canSwapPhotoFrames, filledPhotoFrames, setFramePhoto, shuffledPhotoIds } from '@/core/document/photos';
 import { listProjectSummaries, preserveLegacyBackup, readProject, writeProject, type StoredProjectSummary } from '@/storage/database';
 import { assetRepository } from '@/assets/indexeddb/IndexedDbAssetRepository';
@@ -306,6 +308,9 @@ export const useDocumentStore = create<EditorState>((set, get) => ({
     if (!stored) return;
     try {
       const doc = migrateDocument(stored);
+      await ensureLayerFonts(Object.values(doc.layers)).catch((error: unknown) => {
+        useToasts.getState().addToast(error instanceof Error ? error.message : 'A project font could not be loaded.', 'warning', { label: 'Manage fonts', run: () => useEditorSession.getState().setOverlay('fonts') });
+      });
       if (!('schemaVersion' in stored)) await preserveLegacyBackup(projectId, stored);
       set({ doc, activeProjectId: doc.id, selectedSlideId: doc.slideOrder[0] ?? '', selectedLayerId: null, selectedLayerIds: [], past: [], future: [], readOnlyError: null });
       useEditorSession.getState().resetSelection(doc.slideOrder[0] ?? '');

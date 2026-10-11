@@ -2,7 +2,7 @@ import { create } from 'zustand';
 
 export type LeftPanel = 'templates' | 'photos' | 'text' | 'shapes' | 'background' | 'export';
 export type SaveStatus = 'saved' | 'pending' | 'saving';
-export type Overlay = 'palette' | 'shortcuts' | 'export' | null;
+export type Overlay = 'palette' | 'shortcuts' | 'export' | 'fonts' | null;
 
 interface SessionState {
   selectedSlideId: string;

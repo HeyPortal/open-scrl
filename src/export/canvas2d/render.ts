@@ -3,6 +3,7 @@ import { compileScene } from '@/core/scene/compileScene';
 import { getSlideViewport } from '@/core/document/coordinates';
 import { paintBackground, paintLayer } from '@/render/paint/layers';
 import { loadInterFonts } from '@/render/fonts/inter';
+import { ensureLayerFonts } from '@/render/fonts/families';
 
 export interface RenderOptions { format: 'png' | 'jpeg'; quality: number; pixelRatio: number }
 export interface ExportProgress { phase: 'compile' | 'decode' | 'render' | 'encode'; current: number; total: number }
@@ -36,6 +37,7 @@ export async function renderSlides(
     const viewport = getSlideViewport(doc, doc.slideOrder[index]);
     return viewport ? compileScene(doc, viewport) : [];
   });
+  await ensureLayerFonts(scenes.flatMap((scene) => scene.map((item) => item.layer)));
   onProgress?.({ phase: 'compile', current: 1, total: 1 });
   // Decoded media is released as soon as the last slide using it is drawn.
   const uses = new Map<string, number>();

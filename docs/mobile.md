@@ -55,6 +55,12 @@ Tap a layer on the canvas to select it. The selection bar starts with a label (P
 
 **Edit** opens a properties sheet titled Photo, Text, Shape, Layer, or "N layers". It holds the desktop inspector's controls with larger targets. In a photo's section, **Replace** (or **Choose photo** for an empty frame) opens **Photos**.
 
+For text, **Typography → Manage fonts** imports your own font files or browses
+the Google Fonts catalog. Google Fonts requires a configured API key and an
+internet connection; its tab is grayed out offline with connection guidance.
+Previously imported or downloaded fonts stay available offline. See
+[custom fonts](custom-fonts.md) for setup and supported file formats.
+
 To replace a photo, select it and tap **Replace**. The Photos sheet then reads "Tap a photo to replace" the frame. Tapping another photo swaps it in. Tapping the photo already there duplicates it. **Add new instead** cancels the replace and adds a new layer.
 
 On the canvas, one finger selects one layer at a time. To select several, open **Layers**, tap **Select**, and tap the layers you want.

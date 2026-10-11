@@ -13,7 +13,7 @@ import { useToasts } from '@/store/toasts';
 import { useContextMenu } from '@/components/Menu';
 import { layerMenu } from '@/app/menus';
 import { isMac } from '@/app/actions';
-import type { Bounds, Layer as DocLayer, Slide } from '@/types';
+import type { Bounds, Layer as DocLayer, Slide, TextLayer } from '@/types';
 import { expandToGroups, findLayerSlideId, getSlideLayers, selectionSlideId } from '@/core/document/selectors';
 import { rotatedBounds, scaleLayer, unionBounds } from '@/core/document/geometry';
 import { intersects } from '@/core/document/coordinates';
@@ -23,7 +23,9 @@ import { getCanvasScrollIntent } from '@/core/scene/scrollIntent';
 import { snapBox, type SnapGuide } from '@/lib/snap';
 import { createSnapFeedback } from '@/lib/mobileHaptics';
 import { ImageNode } from './ImageNode';
-import { TextNode } from './TextNode';
+import { TextNode, previewTextNode } from './TextNode';
+import { resizeTextLayer } from './textResize';
+import { measureTextHeight } from '@/render/paint/text';
 import { ShapeNode } from './ShapeNode';
 import { TextEditor } from './TextEditor';
 import { MobileTextEditor } from './MobileTextEditor';
@@ -120,6 +122,7 @@ export function Canvas({ width, height, variant = 'desktop' }: { width: number; 
   // Mobile: the zoom the user pinched to (null = following the fit zoom), a scroll to apply once that zoom has rendered, and the last slide focus handled.
   const userZoom = useRef<number | null>(null);
   const pendingScroll = useRef<{ left: number; top: number } | null>(null);
+  const wheelZoom = useRef<number | null>(null);
   const focusKey = useRef('');
   // A layer keeps its document owner when it crosses a seam. Refits should keep
   // showing the slide being viewed, rather than returning to that owner.
@@ -129,6 +132,7 @@ export function Canvas({ width, height, variant = 'desktop' }: { width: number; 
   const gestureHost = useRef<GestureHost | null>(null);
   const drag = useRef<DragSession | null>(null);
   const groupTransform = useRef<GroupTransform | null>(null);
+  const textTransform = useRef<{ base: TextLayer; inverse: Konva.Transform; start: { x: number; y: number }; anchor: string; preview: TextLayer } | null>(null);
   const pendingNarrow = useRef<string | null>(null);
   const snapFeedback = useRef(createSnapFeedback());
   type CanvasActivity = `drag:${string}` | 'transform' | 'touch' | 'marquee';
@@ -170,7 +174,7 @@ export function Canvas({ width, height, variant = 'desktop' }: { width: number; 
     const cancel = () => {
       snapFeedback.current.reset();
       cancelling.current = true;
-      drag.current = null; groupTransform.current = null; touch.current = null;
+      drag.current = null; groupTransform.current = null; textTransform.current = null; touch.current = null;
       marqueeCleanup.current?.(); marqueeCleanup.current = null;
       abortTouchGestures.current?.();
       // Stopping Konva emits end events; cancelled sessions must not commit.
@@ -179,7 +183,8 @@ export function Canvas({ width, height, variant = 'desktop' }: { width: number; 
       for (const [id, node] of layerNodes.current) {
         node.stopDrag();
         const layer = current.layers[id];
-        if (layer) node.setAttrs({ ...centerOf(layer), rotation: layer.rotation, scaleX: 1, scaleY: 1 });
+        if (layer?.kind === 'text') previewTextNode(node as Konva.Group, layer, false);
+        else if (layer) node.setAttrs({ ...centerOf(layer), rotation: layer.rotation, scaleX: 1, scaleY: 1 });
       }
       const ids = useEditorSession.getState().selectedLayerIds.filter((id) => current.layers[id]);
       const bounds = unionBounds(ids.map((id) => rotatedBounds(current.layers[id])));
@@ -267,6 +272,7 @@ export function Canvas({ width, height, variant = 'desktop' }: { width: number; 
     // picks mark that change as quiet; only navigation requests move the view.
     const key = `${selectedSlideId}:${slideFocusRequest}:${index}`;
     const geometryKey = `${originX}:${fmt.width}:${zoom}:${width}`;
+    if (wheelZoom.current === zoom) { wheelZoom.current = null; focusKey.current = key; focusGeometryKey.current = geometryKey; return; }
     const quiet = focusKey.current === key;
     if (mobile && quiet && isCustomZoom()) { focusGeometryKey.current = geometryKey; return; }
     if (mobile && quiet && focusGeometryKey.current === geometryKey) return;
@@ -381,12 +387,15 @@ export function Canvas({ width, height, variant = 'desktop' }: { width: number; 
       const top=Math.max(0,Math.min(el.scrollHeight-el.clientHeight,el.scrollTop+intent.top));
       el.scrollTo({left,top});scrollPosition.current={left,top};setViewportOffset({x:originX-left,y:centeredY-top});updateVisible();return;
     }
-    const rect = el.getBoundingClientRect(); const pointerX = event.evt.clientX - rect.left; const pointerY = event.evt.clientY - rect.top;
-    const contentX = (el.scrollLeft + pointerX - originX) / zoom; const contentY = (el.scrollTop + pointerY - centeredY) / zoom;
+    const rect = el.getBoundingClientRect(); const pointer = { x: event.evt.clientX - rect.left, y: event.evt.clientY - rect.top };
+    const geometry = { width, height, deckWidth, centreWidth, slideHeight: fmt.height, padding: PADDING };
+    const content = contentPointAt(geometry, zoom, { left: el.scrollLeft, top: el.scrollTop }, pointer);
     const next = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom * Math.exp(-event.evt.deltaY * .00115)));
+    if (next === zoom) return;
     if (mobile) userZoom.current = next;
+    wheelZoom.current = next;
+    pendingScroll.current = scrollForAnchor(geometry, next, content, pointer);
     setZoom(next);
-    requestAnimationFrame(() => { el.scrollLeft = Math.max(0, originXFor(next) + contentX * next - pointerX); el.scrollTop = Math.max(0, centeredY + contentY * next - pointerY); scheduleScrollSync(); });
   };
 
   const slideIndexAt = (stageX: number) => Math.max(0, Math.min(doc.slideOrder.length - 1, Math.floor(((stageX - viewportOffset.x) / zoom) / fmt.width)));
@@ -510,6 +519,16 @@ export function Canvas({ width, height, variant = 'desktop' }: { width: number; 
     return { x: node.x() - width/2, y: node.y() - height/2, width, height };
   };
   const snap = (slide: Slide, layer: DocLayer, moving: {x:number;y:number;width:number;height:number}) => snapBox(moving, slide.layers.filter((l)=>l.id!==layer.id), fmt, SNAP_THRESHOLD_PX/zoom);
+
+  const onTextTransformStart = () => {
+    const tr = transformerRef.current;
+    const node = tr?.nodes()[0]; const pointer = stageRef.current?.getPointerPosition();
+    const layer = node ? useEditor.getState().doc.layers[node.id()] : undefined;
+    const anchor = tr?.getActiveAnchor();
+    if (layer?.kind !== 'text' || !node || !pointer || !anchor) return;
+    const inverse = node.getAbsoluteTransform().copy().invert();
+    textTransform.current = { base: layer, inverse, start: inverse.point(pointer), anchor, preview: layer };
+  };
 
   // Scaling or rotating a multi-layer selection: the transformer drives an invisible box, and
   // every selected layer follows it. The document changes once, when the gesture ends.
@@ -642,8 +661,44 @@ export function Canvas({ width, height, variant = 'desktop' }: { width: number; 
         useEditor.getState().moveLayers(st.ids, st.dx, st.dy);
       } finally { endActivity(`drag:${layer.id}`); }
     };
-    const onTransform = (e: Konva.KonvaEventObject<Event>) => { if(layer.locked)return;const moving=localMoving(e.target,layer,true);const result=snap(slide,layer,moving);if(mobile)snapFeedback.current.update([...result.guides.map((guide)=>`${guide.orientation}:${guide.position+(guide.orientation==='v'?offset:0)}`),...(e.target.rotation()!==layer.rotation&&Math.abs(e.target.rotation()%45)<.001?[`rotation:${e.target.rotation()}`]:[])]);e.target.position({x:result.x+moving.width/2,y:result.y+moving.height/2});setGuideOffsetX(offset);setGuides(result.guides);if(layer.kind==='image'){const seams=findCrossedSlideSeams({x:offset+result.x,y:result.y,width:moving.width,height:moving.height},fmt.width,doc.slideOrder.length);setResizeSeams(seams.map((x)=>({x,y:result.y,height:moving.height})));}else setResizeSeams([]); };
-    const onTransformEnd = (e: Konva.KonvaEventObject<Event>) => { try { setResizeSeams([]);if(layer.locked||cancelling.current)return;const node=e.target;const moving=localMoving(node,layer,true);const result=snap(slide,layer,moving);node.scale({x:1,y:1});updateLayer(layer.id,{x:result.x,y:result.y,width:moving.width,height:moving.height,rotation:node.rotation()});setGuides([]); } finally { endActivity('transform'); } };
+    const onTransform = (e: Konva.KonvaEventObject<Event>) => {
+      if (layer.locked) return;
+      const st = textTransform.current;
+      if (layer.kind === 'text' && st?.base.id === layer.id) {
+        if (st.anchor === 'rotater') {
+          st.preview = { ...st.base, rotation: normalizeAngle(e.target.rotation()) };
+          previewTextNode(e.currentTarget as Konva.Group, st.preview);
+          setGuides([]);
+          return;
+        }
+        const pointer = stageRef.current?.getPointerPosition(); if (!pointer) return;
+        const local = st.inverse.point(pointer);
+        const result = resizeTextLayer(st.base, { x: local.x - st.start.x, y: local.y - st.start.y }, st.anchor, 'altKey' in e.evt && !!e.evt.altKey,
+          { others: slide.layers.filter((l) => l.id !== layer.id), canvas: fmt, threshold: SNAP_THRESHOLD_PX / zoom }, measureTextHeight);
+        st.preview = result.layer;
+        previewTextNode(e.currentTarget as Konva.Group, result.layer);
+        transformerRef.current?.forceUpdate();
+        if (mobile) snapFeedback.current.update(result.guides.map((guide) => `${guide.orientation}:${guide.position + (guide.orientation === 'v' ? offset : 0)}`));
+        setGuideOffsetX(offset); setGuides(result.guides); setResizeSeams([]);
+        return;
+      }
+      const moving=localMoving(e.target,layer,true);const result=snap(slide,layer,moving);if(mobile)snapFeedback.current.update([...result.guides.map((guide)=>`${guide.orientation}:${guide.position+(guide.orientation==='v'?offset:0)}`),...(e.target.rotation()!==layer.rotation&&Math.abs(e.target.rotation()%45)<.001?[`rotation:${e.target.rotation()}`]:[])]);e.target.position({x:result.x+moving.width/2,y:result.y+moving.height/2});setGuideOffsetX(offset);setGuides(result.guides);if(layer.kind==='image'){const seams=findCrossedSlideSeams({x:offset+result.x,y:result.y,width:moving.width,height:moving.height},fmt.width,doc.slideOrder.length);setResizeSeams(seams.map((x)=>({x,y:result.y,height:moving.height})));}else setResizeSeams([]);
+    };
+    const onTransformEnd = (e: Konva.KonvaEventObject<Event>) => {
+      try {
+        setResizeSeams([]); setGuides([]);
+        if (layer.locked || cancelling.current) return;
+        const st = textTransform.current;
+        if (layer.kind === 'text' && st?.base.id === layer.id) {
+          const { x, y, width, height, rotation } = st.preview;
+          updateLayer(layer.id, { x, y, width, height, rotation });
+          previewTextNode(e.currentTarget as Konva.Group, useEditor.getState().doc.layers[layer.id] as TextLayer, false);
+          transformerRef.current?.forceUpdate();
+          return;
+        }
+        const node=e.target;const moving=localMoving(node,layer,true);const result=snap(slide,layer,moving);node.scale({x:1,y:1});updateLayer(layer.id,{x:result.x,y:result.y,width:moving.width,height:moving.height,rotation:node.rotation()});
+      } finally { textTransform.current = null; endActivity('transform'); }
+    };
     const ref = (node: Konva.Node|null) => { if(node)layerNodes.current.set(layer.id,node);else layerNodes.current.delete(layer.id); };
     const outline = selectedSet.has(layer.id);
     const hitPad=mobile?{x:Math.max(0,(TOUCH_TARGET_PX/zoom-layer.width)/2),y:Math.max(0,(TOUCH_TARGET_PX/zoom-layer.height)/2)}:undefined;
@@ -672,10 +727,10 @@ export function Canvas({ width, height, variant = 'desktop' }: { width: number; 
         <KLayer><Group x={canvasOffset.x} y={canvasOffset.y} scaleX={zoom} scaleY={zoom}>
           {visibleItems.map((item)=>renderNode(item.slideId,item.layer))}
           {selectionBox&&<Rect ref={proxyRef} x={pageX(selectionBox.slideId)+selectionBox.bounds.x} y={selectionBox.bounds.y} width={selectionBox.bounds.width} height={selectionBox.bounds.height} listening={false}/>}
-          <Transformer ref={transformerRef} rotateEnabled anchorSize={mobile?18:10} anchorCornerRadius={mobile?9:3} anchorStroke={canvasTheme.selection} anchorFill={canvasTheme.transformerAnchorFill} borderStroke={canvasTheme.selection} borderStrokeWidth={mobile?2.5:1.5} borderDash={multi?[4,3]:undefined} {...(mobile?{visible:!editingTextId,anchorStrokeWidth:2,rotateAnchorOffset:32,anchorStyleFunc:touchAnchor}:{})} keepRatio={multi||active?.kind==='image'} flipEnabled={!multi} ignoreStroke
+          <Transformer ref={transformerRef} rotateEnabled anchorSize={mobile?18:10} anchorCornerRadius={mobile?9:3} anchorStroke={canvasTheme.selection} anchorFill={canvasTheme.transformerAnchorFill} borderStroke={canvasTheme.selection} borderStrokeWidth={mobile?2.5:1.5} borderDash={multi?[4,3]:undefined} {...(mobile?{visible:!editingTextId,anchorStrokeWidth:2,rotateAnchorOffset:32,anchorStyleFunc:touchAnchor}:{})} keepRatio={multi||active?.kind==='image'} flipEnabled={!multi&&active?.kind!=='text'} ignoreStroke
             enabledAnchors={!multi&&active?.kind==='text'&&!active.autoFit?['middle-left','middle-right']:mobile&&!multi&&active?.kind==='image'?MOBILE_ANCHORS:undefined}
             boundBoxFunc={(oldBox,newBox)=>multi&&(Math.abs(newBox.width)<MIN_LAYER_SIZE*zoom||Math.abs(newBox.height)<MIN_LAYER_SIZE*zoom)?oldBox:newBox}
-            onTransformStart={()=>{beginActivity('transform');onGroupTransformStart();}} onTransform={()=>applyGroupTransform(false)} onTransformEnd={onGroupTransformEnd}/>
+            onTransformStart={()=>{beginActivity('transform');onGroupTransformStart();onTextTransformStart();}} onTransform={()=>applyGroupTransform(false)} onTransformEnd={onGroupTransformEnd}/>
         </Group></KLayer>
         <KLayer listening={false}><Group x={canvasOffset.x} y={canvasOffset.y} scaleX={zoom} scaleY={zoom}>
           {wideMode&&visibleSlides.slice(1).map(({index})=><Line key={`seam-${index}`} points={[index*fmt.width,0,index*fmt.width,fmt.height]} stroke={canvasTheme.seam} opacity={0.45} strokeWidth={1/zoom} dash={[6/zoom,5/zoom]}/>)}

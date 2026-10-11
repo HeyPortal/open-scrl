@@ -43,7 +43,7 @@ import { ALIGN_BUTTONS, SelectionInspector } from './inspector/SelectionInspecto
 import { groupMemberIds } from '@/core/document/selectors';
 import { getLiveGrid, hasLinkedSpacing } from '@/core/document/grid';
 import { linkedMax, maxGapFor, maxMargin } from '@/lib/grids';
-import { resolveFontFamily } from '@/render/fonts/families';
+import { FontSelector } from './fonts/FontSelector';
 
 const KIND_META = {
   image: { label: 'Photo', Icon: ImageIcon },
@@ -323,7 +323,6 @@ function ImageInspector({ layer }: { layer: ImageLayer }) {
 
 const FONT_SIZE_MIN = 8;
 const FONT_SIZE_MAX = 400;
-const FONTS = ['Inter', 'Helvetica', 'Arial', 'Georgia', 'Times New Roman', 'Courier New', 'system-ui'];
 
 function TextInspector({ layer }: { layer: TextLayer }) {
   const updateLayer = useEditor((s) => s.updateLayer);
@@ -343,14 +342,10 @@ function TextInspector({ layer }: { layer: TextLayer }) {
         <textarea className="input min-h-[4.5rem] resize-y" rows={3} value={layer.text} onChange={(e) => u({ text: e.target.value })} aria-label="Text content" />
       </Section>
       <Section title="Typography">
-        <select className="input" value={layer.fontFamily} onChange={(e) => u({ fontFamily: e.target.value })} aria-label="Font" style={{ fontFamily: resolveFontFamily(layer.fontFamily) }}>
-          {FONTS.map((f) => (
-            <option key={f} style={{ fontFamily: resolveFontFamily(f) }}>{f}</option>
-          ))}
-        </select>
+        <FontSelector key={layer.id} layer={layer} />
         <div className="grid grid-cols-2 gap-2">
           <select className="input" value={layer.fontWeight} onChange={(e) => u({ fontWeight: Number(e.target.value) })} aria-label="Font weight">
-            {[300, 400, 500, 600, 700, 800, 900].map((w) => (
+            {[100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, ...(layer.fontWeight % 100 ? [layer.fontWeight] : [])].sort((a, b) => a - b).map((w) => (
               <option key={w} value={w}>{w}</option>
             ))}
           </select>

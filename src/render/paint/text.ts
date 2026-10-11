@@ -28,6 +28,7 @@ export interface TextLayoutResult {
 const MIN_FIT_SIZE = 4;
 const cache = new Map<string, TextLayoutResult>();
 const CACHE_LIMIT = 300;
+export function invalidateTextLayoutCache() { cache.clear(); }
 
 export const textFont = (layer: Pick<TextLayer, 'italic' | 'fontWeight' | 'fontFamily'>, size: number) =>
   `${layer.italic ? 'italic ' : ''}${layer.fontWeight} ${size}px ${resolveFontFamily(layer.fontFamily)}`;

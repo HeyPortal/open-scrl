@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Command, Search, X } from 'lucide-react';
 import { useEditorSession } from '@/editor/sessionStore';
 import { buildActions, formatBinding, isMac, type Action, type ActionGroup } from '@/app/actions';
 import { ExportDialog } from './export/ExportDialog';
+import { useEditor } from '@/store/editor';
+const FontLibraryDialog = lazy(() => import('./fonts/FontLibraryDialog').then((module) => ({ default: module.FontLibraryDialog })));
 
 const GROUP_ORDER: ActionGroup[] = ['Insert', 'Edit', 'Arrange', 'Slide', 'View', 'Panels', 'Export', 'Project', 'Grids'];
 
@@ -171,8 +173,10 @@ export function ShortcutsDialog() {
 
 export function EditorOverlays() {
   const overlay = useEditorSession((s) => s.overlay);
+  const projectId = useEditor((s) => s.doc.id);
   if (overlay === 'palette') return <CommandPalette />;
   if (overlay === 'shortcuts') return <ShortcutsDialog />;
   if (overlay === 'export') return <ExportDialog />;
+  if (overlay === 'fonts') return <Suspense fallback={<div className="studio-scrim"><p role="status">Opening fonts…</p></div>}><FontLibraryDialog key={projectId} /></Suspense>;
   return null;
 }
