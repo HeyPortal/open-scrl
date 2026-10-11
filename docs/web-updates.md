@@ -26,4 +26,4 @@ worker, followed by the existing thumbnail and asset import worker.
 The build uses Vite 8, React plugin 6, and PWA plugin 2. It preserves the previous
 browser compilation targets. Bundled development and the experimental native
 React Compiler remain disabled. Production PWA lifecycle checks run with
-`npm run test:pwa`; the development browser tests do not register service workers.
+`bun run test:pwa`; the development browser tests do not register service workers.

@@ -82,14 +82,14 @@ two apps can't open each other's projects yet.
 ## Development
 
 ```bash
-npm ci
-npm run dev        # http://localhost:5173
-npm run verify     # typecheck, lint, tests, build
-npm run test:e2e   # Playwright (run `npx playwright install chromium` first)
-npm run test:pwa   # production offline and update checks
+bun install
+bun run dev        # http://localhost:5173
+bun run verify     # typecheck, lint, tests, build
+bun run test:e2e   # Playwright (run `bunx playwright install chromium` first)
+bun run test:pwa   # production offline and update checks
 ```
 
-Requires Node 22.12+. For the Mac app, open `macos/OpenSCRL.xcodeproj` in Xcode 27 and run it.
+Requires Bun 1.4+ and Node 22.12+ (Vite, Vitest and Playwright still run on Node). For the Mac app, open `macos/OpenSCRL.xcodeproj` in Xcode 27 and run it.
 
 For a phone preview on the same network, open the Network URL printed by Vite.
 Image imports and project storage also work at this HTTP preview address.
