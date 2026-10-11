@@ -7,6 +7,9 @@ The desktop captures use a 1600 × 1000 Chromium viewport; the phone layout uses
 The export strip contains PNG slides rendered by the app's export worker;
 slides 4 and 5 share one beach panorama across their seam.
 
+The export-menu captures (`web-export.png` and `mobile-export.png`) use the
+same sample project, captured on 2026-10-11.
+
 The photos below were downloaded from Wikimedia Commons. They are cropped and
 scaled inside the sample layouts; some have text or translucent shapes over them.
 The original stock files and browser-local projects are not committed.
@@ -35,6 +38,8 @@ This applies to these image assets; the application source remains under MIT.
 - `images/mobile-home.png`
 - `images/mobile-editor.png`
 - `images/mobile-grid.png`
+- `images/web-export.png`
+- `images/mobile-export.png`
 - `images/export-strip.webp` (six exported slides assembled in posting order)
 
 The native Mac screenshot is unchanged. Its original Unsplash photo credits

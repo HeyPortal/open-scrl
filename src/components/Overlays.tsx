@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Command, Search, X } from 'lucide-react';
 import { useEditorSession } from '@/editor/sessionStore';
 import { buildActions, formatBinding, isMac, type Action, type ActionGroup } from '@/app/actions';
+import { ExportDialog } from './export/ExportDialog';
 
 const GROUP_ORDER: ActionGroup[] = ['Insert', 'Edit', 'Arrange', 'Slide', 'View', 'Panels', 'Export', 'Project', 'Grids'];
 
@@ -172,5 +173,6 @@ export function EditorOverlays() {
   const overlay = useEditorSession((s) => s.overlay);
   if (overlay === 'palette') return <CommandPalette />;
   if (overlay === 'shortcuts') return <ShortcutsDialog />;
+  if (overlay === 'export') return <ExportDialog />;
   return null;
 }

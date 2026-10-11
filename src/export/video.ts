@@ -261,17 +261,22 @@ async function renderSlideVideo(
   slideId: string,
   preferTemporary: boolean,
   onProgress?: (frame: number, total: number) => void,
+  options: { signal?: AbortSignal } = {},
 ): Promise<RenderedSlideVideo> {
+  const checkCancelled = () => { if (options.signal?.aborted) throw new DOMException('Export cancelled.', 'AbortError'); };
+  checkCancelled();
   if (!('VideoEncoder' in window) || !('VideoFrame' in window)) {
     throw new Error('MP4 export needs a browser with WebCodecs support. Try the latest Chrome or Edge.');
   }
   if (!project.slides[slideId]) throw new Error('A slide no longer exists.');
   await loadInterFonts();
   await document.fonts?.ready;
+  checkCancelled();
   const { config, fps } = await bestSupportedConfig(project);
   const { animated, duration } = await inspectSlideVideo(project, slideId);
   if (!animated) throw new Error('Only slides containing a GIF or video need MP4 rendering.');
   const total = Math.max(1, Math.round(duration * fps));
+  checkCancelled();
 
   const output = await createVideoOutput(preferTemporary);
   const muxer = new Muxer({
@@ -291,12 +296,16 @@ async function renderSlideVideo(
     output: (chunk, metadata) => muxer.addVideoChunk(chunk, metadata),
     error: (error) => { encoderError = error; },
   });
+  const cancelEncoder = () => { if (encoder.state !== 'closed') encoder.close(); };
+  options.signal?.addEventListener('abort', cancelEncoder, { once: true });
   let prepared: Awaited<ReturnType<typeof prepareStage>> | undefined;
   let completed = false;
   try {
+    checkCancelled();
     encoder.configure(config);
     prepared = await prepareStage(project, slideId);
     await prepared.play();
+    checkCancelled();
     const started = performance.now();
     const durationMicros = Math.round(duration * 1_000_000);
     let scheduledSlot = 0;
@@ -317,6 +326,7 @@ async function renderSlideVideo(
 
     while (scheduledSlot < total) {
       await waitUntil(started + scheduledSlot * 1000 / fps);
+      checkCancelled();
       const elapsedMs = performance.now() - started;
       if (pending && elapsedMs >= duration * 1000) {
         onProgress?.(total, total);
@@ -341,12 +351,17 @@ async function renderSlideVideo(
     }
     if (pending) encodeCanvas(pending, durationMicros - pending.timestamp);
     await encoder.flush();
+    checkCancelled();
     if (encoderError) throw encoderError;
     muxer.finalize();
     const result = await output.complete();
     completed = true;
     return result;
+  } catch (error) {
+    checkCancelled();
+    throw error;
   } finally {
+    options.signal?.removeEventListener('abort', cancelEncoder);
     prepared?.destroy();
     if (encoder.state !== 'closed') encoder.close();
     if (!completed) await output.abort(encoderError);
@@ -357,8 +372,9 @@ export async function renderSlideAsVideoResource(
   project: ProjectDocumentV2,
   slideId: string,
   onProgress?: (frame: number, total: number) => void,
+  options: { signal?: AbortSignal } = {},
 ) {
-  return renderSlideVideo(project, slideId, true, onProgress);
+  return renderSlideVideo(project, slideId, true, onProgress, options);
 }
 
 export async function renderSlideAsVideo(

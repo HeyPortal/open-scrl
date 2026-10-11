@@ -179,7 +179,7 @@ export function buildActions(): Action[] {
     { id: 'panel-background', label: 'Open Background', group: 'Panels', keywords: 'color colour gradient', run: () => session().setLeftPanel('background') },
 
     // Export
-    { id: 'export-carousel', label: 'Export carousel', group: 'Export', keys: [{ key: 'e', mod: true, shift: true, global: true }], keywords: 'zip instagram download', enabled: () => !useExport.getState().exporting, run: () => void useExport.getState().exportCarousel() },
+    { id: 'export-carousel', label: 'Export carousel', group: 'Export', keys: [{ key: 'e', mod: true, shift: true, global: true }], keywords: 'zip instagram download jpeg png quality resolution', run: () => session().setOverlay('export') },
     { id: 'export-slide', label: 'Download slide as PNG', group: 'Export', keywords: 'image save', enabled: () => !useExport.getState().exporting, run: () => void useExport.getState().exportCurrentSlide() },
 
     // Project

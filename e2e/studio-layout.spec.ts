@@ -98,6 +98,7 @@ test.describe('Studio desktop', () => {
     await expect(page.getByRole('dialog')).toHaveCount(0);
     const download = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Export Carousel', exact: true }).click();
+    await page.getByRole('dialog', { name: 'Export', exact: true }).getByRole('button', { name: 'Export carousel', exact: true }).click();
     expect((await download).suggestedFilename()).toMatch(/\.zip$/);
     expect(errors).toEqual([]);
   });

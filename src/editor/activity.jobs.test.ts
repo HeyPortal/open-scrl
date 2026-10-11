@@ -62,3 +62,29 @@ describe('update activity across user jobs', () => {
     vi.restoreAllMocks();
   });
 });
+
+it('holds update activity until cancellation settles, suppresses success, and permits retry', async () => {
+  const work = deferred();
+  mocks.exportCarousel.mockReturnValueOnce(work.promise);
+  const exporting = useExport.getState().exportCarousel({ format: 'jpeg', pixelRatio: 2 });
+  const [, report, request] = mocks.exportCarousel.mock.calls[0];
+  expect(request).toMatchObject({ format: 'jpeg', pixelRatio: 2 });
+  report('Rendering…', .3);
+  expect(useExport.getState().fraction).toBe(.3);
+  useExport.getState().cancel();
+  expect(request.signal.aborted).toBe(true);
+  expect(useExport.getState().cancelling).toBe(true);
+  expect(editorActivity.getSnapshot()).toBe(1);
+  await useExport.getState().exportCurrentSlide();
+  expect(mocks.exportSlide).not.toHaveBeenCalled();
+  report('Too late', 1);
+  expect(useExport.getState().progress).toBe('Cancelling…');
+  work.resolve();
+  await exporting;
+  expect(useExport.getState()).toMatchObject({ outcome: 'cancelled', exporting: false, error: null });
+  expect(editorActivity.getSnapshot()).toBe(0);
+  mocks.exportCarousel.mockResolvedValueOnce(undefined);
+  await useExport.getState().exportCarousel();
+  expect(useExport.getState().outcome).toBe('complete');
+  expect(editorActivity.getSnapshot()).toBe(0);
+});

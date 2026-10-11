@@ -27,7 +27,7 @@ Document colors, presets and simulated feeds are content; changing the shell
 palette must not recolor them. Fallback project covers use brand tokens.
 
 `AppLogo` uses `public/app-icon.png`, the same artwork as the Mac app and
-GitHub README (`docs/images/logo.png`). The loading screen, favicon, Apple
+GitHub README (`docs/images/logo.png`). The favicon, Apple
 touch icon and PWA icons share it. Regenerate those PNGs from the README
 icon when the branding changes. The maskable PWA icon includes dark padding
 so the artwork fits inside the central safe circle.
@@ -39,7 +39,9 @@ opens a library card; its active button or Escape closes it. Selection opens
 Properties with Design and Layers tabs. With no selection, Layers and Slide
 design open that card. Closing Properties clears selection. The timeline
 provides slide previews, animated badges, sorting and slide actions, plus
-zoom, fit, wide view and Slide PNG export.
+zoom, fit, wide view and quick Slide PNG export. The top-bar Export button
+opens shared [export settings](web-export.md) in a desktop dialog; on phones
+they appear in a full-height sheet with a fixed action footer.
 
 Cards occupy measured flex space rather than covering the fitted canvas.
 `useStageMeasurement` observes the canvas frame; each editor mounts shared

@@ -190,17 +190,20 @@ test('caches optional export tools with query strings for later offline use', as
   await install(page);
   await createProject(page, 'Cached tools');
   const firstDownload = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Export Carousel' }).click();
+  await page.getByRole('button', { name: 'Export Carousel', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Export', exact: true }).getByRole('button', { name: 'Export carousel', exact: true }).click();
   expect((await firstDownload).suggestedFilename()).toMatch(/_instagram\.zip$/);
   const cached = await page.evaluate(async () => (await (await caches.open('optional-editor-tools')).keys()).map((request) => request.url));
   expect(cached.some((url) => /export\.worker-.*\?cache-check=1$/.test(url))).toBe(true);
   expect(cached.some((url) => /\/zip-[^/]+\.js$/.test(url))).toBe(true);
+  await page.getByRole('button', { name: 'Close Export', exact: true }).click();
   await page.getByTitle('Projects').click();
   await context.setOffline(true);
   await page.reload();
   await page.getByRole('button', { name: /Cached tools/ }).click();
   const offlineDownload = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Export Carousel' }).click();
+  await page.getByRole('button', { name: 'Export Carousel', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Export', exact: true }).getByRole('button', { name: 'Export carousel', exact: true }).click();
   expect((await offlineDownload).suggestedFilename()).toMatch(/_instagram\.zip$/);
 });
 

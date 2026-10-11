@@ -58,10 +58,7 @@ export function StudioPublish() {
     </span>
     <button className="btn btn-ghost" title="Preview on a phone" onClick={() => runStudioAction('preview')}><Smartphone size={16} aria-hidden /><span>Preview</span></button>
     <span className="studio-divider" aria-hidden />
-    <div className="studio-split">
-      <button className="btn btn-primary" aria-label="Export Carousel" disabled={exporting} onClick={() => runStudioAction('export-carousel')}><Package size={15} aria-hidden />Export</button>
-      <DropdownMenu label="Export options" title="Export options" className="icon-btn studio-split-caret" align="end" items={() => studioActionItems(['export-carousel', 'export-slide'])}><ChevronDown size={14} aria-hidden /></DropdownMenu>
-    </div>
+    <button className="btn btn-primary" aria-label="Export Carousel" aria-busy={exporting} onClick={() => runStudioAction('export-carousel')}>{exporting ? <Loader2 size={15} className="animate-spin" aria-hidden /> : <Package size={15} aria-hidden />}Export<ChevronDown size={13} aria-hidden /></button>
   </div>;
 }
 

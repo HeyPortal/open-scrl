@@ -102,13 +102,13 @@ test('slide navigation does not rescan the complete media catalog',async({page})
 });
 
 test('exports every static carousel slide as a separate PNG',async({page})=>{
-  await page.goto('/');await page.getByRole('button',{name:/create|start/i}).first().click();await page.getByTitle('Add slide').click();const download=page.waitForEvent('download');await page.getByRole('button',{name:'Export Carousel'}).click();const value=await download;expect(value.suggestedFilename()).toMatch(/_instagram\.zip$/);expect(await archiveEntries(value)).toEqual(['01.png','02.png']);
+  await page.goto('/');await page.getByRole('button',{name:/create|start/i}).first().click();await page.getByTitle('Add slide').click();const download=page.waitForEvent('download');await page.getByRole('button',{name:'Export Carousel'}).click();await page.getByRole('dialog',{name:'Export',exact:true}).getByRole('button',{name:'Export carousel',exact:true}).click();const value=await download;expect(value.suggestedFilename()).toMatch(/_instagram\.zip$/);expect(await archiveEntries(value)).toEqual(['01.png','02.png']);
 });
 
 test('exports animated carousel slides as MP4 without combining slides',async({page})=>{
   await page.goto('/');await page.getByRole('button',{name:/create|start/i}).first().click();const button=page.getByRole('button',{name:'Export Carousel'});await expect(button).toBeEnabled();
   const input=page.locator('input[type=file]');await input.setInputFiles({name:'tiny.gif',mimeType:'image/gif',buffer:tinyGif});await page.getByAltText('tiny.gif').click();await page.getByTitle('Add slide').click();
-  const download=page.waitForEvent('download',{timeout:30000}).then((value)=>({type:'download' as const,value})).catch(()=>({type:'timeout' as const}));const unsupported=page.getByText(/WebCodecs support|cannot encode an Instagram-compatible/).waitFor({state:'visible',timeout:30000}).then(()=>({type:'unsupported' as const})).catch(()=>({type:'timeout' as const}));await button.click();const outcome=await Promise.race([download,unsupported]);expect(outcome.type).not.toBe('timeout');
+  const download=page.waitForEvent('download',{timeout:30000}).then((value)=>({type:'download' as const,value})).catch(()=>({type:'timeout' as const}));const unsupported=page.getByRole('dialog',{name:'Export',exact:true}).getByRole('alert').filter({hasText:/WebCodecs support|cannot encode an Instagram-compatible/}).waitFor({state:'visible',timeout:30000}).then(()=>({type:'unsupported' as const})).catch(()=>({type:'timeout' as const}));await button.click();await page.getByRole('dialog',{name:'Export',exact:true}).getByRole('button',{name:'Export carousel',exact:true}).click();const outcome=await Promise.race([download,unsupported]);expect(outcome.type).not.toBe('timeout');
   if(outcome.type==='download'){expect(outcome.value.suggestedFilename()).toMatch(/_instagram\.zip$/);expect(await archiveEntries(outcome.value)).toEqual(['01.mp4','02.png']);}
 });
 

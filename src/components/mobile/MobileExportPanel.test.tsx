@@ -3,74 +3,97 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { newDocument, useDocumentStore } from '@/editor/documentStore';
 import { useEditorSession } from '@/editor/sessionStore';
 import { useEditorView } from '@/editor/viewStore';
-import { useExport } from '@/editor/exportStore';
-import { useToasts } from '@/store/toasts';
+import { DEFAULT_EXPORT_SETTINGS, useExport } from '@/editor/exportStore';
+import { inspectSlideVideo } from '@/export/video';
 import { MobileExportPanel } from './MobileExportPanel';
 
-// The export pipeline loads Konva's Node build; the panel only needs the store's behaviour.
 vi.mock('@/lib/export', () => ({ exportInstagramCarousel: vi.fn(), exportSlide: vi.fn() }));
-
+vi.mock('@/export/video', () => ({ inspectSlideVideo: vi.fn() }));
 const exportCarousel = vi.fn(async () => undefined);
 const exportCurrentSlide = vi.fn(async () => undefined);
+const cancel = vi.fn();
+const inspect = vi.mocked(inspectSlideVideo);
 
 beforeEach(() => {
   const doc = newDocument({ name: 'Trip', width: 1080, height: 1350 });
-  doc.format = { name: 'IG Portrait', width: 1080, height: 1350 };
   useDocumentStore.setState({ doc, past: [], future: [], transaction: null, readOnlyError: null });
   useEditorSession.getState().selectSlide(doc.slideOrder[0]);
   useEditorView.setState({ previewOpen: false });
-  useToasts.setState({ toasts: [] });
-  exportCarousel.mockClear();
-  exportCurrentSlide.mockClear();
-  useExport.setState({ exporting: false, progress: '', exportCarousel, exportCurrentSlide });
+  vi.clearAllMocks();
+  inspect.mockResolvedValue({ animated: false, duration: 3 });
+  useExport.setState({ exporting: false, cancelling: false, progress: '', fraction: null, error: null, outcome: 'idle', settings: DEFAULT_EXPORT_SETTINGS, exportCarousel, exportCurrentSlide, cancel });
 });
 afterEach(cleanup);
+const ready = async () => { await waitFor(() => expect(screen.getByRole('button', { name: 'Export carousel' })).toBeEnabled()); };
 
-describe('MobileExportPanel', () => {
-  it('summarises the project', () => {
+describe('shared web export controls in the phone sheet', () => {
+  it('passes JPEG quality and resolution into both carousel and current-slide jobs', async () => {
     render(<MobileExportPanel onDone={vi.fn()} />);
-    expect(screen.getByText('1 slide · IG Portrait · 1080×1350')).toBeInTheDocument();
+    await ready();
+    fireEvent.change(screen.getByLabelText('Image format'), { target: { value: 'jpeg' } });
+    fireEvent.change(screen.getByLabelText('Image resolution'), { target: { value: '2' } });
+    fireEvent.change(screen.getByRole('slider', { name: /JPEG quality/ }), { target: { value: '80' } });
+    expect(screen.getByText(/2160 × 2700/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Export carousel' }));
+    expect(exportCarousel).toHaveBeenCalledWith(expect.objectContaining({ format: 'jpeg', quality: .8, pixelRatio: 2, slideIndexes: [0] }));
+    fireEvent.click(screen.getByRole('radio', { name: 'This slide' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save this slide' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Save this slide' }));
+    expect(exportCurrentSlide).toHaveBeenCalledWith(expect.objectContaining({ format: 'jpeg', quality: .8, pixelRatio: 2 }));
+    expect(useDocumentStore.getState().doc.format).toMatchObject({ width: 1080, height: 1350 });
   });
 
-  it('exports the carousel and the current slide', async () => {
+  it('requires a selected slide and preserves its original index', async () => {
+    useDocumentStore.getState().addSlide();
     render(<MobileExportPanel onDone={vi.fn()} />);
-    fireEvent.click(screen.getByRole('button', { name: /export carousel/i }));
-    expect(exportCarousel).toHaveBeenCalledTimes(1);
-    fireEvent.click(screen.getByRole('button', { name: /save this slide/i }));
-    expect(exportCurrentSlide).toHaveBeenCalledTimes(1);
-    await waitFor(() => expect(useToasts.getState().toasts.map((t) => t.kind)).toEqual(['success']));
+    await ready();
+    fireEvent.click(screen.getByRole('radio', { name: 'Choose slides' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
+    expect(screen.getByRole('button', { name: 'Export selected slides' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Slide 2' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Export selected slides' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Export selected slides' }));
+    expect(exportCarousel).toHaveBeenCalledWith(expect.objectContaining({ slideIndexes: [1] }));
+  });
+
+  it('lets animations become still frames and enables image options for that output', async () => {
+    inspect.mockResolvedValue({ animated: true, duration: 3 });
+    render(<MobileExportPanel onDone={vi.fn()} />);
+    await ready();
+    expect(screen.getByLabelText('Image resolution')).toBeDisabled();
+    expect(screen.getByText('1 MP4 video · 1080 × 1350 px')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Animated slides'), { target: { value: 'still' } });
+    expect(screen.getByLabelText('Image resolution')).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Export carousel' }));
+    expect(exportCarousel).toHaveBeenCalledWith(expect.objectContaining({ animation: 'still' }));
   });
 
   it('opens the phone preview and closes the sheet', () => {
     const onDone = vi.fn();
     render(<MobileExportPanel onDone={onDone} />);
-    fireEvent.click(screen.getByRole('button', { name: /preview on phone/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Preview on phone' }));
     expect(useEditorView.getState().previewOpen).toBe(true);
-    expect(onDone).toHaveBeenCalledTimes(1);
+    expect(onDone).toHaveBeenCalledOnce();
   });
 
-  it('shows progress and locks the other actions while a carousel exports', () => {
-    useExport.setState({ exporting: true, progress: 'Slide 2/4 · image' });
+  it('keeps cancellation available while export settings are locked', () => {
+    useExport.setState({ exporting: true, progress: 'Slide 2/4 · image', fraction: .25 });
     render(<MobileExportPanel onDone={vi.fn()} />);
     expect(screen.getByRole('status')).toHaveTextContent('Slide 2/4 · image');
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '25');
-    expect(screen.getByRole('button', { name: /save this slide/i })).toBeDisabled();
-    expect(screen.getByRole('button', { name: /preview on phone/i })).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: /export carousel/i }));
-    expect(exportCarousel).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Image format')).toBeDisabled();
+    expect(screen.getByRole('radio', { name: 'This slide' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel export' }));
+    expect(cancel).toHaveBeenCalledOnce();
   });
 
-  it('locks the other actions while a single slide renders', () => {
-    useExport.setState({ exporting: true, progress: '' });
+  it('offers retry when media inspection fails', async () => {
+    inspect.mockRejectedValueOnce(new Error('Unreadable media'));
     render(<MobileExportPanel onDone={vi.fn()} />);
-    expect(screen.getByRole('button', { name: /export carousel/i })).toBeDisabled();
-    expect(screen.getByRole('button', { name: /preview on phone/i })).toBeDisabled();
-  });
-
-  it('reports a failed slide export', async () => {
-    exportCurrentSlide.mockRejectedValueOnce(new Error('Canvas too large'));
-    render(<MobileExportPanel onDone={vi.fn()} />);
-    fireEvent.click(screen.getByRole('button', { name: /save this slide/i }));
-    await waitFor(() => expect(useToasts.getState().toasts[0]).toMatchObject({ kind: 'error', message: 'Canvas too large' }));
+    await screen.findByRole('alert');
+    expect(screen.getByRole('button', { name: 'Export carousel' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry check' }));
+    await ready();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });

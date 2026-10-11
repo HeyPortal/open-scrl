@@ -734,16 +734,20 @@ test.describe('mobile editor', () => {
     expect(errors).toEqual([]);
   });
 
-  test('the Export sheet offers three options and "Export carousel" downloads a ZIP', async ({ page }) => {
+  test('the Export sheet offers output settings and downloads a ZIP', async ({ page }) => {
     const errors = trackPageErrors(page);
     await createCarousel(page);
 
-    await test.step('Export opens the sheet with its three options', async () => {
+    await test.step('Export opens the sheet with output settings', async () => {
       await page.getByRole('button', { name: 'Export', exact: true }).tap();
       const exportSheet = sheetRegion(page, 'Export');
       await expect(exportSheet).toBeVisible();
       await expect(exportSheet.getByRole('button', { name: /^Export carousel/ })).toBeVisible();
+      await expect(exportSheet.getByRole('combobox', { name: 'Image format', exact: true })).toBeVisible();
+      await expect(exportSheet.getByRole('combobox', { name: 'Image resolution', exact: true })).toBeVisible();
+      await exportSheet.getByText('This slide', { exact: true }).tap();
       await expect(exportSheet.getByRole('button', { name: /^Save this slide/ })).toBeVisible();
+      await exportSheet.getByText('All slides', { exact: true }).tap();
       await expect(exportSheet.getByRole('button', { name: /^Preview on phone/ })).toBeVisible();
     });
 

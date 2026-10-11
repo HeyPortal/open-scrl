@@ -33,7 +33,7 @@ icon with blue, teal and pink format previews and grid diagrams.
 - **Dock**: six tabs, **Photos**, **Grids**, **Text**, **Shapes**, **Canvas**, and **Layers**. Each opens a sheet. Tap the active tab again to close its sheet.
 - **Selection bar**: replaces the dock while a layer is selected. See [Selecting and editing](#selecting-and-editing).
 
-A sheet rises from the dock and the canvas shrinks to make room. The slide strip hides while a sheet is open. Sheets open at half height. Drag the handle or title bar up to expand a sheet to full height, or down to collapse it. Drag further down, or tap the X, to close it. Tapping the handle or title bar toggles between half and full height.
+A sheet rises from the dock and the canvas shrinks to make room. The slide strip hides while a sheet is open. Most sheets open at half height; Export opens at full height. Drag the handle or title bar up to expand a sheet to full height, or down to collapse it. Drag further down, or tap the X, to close it. Tapping the handle or title bar toggles between half and full height.
 
 ## Adding photos, grids, text, shapes, and backgrounds
 
@@ -89,13 +89,18 @@ The **Layers** sheet lists the current slide's layers, top layer first. Tap a ro
 
 ## Export and phone preview
 
-**Export** in the top bar opens the export sheet, which shows the slide count, format, and pixel size. Everything is rendered on the device.
+**Export** in the top bar opens the full-height export sheet. It has the same
+[export settings](./web-export.md) as desktop. Everything is rendered on the device.
 
-- **Export carousel** downloads one ZIP named after the project with `_instagram` added. It holds `01.png`, `02.png`, and so on for still slides, and `01.mp4` for any slide with a GIF or video. A progress bar shows while it works.
-- **Save this slide** downloads the selected slide as a PNG named after the project and its slide number.
-- **Preview on phone** shows the project in a phone frame, in Feed (Story for story formats) or Profile grid. Swipe to move between slides, and close the preview with its close button.
+- **All slides** downloads a ZIP; **This slide** saves one file; **Choose slides** downloads a ZIP of the checked slides, keeping their original numbers.
+- Choose **PNG** or **JPEG**, **1×** or **2×** image resolution, and JPEG quality. Animated slides can stay MP4 or become still frames; MP4 keeps the original canvas size.
+- Expand **File name** to change the download name. The summary shows the output size and name before export.
+- **Cancel export** stops a running export. Progress, completion, and errors appear in the sheet; after a failure you can retry.
+- The phone icon beside the export button opens **Preview on phone**, with Feed (Story for story formats) and Profile grid views. Swipe to move between slides.
 
-Images are exported at the canvas size (for example 1080 × 1350 for IG Portrait). Files download through the browser. Nothing is saved to Photos.
+<img src="./images/mobile-export.png" alt="The phone export sheet with slide selection, image format, and resolution controls." width="320" />
+
+Files download through the browser. Nothing is saved to Photos.
 
 ## Landscape
 

@@ -78,7 +78,7 @@ export default function MobileEditorShell() {
   }, [openSheet, hasSelection]);
 
   const open = (next: Exclude<Sheet, null>) => {
-    if (next !== sheet) setDetent('half');
+    if (next !== sheet) setDetent(next === 'export' ? 'full' : 'half');
     if (next !== 'layers') setMultiSelect(false);
     setOpenSheet(next);
   };
