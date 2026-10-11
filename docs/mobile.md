@@ -12,7 +12,7 @@ The mobile layout is used when the browser window is 767 px wide or narrower, or
 
 ## Home screen
 
-The page keeps its dark background while the app and bundled fonts get ready, without a loading splash or default browser text.
+The page shows the Open-SCRL icon and a loading indicator while the app, bundled fonts, and saved projects get ready. The indicator appears before JavaScript downloads, including on slower connections, and respects reduced-motion preferences. Opening the editor shows the same indicator with “Opening editor…” until it is ready.
 
 - **New carousel**: pick a canvas size from the cards (IG Portrait, IG Square, IG Story / Reels, IG Landscape, TikTok, or Pinterest; swipe sideways for the rest), type a name, and tap **Create carousel**. A blank name keeps the project called Untitled. Scrolling past the card shows a floating **New carousel** button above the bottom edge that scrolls back up to it; it hides while the keyboard is open.
 - **Start from a grid layout**: expand this section to choose from eight photo layouts, such as a 2 × 2 grid or a 1 + 2 layout. Tapping one creates a project in the chosen size with that grid already placed.
@@ -64,6 +64,7 @@ On the canvas, one finger selects one layer at a time. To select several, open *
 - **Tap** a layer to select it. Tap empty canvas to clear the selection and select the slide under your finger.
 - **Drag** a layer to move it, with snapping. Dragging an unselected layer selects it first.
 - **Drag** empty canvas to pan. At fit zoom, a slow swipe settles on the nearest slide, and a quick flick moves one slide.
+- **Swipe past the last slide** on empty canvas at fit zoom to add a blank slide at the end. Keep pulling until “Release to add slide” appears, then lift your finger: the carousel settles onto the new slide. A short pull returns to the last slide. Pinching, moving a selected layer, and zoomed panning do not add slides. The settling animation respects reduced-motion preferences, and **Undo** removes the added slide.
 - **Pinch** on empty canvas to zoom around your fingers. Pinching together past the fit view shows several slides side by side. Pinching back to near fit snaps to fit.
 - **Two fingers on a selected layer**: if one unlocked layer is selected and your fingers start on or just around it, pinching scales it, twisting rotates it (snapping to 45° when within 4°), and moving both fingers moves it. Releasing commits the whole change as a single undo step. Two fingers that start elsewhere zoom the canvas instead.
 - **Double-tap** a text layer to edit it in place. The box grows with the text and stays within the screen above the keyboard. Tap **Done** above it, or tap outside it, to finish.
@@ -73,9 +74,33 @@ Touch selection follows the current position, rotation, and stacking order of th
 
 The browser's own pinch-zoom is turned off on the canvas, so pinching only changes the canvas.
 
+<img src="./images/mobile-swipe-add.png" alt="Pulling past the last slide reveals a blank slide preview and a Release to add slide cue." width="320" />
+
 After an interrupted touch, you can select or move a layer again without refreshing the page. A handle resize interrupted by the browser keeps its last visible size.
 
 A pan, pinch, two-finger layer change, handle resize, layer drag, or unfinished text edit counts as work in progress: a new version of the app waits to be offered until it finishes (see [web updates](./web-updates.md)). Interrupted drags and two-finger transforms are discarded. Text typed in place is kept when you tap **Done** or elsewhere; a hardware **Escape** key, or opening another project, discards it.
+
+Swiping to add a slide keeps this update hold through the settling animation.
+
+## Haptics
+
+Mobile touch feedback uses [web-haptics](https://github.com/lochie/web-haptics).
+Turn **Haptics** on or off in the **Project** sheet; the preference stays on this
+device across projects and reloads, and turning it off stops any active feedback.
+
+- A soft tick marks layer or slide selection, opening a tool or slide menu, and changing a sheet's size.
+- A crisp tick marks a new alignment guide while moving or resizing, a 45° rotation stop during a twist, or snapping the canvas back to fit. Holding the same snap point stays quiet.
+- Swiping past the last slide gives one readiness pulse when the add threshold is reached, then a firmer confirmation when the slide is added. Short or canceled pulls do not confirm an addition.
+- Adding, duplicating, rearranging, grouping, applying grids, and replacing photos get a confirmation pulse after the change. Deleting gets a stronger pulse; Undo and Redo have their own softer pulse.
+- Export gives a start pulse, two taps when the download is ready, or three taps if it fails. Canceling an export stays quiet.
+
+Panning, scrolling, typing, continuous sliders, autosave, and disabled actions stay
+quiet. Feedback stops when the app loses focus and only runs in the mobile layout.
+The library uses Android's Vibration API and an iOS switch fallback. What you feel
+depends on the browser, device, and system haptic settings; unsupported devices
+keep the same visual feedback. Simulators cannot verify the physical feel.
+
+<img src="./images/mobile-haptics.png" alt="The Project sheet with the saved Haptics toggle enabled." width="320" />
 
 ## Slides
 

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { mobileHaptic, startMobileHaptics } from '@/lib/mobileHaptics';
 import { AlertTriangle, ChevronDown, Lock, Plus } from 'lucide-react';
 import { AppLogo } from '../AppLogo';
 import type { Format } from '@/types';
@@ -43,6 +44,7 @@ function useKeyboardOpen() {
 
 /** Mobile home screen: start a carousel and open saved projects. */
 export default function MobileHome() {
+  useEffect(startMobileHaptics, []);
   const projects = useEditor((s) => s.projects);
   const actions = useHomeActions();
   const now = useNow();
@@ -107,12 +109,12 @@ export default function MobileHome() {
           <NewCarouselCard
             ref={createCard}
             format={format}
-            onFormatChange={setFormat}
+            onFormatChange={(next) => { if (next.name !== format.name) mobileHaptic('selection'); setFormat(next); }}
             name={name}
             onNameChange={setName}
             creating={actions.creating === BLANK}
             busy={actions.busy}
-            onSubmit={() => void actions.create(format, name)}
+            onSubmit={() => { mobileHaptic('confirm'); void actions.create(format, name); }}
           />
 
           <details className="home-grid-options">
@@ -121,7 +123,7 @@ export default function MobileHome() {
               format={format}
               pendingId={actions.creating !== BLANK ? actions.creating : null}
               busy={actions.busy}
-              onPick={(template) => void actions.create(format, name, template)}
+              onPick={(template) => { mobileHaptic('confirm'); void actions.create(format, name, template); }}
             />
           </details>
 
@@ -130,7 +132,7 @@ export default function MobileHome() {
             openingId={actions.openingId}
             busy={actions.busy}
             now={now}
-            onOpen={(project) => void actions.open(project)}
+            onOpen={(project) => { mobileHaptic('selection'); void actions.open(project); }}
           />
 
           <footer className="home-phone-footer">

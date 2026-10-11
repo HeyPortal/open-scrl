@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   contentPointAt, layerTwoFinger, normalizeDegrees, originXFor, originYFor, pickSettleSlide, pinchView, pointInLayer, sampleVelocity,
-  scaleLimits, scrollForAnchor, shortestTurn, slideIndexAtCentre, slideScrollLeft, snapRotation, snapZoom, zoomLimits,
+  scaleLimits, scrollForAnchor, shortestTurn, slideAppendPull, slideIndexAtCentre, slideScrollLeft, snapRotation, snapZoom, zoomLimits,
   type LayerFrame, type Point, type ViewGeometry,
 } from './touchMath';
 
@@ -216,5 +216,24 @@ describe('slide settling', () => {
     expect(sampleVelocity(samples, 500, 100)).toBeCloseTo(-0.3, 6);
     expect(sampleVelocity(samples, 5000, 100)).toBe(0);
     expect(sampleVelocity([], 0)).toBe(0);
+  });
+});
+
+describe('pulling to append a slide', () => {
+  it('requires a deliberate pull across portrait and landscape slide sizes', () => {
+    for (const pixels of [100, 240, 360, 800]) {
+      expect(slideAppendPull(55, pixels).ready).toBe(false);
+      expect(slideAppendPull(96, pixels).ready).toBe(true);
+    }
+    expect(slideAppendPull(89, 360).ready).toBe(false);
+    expect(slideAppendPull(90, 360).ready).toBe(true);
+  });
+
+  it('resists the pull, stays bounded, and reverses smoothly to zero', () => {
+    expect(slideAppendPull(-20, 360)).toEqual({ distance: 0, ready: false });
+    const distances = [0, 40, 80, 160, 10000].map((travel) => slideAppendPull(travel, 360).distance);
+    for (let index = 1; index < distances.length; index++) expect(distances[index]).toBeGreaterThan(distances[index - 1]);
+    expect(distances[2]).toBeLessThan(80);
+    expect(distances.at(-1)).toBeLessThanOrEqual(360 * .65);
   });
 });

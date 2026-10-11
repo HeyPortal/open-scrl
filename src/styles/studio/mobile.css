@@ -30,6 +30,25 @@
 .studio-mobile-shell :is(button, [role='tab']):focus-visible { outline: 2px solid rgb(var(--c-accent)); outline-offset: 2px; }
 .studio-mobile-shell .mobile-dock [role='tab']:not([aria-selected='true']):active > span[aria-hidden] { opacity: 1; background: rgb(var(--c-bg-hover) / .7); }
 .studio-mobile-shell .mobile-strip { margin-top: 8px; }
+/* A blank page peeks in as the carousel is pulled past its last slide. */
+.mobile-slide-append-preview {
+  position: absolute; pointer-events: none; box-sizing: border-box;
+  background: #fff; border: 2px dashed rgb(var(--c-accent));
+}
+.mobile-slide-append-preview > span {
+  position: absolute; top: 50%; transform: translate(-50%, -50%);
+  display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%;
+  color: rgb(var(--c-accent-ink)); background: rgb(var(--c-accent) / .3);
+}
+.mobile-slide-append-hint {
+  position: absolute; inset: auto 12px 48px; pointer-events: none;
+  display: flex; justify-content: center;
+}
+.mobile-slide-append-hint > span {
+  padding: 8px 12px; border: 1px solid rgb(var(--c-accent) / .3); border-radius: 999px;
+  background: rgb(var(--c-bg-panel)); color: rgb(var(--c-ink)); font-size: 13px; line-height: 1.4;
+  box-shadow: var(--shadow-soft);
+}
 /* Thumbnails fade out under the island edges when the strip scrolls. */
 .studio-mobile-shell .mobile-strip > .no-scrollbar {
   -webkit-mask-image: linear-gradient(90deg, transparent, #000 10px, #000 calc(100% - 10px), transparent);

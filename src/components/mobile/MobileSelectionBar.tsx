@@ -23,17 +23,9 @@ import { buildActions } from '@/app/actions';
 import { useContextMenu, type MenuEntry } from '@/components/Menu';
 import { selectionSlideId, selectionUnits } from '@/core/document/selectors';
 import type { Layer, ProjectDocumentV2 } from '@/types';
+import { mobileHaptic } from '@/lib/mobileHaptics';
 
 type Icon = ComponentType<{ size?: number; strokeWidth?: number; 'aria-hidden'?: boolean }>;
-
-/** Light tap feedback where the browser supports it (Android Chrome; iOS Safari ignores it). */
-function haptic() {
-  try {
-    navigator.vibrate?.(8);
-  } catch {
-    // Some browsers throw when vibration is blocked; the tap still works.
-  }
-}
 
 /** Names the selection for the chip at the left of the bar: "Photo", "Text", "Shape", "Group", "3 layers". */
 function describeSelection(doc: ProjectDocumentV2, layers: Layer[], ids: string[]): { label: string; Icon: Icon } {
@@ -72,7 +64,6 @@ function BarButton({ Icon, label, onClick, disabled, tone = 'default', ariaLabel
       aria-expanded={expanded}
       className={`mobile-selbar-btn flex h-14 min-w-0 flex-1 touch-manipulation select-none flex-col items-center justify-center gap-1 rounded-xl px-0.5 text-[11px] font-medium leading-none transition-colors duration-150 active:bg-bg-hover disabled:pointer-events-none disabled:opacity-35 ${expanded ? 'bg-bg-hover text-ink' : color}`}
       onClick={(event) => {
-        haptic();
         onClick(event.currentTarget);
       }}
     >
@@ -121,7 +112,6 @@ export function MobileSelectionBar({ onEdit, onReplacePhoto }: { onEdit: () => v
     icon: <Icon size={16} strokeWidth={1.8} aria-hidden />,
     disabled: !can(id) || extra.disabled,
     onSelect: () => {
-      haptic();
       run(id);
     },
   });
@@ -138,6 +128,7 @@ export function MobileSelectionBar({ onEdit, onReplacePhoto }: { onEdit: () => v
     entry(allLocked ? 'Unlock' : 'Lock', allLocked ? LockOpen : Lock, 'toggle-lock'),
   ];
   const toggleMore = (button: HTMLElement) => {
+    mobileHaptic('selection');
     const menu = useContextMenu.getState();
     if (moreOpen) return menu.close();
     const rect = button.getBoundingClientRect();
@@ -179,7 +170,7 @@ export function MobileSelectionBar({ onEdit, onReplacePhoto }: { onEdit: () => v
             type="button"
             className="h-10 touch-manipulation select-none rounded-full bg-accent px-4 text-[15px] font-semibold text-accent-ink transition-colors duration-150 active:bg-accent-hover"
             onClick={() => {
-              haptic();
+              mobileHaptic('selection');
               useEditorSession.getState().selectLayer(null);
             }}
           >

@@ -3,11 +3,12 @@ import Konva from 'konva';
 import { useEditor } from '@/store/editor';
 import { useEditorSession } from '@/editor/sessionStore';
 import { editorActivity } from '@/editor/activity';
+import { createSnapFeedback, mobileHaptic } from '@/lib/mobileHaptics';
 import { findLayerSlideId } from '@/core/document/selectors';
 import { createMobileHitTest } from './mobileHitTest';
 import {
   angleBetween, clamp, contentPointAt, distance, easeOutCubic, layerTwoFinger, midpoint, pickSettleSlide, pinchView, pointInLayer,
-  sampleVelocity, scaleLimits, shortestTurn, slideIndexAtCentre, slideScrollLeft, snapZoom,
+  sampleVelocity, scaleLimits, shortestTurn, slideAppendPull, slideIndexAtCentre, slideScrollLeft, snapZoom,
   type LayerFrame, type LayerPinch, type PinchStart, type Point, type Sample, type Scroll, type ViewGeometry,
 } from './touchMath';
 
@@ -22,6 +23,7 @@ const TOUCH_ECHO_MS = 700;
 const LAYER_MARGIN_PX = 28;
 const MIN_LAYER_SIZE = 8;
 const SETTLE_MS = 220;
+const APPEND_SETTLE_MS = 360;
 
 /** What the canvas shows right now, read on every gesture event. */
 export interface GestureView {
@@ -33,6 +35,7 @@ export interface GestureView {
   limits: { min: number; max: number };
   slideWidth: number;
   slideOrder: string[];
+  canAppendSlide: boolean;
 }
 
 /** The canvas side of the gestures: it owns zoom, scroll and the Konva nodes. */
@@ -51,6 +54,10 @@ export interface GestureHost {
   pageX(slideId: string): number;
   /** Marks the layer drag in progress as cancelled, so its end discards the move instead of committing it. */
   cancelDrag(): void;
+  /** Preview a blank slide past the end without changing the document. */
+  previewNextSlide(distance: number, ready: boolean): void;
+  /** Appends one slide while preserving the preview's viewport position. */
+  appendSlide(scrollLeft: number): string | null;
 }
 
 type Mode = 'idle' | 'konva' | 'candidate' | 'pan' | 'pinch' | 'xform' | 'ignore' | 'dead';
@@ -121,6 +128,12 @@ export function useTouchGestures(
     let transform: TransformSession | null = null;
     let lastTap: { t: number; x: number; y: number } | null = null;
     let tween = 0;
+    let releaseTweenActivity: (() => void) | null = null;
+    let pull = 0;
+    let pullReady = false;
+    let appendArmed = false;
+    const rotationFeedback = createSnapFeedback();
+    let appendStart: { projectId: string; lastId: string; count: number; zoom: number; width: number; height: number } | null = null;
     // Unfinished canvas work holds back a waiting app update, like the desktop gestures do. It is
     // taken once a touch the canvas itself handles begins and released when every finger is up,
     // the touch is cancelled, or the gestures are torn down. A layer drag or handle resize that
@@ -141,25 +154,39 @@ export function useTouchGestures(
     const prevent = (e: Event) => { if (e.cancelable) e.preventDefault(); };
     const swallow = (e: Event) => { e.stopPropagation(); prevent(e); };
 
-    const stopTween = () => { if (tween) cancelAnimationFrame(tween); tween = 0; };
-    const tweenScroll = (to: number, done: () => void) => {
-      const el = scrollRef.current;
+    const clearPull = () => { pull = 0; pullReady = false; hostRef.current?.previewNextSlide(0, false); };
+    const stopTween = () => {
+      if (tween) cancelAnimationFrame(tween);
+      tween = 0;
+      clearPull();
+      releaseTweenActivity?.(); releaseTweenActivity = null;
+    };
+    const animate = (from: number, to: number, apply: (value: number) => void, done: () => void, duration: number, holdActivity = false, valid = () => true) => {
       stopTween();
-      if (!el) return;
-      const from = el.scrollLeft;
+      if (holdActivity) releaseTweenActivity = editorActivity.begin();
+      const finish = () => {
+        tween = 0;
+        try { done(); } finally { releaseTweenActivity?.(); releaseTweenActivity = null; }
+      };
       if (Math.abs(to - from) < 1 || prefersReducedMotion()) {
-        if (Math.abs(to - from) >= 1) host().scrollTo(to, el.scrollTop);
-        done();
+        apply(to);
+        finish();
         return;
       }
+      apply(from);
       const t0 = performance.now();
       const step = (now: number) => {
-        const k = (now - t0) / SETTLE_MS;
-        host().scrollTo(from + (to - from) * easeOutCubic(k), el.scrollTop);
+        if (!valid()) { stopTween(); return; }
+        const k = (now - t0) / duration;
+        apply(from + (to - from) * easeOutCubic(k));
         if (k < 1) tween = requestAnimationFrame(step);
-        else { tween = 0; done(); }
+        else finish();
       };
       tween = requestAnimationFrame(step);
+    };
+    const tweenScroll = (to: number, done: () => void) => {
+      const el = scrollRef.current;
+      if (el) animate(el.scrollLeft, to, (left) => host().scrollTo(left, el.scrollTop), done, SETTLE_MS);
     };
 
     // ---- panning ---------------------------------------------------------------------
@@ -176,6 +203,17 @@ export function useTouchGestures(
         index: slideIndexAtCentre(v.geometry, v.zoom, el.scrollLeft, v.slideWidth, v.slideOrder.length),
       };
       samples = [{ t: begin.t, x: p.x }];
+      appendArmed = false;
+      appendStart = !alreadyMoved && tapEmpty && v.canAppendSlide && !host().isCustomZoom() && begin.index === v.slideOrder.length - 1 && !useEditorSession.getState().selectedLayerIds.length
+        ? { projectId: useEditor.getState().doc.id, lastId: v.slideOrder.at(-1)!, count: v.slideOrder.length, zoom: v.zoom, width: v.geometry.width, height: v.geometry.height }
+        : null;
+    };
+
+    const canAppend = () => {
+      const v = host().view();
+      return appendStart && v.canAppendSlide && !host().isCustomZoom() && !useEditorSession.getState().selectedLayerIds.length
+        && useEditor.getState().doc.id === appendStart.projectId && v.slideOrder.at(-1) === appendStart.lastId && v.slideOrder.length === appendStart.count
+        && v.zoom === appendStart.zoom && v.geometry.width === appendStart.width && v.geometry.height === appendStart.height;
     };
 
     const panMove = (e: TouchEvent) => {
@@ -188,9 +226,42 @@ export function useTouchGestures(
         mode = 'pan';
       }
       prevent(e);
-      host().scrollTo(begin.scroll.left - (p.x - begin.x), begin.scroll.top - (p.y - begin.y));
+      const dx = p.x - begin.x, dy = p.y - begin.y;
+      const v = host().view();
+      const lastLeft = slideScrollLeft(v.geometry, v.zoom, v.slideOrder.length - 1, v.slideWidth);
+      const left = begin.scroll.left - dx;
+      if (canAppend() && dx < -SLOP && Math.abs(dx) > Math.abs(dy) * 1.4 && left > lastLeft) {
+        const next = slideAppendPull(left - lastLeft, v.slideWidth * v.zoom);
+        if (next.ready && !appendArmed) { appendArmed = true; mobileHaptic('ready'); }
+        pull = next.distance; pullReady = next.ready;
+        host().scrollTo(lastLeft, begin.scroll.top);
+        host().previewNextSlide(pull, pullReady);
+      } else {
+        clearPull();
+        host().scrollTo(left, begin.scroll.top - dy);
+      }
       samples.push({ t: performance.now(), x: p.x });
       if (samples.length > 12) samples.shift();
+    };
+
+    const finishPull = (cancelled: boolean) => {
+      if (pull <= 0) return false;
+      const el = scrollRef.current;
+      if (!el) { clearPull(); return true; }
+      const from = pull;
+      if (!cancelled && pullReady && canAppend()) {
+        const slideId = host().appendSlide(el.scrollLeft + from);
+        clearPull();
+        if (slideId) {
+          const v = host().view();
+          const target = slideScrollLeft(v.geometry, v.zoom, v.slideOrder.indexOf(slideId), v.slideWidth);
+          animate(el.scrollLeft, target, (left) => host().scrollTo(left, el.scrollTop), () => host().selectSlideQuiet(slideId), APPEND_SETTLE_MS, true,
+            () => useEditor.getState().doc.id === appendStart?.projectId && host().view().slideOrder.at(-1) === slideId && host().view().zoom === v.zoom);
+        }
+      } else {
+        animate(from, 0, (distance) => host().previewNextSlide(distance, false), clearPull, SETTLE_MS, true);
+      }
+      return true;
     };
 
     /**
@@ -209,7 +280,7 @@ export function useTouchGestures(
       const centre = slideIndexAtCentre(v.geometry, v.zoom, el.scrollLeft, v.slideWidth, count);
       if (h.isCustomZoom()) {
         if (!pinned && v.slideOrder[centre] && v.slideOrder[centre] !== selected) h.selectSlideQuiet(v.slideOrder[centre]);
-        if (snapZoom(v.zoom, v.fitZoom) === v.fitZoom) h.resetZoom();
+        if (snapZoom(v.zoom, v.fitZoom) === v.fitZoom) { mobileHaptic('snap'); h.resetZoom(); }
         return;
       }
       if (pinned) return;
@@ -224,7 +295,7 @@ export function useTouchGestures(
       const double = !!lastTap && now - lastTap.t < DOUBLE_TAP_MS && Math.hypot(x - lastTap.x, y - lastTap.y) < DOUBLE_TAP_DISTANCE;
       lastTap = double ? null : { t: now, x, y };
       const h = host();
-      if (double && h.isCustomZoom()) { h.resetZoom(); return; }
+      if (double && h.isCustomZoom()) { mobileHaptic('confirm'); h.resetZoom(); return; }
       const v = h.view();
       const index = clamp(Math.floor((x - v.offset.x) / v.zoom / v.slideWidth), 0, v.slideOrder.length - 1);
       const slideId = v.slideOrder[index];
@@ -276,6 +347,8 @@ export function useTouchGestures(
         limits: scaleLimits(frame, MIN_LAYER_SIZE, Math.max(v.geometry.deckWidth, v.geometry.slideHeight) * 2),
       };
       mode = 'xform';
+      const initialStop = Math.round(frame.rotation / 45) * 45;
+      rotationFeedback.reset(Math.abs(frame.rotation - initialStop) <= 4 ? [`rotation:${initialStop}`] : []);
       ids = [a.identifier, b.identifier];
       return true;
     };
@@ -292,6 +365,10 @@ export function useTouchGestures(
       s.turn += shortestTurn(s.prevAngle, angle);
       s.prevAngle = angle;
       const result = layerTwoFinger(s.frame, s.start, current, s.turn, s.limits);
+      const rawRotation = s.frame.rotation + s.turn * 180 / Math.PI;
+      const snappedAngle = Math.round(rawRotation / 45) * 45;
+      // The initial angle alone is not a new snap; tick as a twist enters a 45° stop.
+      rotationFeedback.update(Math.abs(rawRotation - snappedAngle) <= 4 ? [`rotation:${snappedAngle}`] : []);
       s.latest = result;
       // Preview on the node alone (like the Transformer); the document changes once, on release.
       s.node.setAttrs({ x: result.cx - s.page, y: result.cy, rotation: result.rotation, scaleX: result.scale, scaleY: result.scale });
@@ -301,6 +378,7 @@ export function useTouchGestures(
     const finishTransform = (commit: boolean) => {
       const s = transform;
       transform = null;
+      rotationFeedback.reset();
       if (!s) return;
       const result = s.latest;
       const layer = useEditor.getState().doc.layers[s.id];
@@ -323,6 +401,8 @@ export function useTouchGestures(
     const reset = () => {
       if (transform) finishTransform(false);
       pinch = null;
+      appendStart = null;
+      clearPull();
       mode = 'idle';
       release();
     };
@@ -377,6 +457,8 @@ export function useTouchGestures(
       }
       // Konva never sees additional fingers: it would select whatever they land on.
       swallow(e);
+      appendStart = null;
+      clearPull();
       if (mode === 'pinch' || mode === 'xform' || mode === 'dead' || mode === 'ignore') return;
       if (stage.find<Konva.Transformer>('Transformer').some((t) => t.isTransforming())) { mode = 'ignore'; return; }
       cancelKonvaDrags();
@@ -410,7 +492,7 @@ export function useTouchGestures(
         e.stopPropagation(); // not a tap on a locked layer
         if (remaining > 0) return;
         mode = 'idle';
-        if (!cancelled) settle(sampleVelocity(samples, performance.now()));
+        if (!finishPull(cancelled) && !cancelled) settle(sampleVelocity(samples, performance.now()));
       } else if (mode === 'pinch') {
         e.stopPropagation();
         if (remaining >= 2) beginPinch(e.touches[0], e.touches[1]);

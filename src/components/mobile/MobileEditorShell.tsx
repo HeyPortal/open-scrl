@@ -20,6 +20,8 @@ import { MobileSelectionBar } from './MobileSelectionBar';
 import { MobileSlideStrip } from './MobileSlideStrip';
 import { MobileTopBar } from './MobileTopBar';
 import './mobile.css';
+import { mobileHaptic } from '@/lib/mobileHaptics';
+import { useMobileHaptics } from './useMobileHaptics';
 
 type Sheet = null | 'photos' | 'grids' | 'text' | 'shapes' | 'canvas' | 'layers' | 'inspect' | 'export' | 'project';
 
@@ -62,6 +64,7 @@ function SlideCounter() {
 
 /** Mobile editor: top bar, canvas, slide strip, tool dock and bottom sheets. */
 export default function MobileEditorShell() {
+  useMobileHaptics();
   const dragHandlers = useEditorShellEvents();
   const selectedIds = useEditorSession((s) => s.selectedLayerIds);
   const hasSelection = selectedIds.length > 0;
@@ -78,11 +81,13 @@ export default function MobileEditorShell() {
   }, [openSheet, hasSelection]);
 
   const open = (next: Exclude<Sheet, null>) => {
+    if (next !== sheet) mobileHaptic('selection');
     if (next !== sheet) setDetent(next === 'export' ? 'full' : 'half');
     if (next !== 'layers') setMultiSelect(false);
     setOpenSheet(next);
   };
   const close = () => {
+    if (sheet) mobileHaptic('selection');
     setMultiSelect(false);
     setOpenSheet(null);
   };
@@ -111,7 +116,7 @@ export default function MobileEditorShell() {
       type="button"
       aria-pressed={multiSelect}
       onPointerDown={(e) => e.stopPropagation()}
-      onClick={() => setMultiSelect((on) => !on)}
+      onClick={() => { mobileHaptic('selection'); setMultiSelect((on) => !on); }}
       className={`sheet-action relative flex h-9 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium transition-colors ${
         multiSelect ? 'bg-accent text-accent-ink' : 'bg-bg-inset text-ink-dim active:bg-bg-hover'
       }`}
@@ -139,7 +144,7 @@ export default function MobileEditorShell() {
 
         {sheet && (
           <div className="mobile-sheet-slot">
-            <BottomSheet title={title} detent={detent} onDetentChange={setDetent} onClose={close} headerAction={layersAction}>
+            <BottomSheet title={title} detent={detent} onDetentChange={(next) => { if (next !== detent) mobileHaptic('selection'); setDetent(next); }} onClose={close} headerAction={layersAction}>
               {body}
             </BottomSheet>
           </div>
