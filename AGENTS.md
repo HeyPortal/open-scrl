@@ -11,7 +11,7 @@ Bun 1.4+ is the package manager and script runner (`bun.lock`; don't add a `pack
 ```bash
 bun install                # --frozen-lockfile in CI
 bun run dev                # Vite dev server on :5173
-bun run verify             # typecheck + lint + vitest + build + bundle:check (what CI runs first)
+bun run verify             # typecheck + lint + vitest + build + bundle:check
 bun run test               # vitest run (jsdom; setup in src/test/setup.ts)
 bunx vitest run src/core/scene/compileScene.test.ts   # single test file
 bunx vitest run -t "name"  # single test by name
@@ -21,8 +21,8 @@ bunx playwright test e2e/smoke.spec.ts
 ```
 
 - Use `bun run test`, never bare `bun test`: the latter starts Bun's own test runner, which doesn't load the Vitest config, jsdom environment or setup file.
-- `verify` does **not** run the Playwright tests; CI runs `verify`, `test:e2e`, then `test:pwa`. Run `bunx playwright install --with-deps chromium` once first.
-- CI repeats `test:pwa` with `SCRL_BASE_PATH=/open-scrl/`, then publishes GitHub Pages only after verification on `main`. `SCRL_BASE_PATH` sets the Vite base and PWA launch URL/scope; leave it unset for root hosting. See `docs/hosting.md`. Root and Pages PWA builds both write `dist/`, so run them sequentially.
+- `verify` does **not** run the Playwright tests; CI runs it alongside two editor shards (`test:e2e --fully-parallel --shard=1/2` and `--shard=2/2`) and separate root/Pages PWA jobs. Each editor runner keeps two workers; each PWA runner keeps one. The final `verify` job gates all results. Run `bunx playwright install --with-deps chromium` once first.
+- CI runs the full `test:pwa` suite with both `/` and `SCRL_BASE_PATH=/open-scrl/`, then publishes GitHub Pages only after all verification succeeds on `main`. `SCRL_BASE_PATH` sets the Vite base and PWA launch URL/scope; leave it unset for root hosting. See `docs/hosting.md`. Root and Pages PWA builds both write `dist/`, so run them sequentially within one checkout; CI uses separate runners.
 - Browser specs import `test` and `expect` from `e2e/fixtures/test.ts`; its automatic fixture checks uncaught errors across all tabs. Browser specs and both Playwright configs are included in `typecheck`. Keep layout assertions retryable through transitions; animation tests should sample controlled progress instead of counting rendered frames. See `docs/testing.md` for focused runs and Bun trace commands.
 - `bundle:check` fails if the initial entry chunk exceeds 120 KiB gzip, so heavy deps must stay in lazy chunks/workers (see `src/app/` lazy boundaries).
 

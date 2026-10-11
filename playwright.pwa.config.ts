@@ -13,8 +13,9 @@ export default defineConfig({
   retries: 0,
   outputDir: `./test-results/${suite}`,
   reporter: [
-    [process.env.CI ? 'dot' : 'list'],
+    ['list'],
     ['html', { outputFolder: `playwright-report/${suite}`, open: 'never' }],
+    ['json', { outputFile: `playwright-report/${suite}/results.json` }],
   ],
   timeout: 45_000,
   webServer: {

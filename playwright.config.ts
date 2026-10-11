@@ -18,8 +18,9 @@ export default defineConfig({
   retries: 0,
   outputDir: './test-results/e2e',
   reporter: [
-    [process.env.CI ? 'dot' : 'list'],
+    ['list'],
     ['html', { outputFolder: 'playwright-report/e2e', open: 'never' }],
+    ['json', { outputFile: 'playwright-report/e2e/results.json' }],
   ],
   webServer: {
     command: `bun run dev --host 127.0.0.1 --port ${port} --strictPort`,
