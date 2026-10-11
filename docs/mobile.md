@@ -92,6 +92,7 @@ The **Layers** sheet lists the current slide's layers, top layer first. Tap a ro
 **Export** in the top bar opens the full-height export sheet. It has the same
 [export settings](./web-export.md) as desktop. Everything is rendered on the device.
 
+- A small slide preview above the settings follows the export selection; use its arrows to browse the included slides.
 - **All slides** downloads a ZIP; **This slide** saves one file; **Choose slides** downloads a ZIP of the checked slides, keeping their original numbers.
 - Choose **PNG** or **JPEG**, **1×** or **2×** image resolution, and JPEG quality. Animated slides can stay MP4 or become still frames; MP4 keeps the original canvas size.
 - Expand **File name** to change the download name. The summary shows the output size and name before export.

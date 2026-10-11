@@ -22,6 +22,11 @@ share the same settings. All rendering and packaging happen on your device.
   `<name>_instagram.zip`; individual files use `<name>_01.png`, `.jpg`, or
   `.mp4`. Spaces and punctuation become underscores.
 
+A small slide preview appears above the settings. Use its arrows to browse
+the slides included in the export, without changing the editor selection.
+PNG previews show transparency as a checkerboard; JPEG previews use white.
+Animations show a still preview.
+
 The summary shows file count, dimensions, and the download name. Image
 format, quality, resolution, and animation preferences last for the current
 app session. The timeline's **Slide PNG** button remains a quick PNG export

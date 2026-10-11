@@ -176,3 +176,55 @@ for (const viewport of [{ width: 320, height: 568 }, { width: 844, height: 390 }
     });
   });
 }
+
+for (const mobile of [false, true]) {
+  test.describe(`${mobile ? 'phone' : 'desktop'} export preview`, () => {
+    test.use(mobile ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } : { viewport: { width: 1280, height: 800 } });
+    test('renders selected slides and browses without changing the editor or document', async ({ page }) => {
+      await create(page, mobile);
+      const original = await page.evaluate(async () => {
+        const path = '/src/editor/documentStore.ts';
+        const { useDocumentStore } = await import(path) as typeof import('../src/editor/documentStore');
+        const store = () => useDocumentStore.getState();
+        store().setBackground({ kind: 'solid', color: '#ff0000' });
+        store().addSlide();
+        store().setBackground({ kind: 'solid', color: '#0000ff' });
+        store().addSlide();
+        store().setBackground({ kind: 'solid', color: '#00ff00' });
+        store().selectSlide(store().doc.slideOrder[1]);
+        return { doc: JSON.stringify(store().doc), selected: store().selectedSlideId };
+      });
+      if (mobile) await page.getByRole('button', { name: 'Export', exact: true }).tap();
+      else await open(page);
+      const surface = mobile ? page.getByRole('region', { name: 'Export', exact: true }) : page.getByRole('dialog', { name: 'Export', exact: true });
+      const preview = surface.locator('.export-slide-artwork canvas');
+      const pixel = () => preview.evaluate((element) => {
+        const canvas = element as HTMLCanvasElement;
+        return [...canvas.getContext('2d')!.getImageData(Math.floor(canvas.width / 2), Math.floor(canvas.height / 2), 1, 1).data];
+      });
+      await expect(surface.getByRole('img', { name: 'Slide 2 preview' })).toBeVisible();
+      await expect.poll(pixel).toEqual([0, 0, 255, 255]);
+      await surface.getByRole('button', { name: 'Next slide preview' }).click();
+      await expect(surface.getByRole('img', { name: 'Slide 3 preview' })).toBeVisible();
+      await expect.poll(pixel).toEqual([0, 255, 0, 255]);
+      await expect(surface.getByRole('button', { name: 'Next slide preview' })).toBeDisabled();
+      await surface.getByText('Choose slides', { exact: true }).click();
+      await surface.getByRole('button', { name: 'Clear', exact: true }).click();
+      await expect(preview).toHaveCount(0);
+      await surface.getByLabel('Slide 1', { exact: true }).check();
+      await surface.getByLabel('Slide 3', { exact: true }).check();
+      await surface.getByRole('button', { name: 'Previous slide preview' }).click();
+      await expect.poll(pixel).toEqual([255, 0, 0, 255]);
+      await surface.getByText('This slide', { exact: true }).click();
+      await expect(surface.getByRole('img', { name: 'Slide 2 preview' })).toBeVisible();
+      await expect.poll(pixel).toEqual([0, 0, 255, 255]);
+      await expect(surface.getByRole('button', { name: 'Next slide preview' })).toHaveCount(0);
+      const after = await page.evaluate(async () => {
+        const path = '/src/editor/documentStore.ts';
+        const { useDocumentStore } = await import(path) as typeof import('../src/editor/documentStore');
+        return { doc: JSON.stringify(useDocumentStore.getState().doc), selected: useDocumentStore.getState().selectedSlideId };
+      });
+      expect(after).toEqual(original);
+    });
+  });
+}

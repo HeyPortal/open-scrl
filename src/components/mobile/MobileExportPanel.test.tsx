@@ -8,6 +8,8 @@ import { inspectSlideVideo } from '@/export/video';
 import { MobileExportPanel } from './MobileExportPanel';
 
 vi.mock('@/lib/export', () => ({ exportInstagramCarousel: vi.fn(), exportSlide: vi.fn() }));
+// Actual canvas pixels and preview navigation are covered in e2e/export.spec.ts.
+vi.mock('@/components/SlidePreviewCanvas', () => ({ SlidePreviewCanvas: () => null }));
 vi.mock('@/export/video', () => ({ inspectSlideVideo: vi.fn() }));
 const exportCarousel = vi.fn(async () => undefined);
 const exportCurrentSlide = vi.fn(async () => undefined);

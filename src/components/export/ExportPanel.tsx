@@ -5,6 +5,7 @@ import { useEditorSession } from '@/editor/sessionStore';
 import { useEditorView } from '@/editor/viewStore';
 import { useExport } from '@/editor/exportStore';
 import { inspectSlideVideo } from '@/export/video';
+import { ExportSlidePreview } from './ExportSlidePreview';
 import './export.css';
 
 type Scope = 'all' | 'current' | 'chosen';
@@ -69,7 +70,7 @@ export function ExportPanel({ onDone }: { onDone: () => void }) {
 
   return <form className="export-panel" onSubmit={(event) => void submit(event)}>
     <div className="export-fields scrollbar-thin">
-      <p className="export-project">{doc.name || 'Untitled'} <span>{doc.slideOrder.length} {doc.slideOrder.length === 1 ? 'slide' : 'slides'}</span></p>
+      <ExportSlidePreview doc={doc} indexes={indexes} current={current} format={settings.format} />
       <fieldset disabled={state.exporting} className="export-scope">
         <legend>Slides</legend>
         <div className="export-segments">
