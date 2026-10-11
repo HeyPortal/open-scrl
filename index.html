@@ -8,14 +8,16 @@
     <meta name="theme-color" content="#0a0a0c" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <title>Open-SCRL — Photo Grid &amp; Carousel Maker</title>
+    <style>
+      /* Paint the app's background before JavaScript, styles or fonts arrive. */
+      html { background: #0a0a0c; color-scheme: dark; }
+      html, body, #root { width: 100%; height: 100%; margin: 0; }
+      .startup-placeholder { width: 100%; height: 100%; background: #0a0a0c; }
+    </style>
   </head>
   <body>
     <div id="root">
-      <div role="status" aria-label="Loading Open-SCRL" class="flex h-full w-full flex-col items-center justify-center gap-4 text-ink-dim">
-        <img src="/app-icon.png" width="48" height="48" alt="" aria-hidden="true" />
-        <p class="app-wordmark text-[26px] -mt-1 text-ink">Open-SCRL</p>
-        <span class="text-sm">Loading…</span>
-      </div>
+      <div role="status" aria-label="Loading Open-SCRL" class="startup-placeholder"></div>
     </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

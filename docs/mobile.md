@@ -12,7 +12,7 @@ The mobile layout is used when the browser window is 767 px wide or narrower, or
 
 ## Home screen
 
-An Open-SCRL loading screen appears while the app and its bundled fonts get ready, including on a slower first visit.
+The page keeps its dark background while the app and bundled fonts get ready, without a loading splash or default browser text.
 
 - **New carousel**: pick a canvas size from the cards (IG Portrait, IG Square, IG Story / Reels, IG Landscape, TikTok, or Pinterest; swipe sideways for the rest), type a name, and tap **Create carousel**. A blank name keeps the project called Untitled. Scrolling past the card shows a floating **New carousel** button above the bottom edge that scrolls back up to it; it hides while the keyboard is open.
 - **Start from a grid**: expand this section to choose from eight photo layouts, such as a 2 × 2 grid or a 1 + 2 layout. Tapping one creates a project in the chosen size with that grid already placed.

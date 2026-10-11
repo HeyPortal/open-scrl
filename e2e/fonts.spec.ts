@@ -4,6 +4,31 @@ for (const mobile of [false, true]) {
   test.describe(mobile ? 'mobile fonts' : 'desktop fonts', () => {
     test.use({ viewport: mobile ? { width: 393, height: 852 } : { width: 1280, height: 800 } });
 
+    test('paints a dark page without visible loading text before the app downloads', async ({ page }) => {
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => { release = resolve; });
+      let requested!: () => void;
+      const entryRequested = new Promise<void>((resolve) => { requested = resolve; });
+      await page.route('**/src/main.tsx', async (route) => {
+        requested();
+        await gate;
+        await route.continue();
+      });
+      await page.goto('/', { waitUntil: 'commit' });
+      await entryRequested;
+      try {
+        await expect(page.locator('html')).toHaveCSS('background-color', 'rgb(10, 10, 12)');
+        await expect(page.locator('body')).toHaveCSS('margin', '0px');
+        const startup = page.getByRole('status', { name: 'Loading Open-SCRL', exact: true });
+        await expect(startup).toBeVisible();
+        await expect(startup).toHaveText('');
+        await expect(page.locator('#root')).toHaveCSS('height', `${page.viewportSize()!.height}px`);
+      } finally {
+        release();
+      }
+      await expect(page.getByRole('button', { name: mobile ? 'Create carousel' : 'Create & open editor', exact: true })).toBeVisible();
+    });
+
     test('UI waits for document Inter and uses Onest while the font selector keeps the document face', async ({ page }) => {
       let release!: () => void;
       const fontGate = new Promise<void>((resolve) => { release = resolve; });
