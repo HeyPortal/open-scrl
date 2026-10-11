@@ -1,11 +1,11 @@
-import { useEffect, useId, useMemo, useState, type FormEvent } from 'react';
-import { Check, Download, Loader2, Package, Smartphone } from 'lucide-react';
+import { useEffect, useId, useMemo, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
+import { Check, Download, FileImage, Loader2, Package, Smartphone } from 'lucide-react';
 import { useEditor } from '@/store/editor';
 import { useEditorSession } from '@/editor/sessionStore';
 import { useEditorView } from '@/editor/viewStore';
 import { useExport } from '@/editor/exportStore';
 import { inspectSlideVideo } from '@/export/video';
-import { ExportSlidePreview } from './ExportSlidePreview';
+import { ExportPanorama } from './ExportPanorama';
 import './export.css';
 
 type Scope = 'all' | 'current' | 'chosen';
@@ -27,6 +27,7 @@ export function ExportPanel({ onDone }: { onDone: () => void }) {
   const indexes = useMemo(() => doc.slideOrder.flatMap((slideId, index) => (
     scope === 'all' || (scope === 'current' ? slideId === current : chosen.has(slideId)) ? [index] : []
   )), [doc.slideOrder, scope, current, chosen]);
+  const included = useMemo(() => new Set(indexes), [indexes]);
 
   useEffect(() => {
     if (!useExport.getState().exporting) useExport.setState({ error: null, outcome: 'idle' });
@@ -68,38 +69,50 @@ export function ExportPanel({ onDone }: { onDone: () => void }) {
     }
   };
 
+  const toggle = (slideId: string, on: boolean) => setChosen((previous) => { const next = new Set(previous); if (on) next.add(slideId); else next.delete(slideId); return next; });
+  const imagesLocked = !checking && stillCount === 0;
+  const kind = settings.format === 'jpeg' ? 'JPEG' : 'PNG';
+
   return <form className="export-panel" onSubmit={(event) => void submit(event)}>
     <div className="export-fields scrollbar-thin">
-      <ExportSlidePreview doc={doc} indexes={indexes} current={current} format={settings.format} />
-      <fieldset disabled={state.exporting} className="export-scope">
-        <legend>Slides</legend>
-        <div className="export-segments">
-          {([['all', 'All slides'], ['current', 'This slide'], ['chosen', 'Choose slides']] as const).map(([value, label]) => <label key={value}>
-            <input type="radio" name={`${id}-scope`} value={value} checked={scope === value} onChange={() => setScope(value)} />
-            <span>{label}</span>
-          </label>)}
+      <section className="export-stage" aria-label="Preview">
+        <ExportPanorama doc={doc} included={included} choosing={scope === 'chosen' && !state.exporting} checkerboard={settings.format === 'png'} onToggle={toggle} />
+        <div className="export-stage-caption">
+          <p className="export-project">{doc.name || 'Untitled'}</p>
+          <span>{indexes.length === doc.slideOrder.length ? `${doc.slideOrder.length} ${doc.slideOrder.length === 1 ? 'slide' : 'slides'}` : `${indexes.length} of ${doc.slideOrder.length} slides`} · {doc.format.name}</span>
         </div>
-        {scope === 'chosen' && <div className="export-slide-picker">
-          <div className="export-pick-actions"><span>{indexes.length} selected</span><button type="button" onClick={() => setChosen(new Set(doc.slideOrder))}>Select all</button><button type="button" onClick={() => setChosen(new Set())}>Clear</button></div>
-          <div className="export-slide-choices">
-            {doc.slideOrder.map((slideId, index) => <label key={slideId}><input type="checkbox" checked={chosen.has(slideId)} onChange={(event) => setChosen((previous) => { const next = new Set(previous); if (event.target.checked) next.add(slideId); else next.delete(slideId); return next; })} /><span>Slide {index + 1}</span></label>)}
-          </div>
-        </div>}
-      </fieldset>
-      <fieldset disabled={state.exporting} className="export-options">
-        <div className="export-option-row">
-          <label>Image format<select disabled={!checking && stillCount === 0} value={settings.format} onChange={(event) => state.setSettings({ format: event.target.value as 'png' | 'jpeg' })}><option value="png">PNG</option><option value="jpeg">JPEG</option></select></label>
-          <label>Image resolution<select disabled={!checking && stillCount === 0} value={settings.pixelRatio} onChange={(event) => state.setSettings({ pixelRatio: Number(event.target.value) })}><option value="1">1× · Original</option><option value="2">2× · High detail</option></select></label>
+      </section>
+      <fieldset disabled={state.exporting} className="export-settings">
+        <div className="export-scope">
+          <Segments label="Slides" name={`${id}-scope`} value={scope} onChange={setScope} options={[['all', 'All slides'], ['current', 'This slide'], ['chosen', 'Choose slides']]} />
+          {scope === 'chosen' && <div className="export-pick-actions"><span>{indexes.length ? `${indexes.length} selected` : 'Tap slides above to include them'}</span><button type="button" onClick={() => setChosen(new Set(doc.slideOrder))}>Select all</button><button type="button" onClick={() => setChosen(new Set())}>Clear</button></div>}
         </div>
-        {settings.format === 'jpeg' && stillCount > 0 && <label className="export-quality" htmlFor={`${id}-quality`}>JPEG quality <output>{Math.round(settings.quality * 100)}%</output><input id={`${id}-quality`} type="range" min="50" max="100" step="1" value={Math.round(settings.quality * 100)} onChange={(event) => state.setSettings({ quality: Number(event.target.value) / 100 })} /><span>Smaller file<span>Best quality</span></span></label>}
-        {animatedCount > 0 && <label>Animated slides<select value={settings.animation} onChange={(event) => state.setSettings({ animation: event.target.value as 'auto' | 'still' })}><option value="auto">Keep animations as MP4</option><option value="still">Export still frames</option></select></label>}
-        <details className="export-naming"><summary>File name</summary><label className="sr-only" htmlFor={`${id}-filename`}>Export file name</label><input id={`${id}-filename`} value={fileName} maxLength={120} placeholder="project" onChange={(event) => setFileName(event.target.value)} /></details>
+        <div className="export-group">
+          <Row label="Format" hint={settings.format === 'jpeg' ? 'Smaller files, no transparency' : 'Lossless, keeps transparency'}>
+            <Segments label="Image format" name={`${id}-format`} value={settings.format} disabled={imagesLocked} onChange={(format) => state.setSettings({ format })} options={[['png', 'PNG'], ['jpeg', 'JPEG']]} compact />
+          </Row>
+          <Row label="Size" hint={settings.pixelRatio === 2 ? 'Double size for extra detail' : 'Native size for every platform'}>
+            <Segments label="Image resolution" name={`${id}-scale`} value={String(settings.pixelRatio) as '1' | '2'} disabled={imagesLocked} onChange={(value) => state.setSettings({ pixelRatio: Number(value) })} options={[['1', '1×'], ['2', '2×']]} compact />
+          </Row>
+          {settings.format === 'jpeg' && stillCount > 0 && <Row label="Quality" hint={settings.quality >= .9 ? 'Best quality' : settings.quality >= .75 ? 'Balanced' : 'Smallest file'}>
+            <div className="export-quality"><input type="range" className="range" aria-label="JPEG quality" min="50" max="100" step="1" value={Math.round(settings.quality * 100)} style={{ '--fill': `${(Math.round(settings.quality * 100) - 50) * 2}%` } as CSSProperties} onChange={(event) => state.setSettings({ quality: Number(event.target.value) / 100 })} /><output>{Math.round(settings.quality * 100)}%</output></div>
+          </Row>}
+          {animatedCount > 0 && <Row label="Animations" hint={settings.animation === 'still' ? 'First frame as an image' : 'H.264 video, Instagram ready'}>
+            <Segments label="Animated slides" name={`${id}-animation`} value={settings.animation ?? 'auto'} onChange={(animation: 'auto' | 'still') => state.setSettings({ animation })} options={[['auto', 'MP4'], ['still', 'Still']]} compact />
+          </Row>}
+          <Row label="File name" htmlFor={`${id}-filename`}>
+            <div className="export-filename-field"><input id={`${id}-filename`} aria-label="Export file name" value={fileName} maxLength={120} placeholder="project" spellCheck={false} onChange={(event) => setFileName(event.target.value)} /><span aria-hidden>{downloadName.slice(safe.length)}</span></div>
+          </Row>
+        </div>
       </fieldset>
       <div className="export-output" aria-live="polite">
-        <p>{checking ? 'Checking slides…' : indexes.length === 0 ? 'Choose at least one slide.' : single ? 'One file' : `${indexes.length} numbered ${indexes.length === 1 ? 'file' : 'files'} in a ZIP`}</p>
-        {!checking && stillCount > 0 && <span>{settings.format === 'jpeg' ? 'JPEG' : 'PNG'} · {width} × {height} px{settings.format === 'jpeg' ? ' · White behind transparency' : ''}</span>}
-        {!checking && videoCount > 0 && <span>{videoCount} MP4 {videoCount === 1 ? 'video' : 'videos'} · {doc.format.width} × {doc.format.height} px</span>}
-        {indexes.length > 0 && <span className="export-filename" title={downloadName}>{downloadName}</span>}
+        <span className="export-output-icon" aria-hidden>{single ? <FileImage size={18} /> : <Package size={18} />}</span>
+        <div>
+          <p>{checking ? 'Checking slides…' : indexes.length === 0 ? 'Choose at least one slide.' : single ? 'One file' : `${indexes.length} numbered ${indexes.length === 1 ? 'file' : 'files'} in a ZIP`}</p>
+          {!checking && stillCount > 0 && <span>{kind} · {width} × {height} px{settings.format === 'jpeg' ? ' · White behind transparency' : ''}</span>}
+          {!checking && videoCount > 0 && <span>{videoCount} MP4 {videoCount === 1 ? 'video' : 'videos'} · {doc.format.width} × {doc.format.height} px</span>}
+          {indexes.length > 0 && <span className="export-filename" title={downloadName}>{downloadName}</span>}
+        </div>
       </div>
       {error && <div className="export-feedback" data-tone="error"><p role="alert">{error}</p>{inspectionError && <button type="button" onClick={() => setAttempt((value) => value + 1)}>Retry check</button>}</div>}
       {!state.exporting && state.outcome === 'complete' && !error && <p className="export-feedback" role="status"><Check size={15} aria-hidden />Your download is ready.</p>}
@@ -115,4 +128,24 @@ export function ExportPanel({ onDone }: { onDone: () => void }) {
       </div>}
     </div>
   </form>;
+}
+
+/** A settings line: label and hint on the left, its control on the right. */
+function Row({ label, hint, htmlFor, children }: { label: string; hint?: string; htmlFor?: string; children: ReactNode }) {
+  return <div className="export-row">
+    <div className="export-row-text">{htmlFor ? <label htmlFor={htmlFor}>{label}</label> : <span>{label}</span>}{hint && <small>{hint}</small>}</div>
+    {children}
+  </div>;
+}
+
+/** Native radios styled as a segmented control, so keyboard and form semantics come for free. */
+function Segments<T extends string>({ label, name, value, options, onChange, disabled, compact }: {
+  label: string; name: string; value: T; options: readonly (readonly [T, string])[]; onChange: (value: T) => void; disabled?: boolean; compact?: boolean;
+}) {
+  return <div className="export-segments" role="radiogroup" aria-label={label} data-compact={compact || undefined}>
+    {options.map(([option, text]) => <label key={option}>
+      <input type="radio" name={name} value={option} checked={value === option} disabled={disabled} onChange={() => onChange(option)} />
+      <span>{text}</span>
+    </label>)}
+  </div>;
 }

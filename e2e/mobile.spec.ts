@@ -743,11 +743,11 @@ test.describe('mobile editor', () => {
       const exportSheet = sheetRegion(page, 'Export');
       await expect(exportSheet).toBeVisible();
       await expect(exportSheet.getByRole('button', { name: /^Export carousel/ })).toBeVisible();
-      await expect(exportSheet.getByRole('combobox', { name: 'Image format', exact: true })).toBeVisible();
-      await expect(exportSheet.getByRole('combobox', { name: 'Image resolution', exact: true })).toBeVisible();
-      await exportSheet.getByText('This slide', { exact: true }).tap();
+      await expect(exportSheet.getByRole('radiogroup', { name: 'Image format', exact: true })).toBeVisible();
+      await expect(exportSheet.getByRole('radiogroup', { name: 'Image resolution', exact: true })).toBeVisible();
+      await exportSheet.getByRole('radio', { name: 'This slide', exact: true }).tap();
       await expect(exportSheet.getByRole('button', { name: /^Save this slide/ })).toBeVisible();
-      await exportSheet.getByText('All slides', { exact: true }).tap();
+      await exportSheet.getByRole('radio', { name: 'All slides', exact: true }).tap();
       await expect(exportSheet.getByRole('button', { name: /^Preview on phone/ })).toBeVisible();
     });
 

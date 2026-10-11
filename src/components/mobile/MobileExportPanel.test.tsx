@@ -8,7 +8,7 @@ import { inspectSlideVideo } from '@/export/video';
 import { MobileExportPanel } from './MobileExportPanel';
 
 vi.mock('@/lib/export', () => ({ exportInstagramCarousel: vi.fn(), exportSlide: vi.fn() }));
-// Actual canvas pixels and preview navigation are covered in e2e/export.spec.ts.
+// Actual panorama pixels are covered in e2e/export.spec.ts.
 vi.mock('@/components/SlidePreviewCanvas', () => ({ SlidePreviewCanvas: () => null }));
 vi.mock('@/export/video', () => ({ inspectSlideVideo: vi.fn() }));
 const exportCarousel = vi.fn(async () => undefined);
@@ -32,8 +32,8 @@ describe('shared web export controls in the phone sheet', () => {
   it('passes JPEG quality and resolution into both carousel and current-slide jobs', async () => {
     render(<MobileExportPanel onDone={vi.fn()} />);
     await ready();
-    fireEvent.change(screen.getByLabelText('Image format'), { target: { value: 'jpeg' } });
-    fireEvent.change(screen.getByLabelText('Image resolution'), { target: { value: '2' } });
+    fireEvent.click(screen.getByRole('radio', { name: 'JPEG' }));
+    fireEvent.click(screen.getByRole('radio', { name: '2×' }));
     fireEvent.change(screen.getByRole('slider', { name: /JPEG quality/ }), { target: { value: '80' } });
     expect(screen.getByText(/2160 × 2700/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Export carousel' }));
@@ -62,10 +62,10 @@ describe('shared web export controls in the phone sheet', () => {
     inspect.mockResolvedValue({ animated: true, duration: 3 });
     render(<MobileExportPanel onDone={vi.fn()} />);
     await ready();
-    expect(screen.getByLabelText('Image resolution')).toBeDisabled();
+    expect(screen.getByRole('radio', { name: '2×' })).toBeDisabled();
     expect(screen.getByText('1 MP4 video · 1080 × 1350 px')).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Animated slides'), { target: { value: 'still' } });
-    expect(screen.getByLabelText('Image resolution')).toBeEnabled();
+    fireEvent.click(screen.getByRole('radio', { name: 'Still' }));
+    expect(screen.getByRole('radio', { name: '2×' })).toBeEnabled();
     fireEvent.click(screen.getByRole('button', { name: 'Export carousel' }));
     expect(exportCarousel).toHaveBeenCalledWith(expect.objectContaining({ animation: 'still' }));
   });
@@ -83,7 +83,7 @@ describe('shared web export controls in the phone sheet', () => {
     render(<MobileExportPanel onDone={vi.fn()} />);
     expect(screen.getByRole('status')).toHaveTextContent('Slide 2/4 · image');
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '25');
-    expect(screen.getByLabelText('Image format')).toBeDisabled();
+    expect(screen.getByRole('radio', { name: 'JPEG' })).toBeDisabled();
     expect(screen.getByRole('radio', { name: 'This slide' })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: 'Cancel export' }));
     expect(cancel).toHaveBeenCalledOnce();
