@@ -90,6 +90,9 @@ npm run test:pwa   # production offline and update checks
 
 Requires Node 22.12+. For the Mac app, open `macos/OpenSCRL.xcodeproj` in Xcode 27 and run it.
 
+For a phone preview on the same network, open the Network URL printed by Vite.
+Image imports and project storage also work at this HTTP preview address.
+
 See [web updates and offline tools](docs/web-updates.md) for reload and caching behavior.
 [AGENTS.md](./AGENTS.md) has a tour of the code, and the [changelog](./CHANGELOG.md) lists
 every release.

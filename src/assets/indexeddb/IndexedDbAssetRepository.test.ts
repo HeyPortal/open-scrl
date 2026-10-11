@@ -1,7 +1,10 @@
 import { openDB } from 'idb';
+import { Blob as NodeBlob } from 'node:buffer';
+import { createHash } from 'node:crypto';
 import { afterAll, describe, expect, it, vi } from 'vitest';
 
 const DATABASE_NAME = 'open-scrl-assets';
+const unusedHash = createHash('sha256').update('unused-photo').digest('hex');
 
 describe('IndexedDbAssetRepository legacy migration', () => {
   afterAll(() => {
@@ -37,9 +40,8 @@ describe('IndexedDbAssetRepository legacy migration', () => {
       mime: 'image/jpeg',
       width: 2000,
       height: 1500,
-      blob: new Blob(['unused-photo']),
+      blob: new NodeBlob(['unused-photo']),
       size: 12,
-      hash: 'unused-photo-hash',
     }, 'unused-photo');
     legacyDb.close();
 
@@ -54,7 +56,7 @@ describe('IndexedDbAssetRepository legacy migration', () => {
     expect(results[0]).toEqual(results[1]);
     expect(results[0]).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: 'legacy-photo', hash: 'legacy-photo-hash' }),
-      expect.objectContaining({ id: 'unused-photo', hash: 'unused-photo-hash' }),
+      expect.objectContaining({ id: 'unused-photo', hash: unusedHash }),
     ]));
     expect(getAll.mock.contexts.map((store) => (store as IDBObjectStore).name)).not.toContain('assets');
 

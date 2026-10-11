@@ -4,6 +4,7 @@ import { id } from '@/lib/nano';
 import { completeTransaction } from '@/storage/transaction';
 import type { AssetRepository, PreparedAsset, ProjectAssetScope } from '../AssetRepository';
 import { deleteOpfsBlob, readOpfsBlob, writeOpfsBlob } from '../opfs/blobStorage';
+import { hashBlob } from '../hashBlob';
 
 interface ProjectAssetLink {
   id: string;
@@ -50,11 +51,6 @@ function getAssetDatabase() {
   }).catch((error) => { dbPromise = null; throw error; });
 }
 
-async function sha256(blob: Blob) {
-  const digest = await crypto.subtle.digest('SHA-256', await blob.arrayBuffer());
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
-}
-
 export class IndexedDbAssetRepository implements AssetRepository {
   private legacyIndexPromise: Promise<void> | null = null;
 
@@ -69,7 +65,7 @@ export class IndexedDbAssetRepository implements AssetRepository {
       const asset = await db.get('assets', assetId);
       if (!asset) continue;
       if (!(await db.get('metadata', asset.id))) {
-        const hash = asset.hash ?? await sha256(asset.blob);
+        const hash = asset.hash ?? await hashBlob(asset.blob);
         const meta: AssetMeta = { id: asset.id, blobKey: `legacy:${asset.id}`, thumbnailKey: `thumb:${asset.id}`, hash, name: asset.name, mime: asset.mime, width: asset.width, height: asset.height, size: asset.size ?? asset.blob.size, mediaKind: asset.mediaKind, duration: asset.duration };
         const tx = db.transaction(['assets', 'metadata'], 'readwrite');
         await completeTransaction(tx, async () => {

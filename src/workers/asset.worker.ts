@@ -1,12 +1,8 @@
 /// <reference lib="webworker" />
 import type { PreparedAsset } from '@/assets/AssetRepository';
+import { hashBlob } from '@/assets/hashBlob';
 
 const THUMB_SIZE = 240;
-
-async function hash(blob: Blob) {
-  const digest = await crypto.subtle.digest('SHA-256', await blob.arrayBuffer());
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
-}
 
 async function gifDuration(blob: Blob) {
   try {
@@ -29,7 +25,7 @@ self.onmessage = async (event: MessageEvent<{ id: string; file: File }>) => {
     const context = canvas.getContext('2d'); if (!context) throw new Error('Thumbnail canvas unavailable.');
     context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
     const thumbnail = await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.78 });
-    const result: PreparedAsset = { file: normalized, thumbnail, hash: await hash(normalized), width: bitmap.width, height: bitmap.height, mime, name: file.name.replace(/\.(heic|heif)$/i, '.jpg'), mediaKind, duration: mediaKind === 'gif' ? await gifDuration(normalized) : 0 };
+    const result: PreparedAsset = { file: normalized, thumbnail, hash: await hashBlob(normalized), width: bitmap.width, height: bitmap.height, mime, name: file.name.replace(/\.(heic|heif)$/i, '.jpg'), mediaKind, duration: mediaKind === 'gif' ? await gifDuration(normalized) : 0 };
     self.postMessage({ id, result });
   } catch (error) {
     self.postMessage({ id, error: error instanceof Error ? error.message : String(error) });
