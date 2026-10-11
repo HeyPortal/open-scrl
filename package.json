@@ -5,6 +5,7 @@
   "type": "module",
   "description": "Open-source, feature-rich photo grid + Instagram carousel maker (PWA). MIT licensed alternative to SCRL.",
   "license": "MIT",
+  "packageManager": "bun@1.4.3",
   "engines": {
     "node": ">=22.12.0"
   },
@@ -18,8 +19,8 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:pwa": "playwright test --config playwright.pwa.config.ts",
-    "bundle:check": "node scripts/check-bundle.mjs",
-    "verify": "npm run typecheck && npm run lint && npm run test && npm run build && npm run bundle:check"
+    "bundle:check": "bun scripts/check-bundle.mjs",
+    "verify": "bun run typecheck && bun run lint && bun run test && bun run build && bun run bundle:check"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

@@ -7,7 +7,7 @@ export default defineConfig({
   workers: 1,
   timeout: 45_000,
   webServer: {
-    command: 'npm run build && node scripts/serve-pwa-test.mjs',
+    command: 'bun run build && bun scripts/serve-pwa-test.mjs',
     url: `http://127.0.0.1:${port}`,
     reuseExistingServer: false,
     timeout: 120_000,
