@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from '../fixtures/test';
 import type { ProjectDocumentV2 } from '../../src/types';
 
 // The touch editor runs its own gestures and text editor. An accepted update must wait for them
@@ -34,9 +34,9 @@ async function holdActivation(page: Page) {
     const gate = { held: [] as (() => void)[], observed: false, pause: true };
     Object.assign(window, { activationGate: gate });
     const original = ServiceWorker.prototype.postMessage;
-    ServiceWorker.prototype.postMessage = function (...args: Parameters<ServiceWorker['postMessage']>) {
-      if (gate.pause && (args[0] as { type?: string }).type === 'SKIP_WAITING') gate.held.push(() => original.apply(this, args));
-      else original.apply(this, args);
+    ServiceWorker.prototype.postMessage = function (...args: [message: unknown, options?: Transferable[] | StructuredSerializeOptions]) {
+      if (gate.pause && (args[0] as { type?: string }).type === 'SKIP_WAITING') gate.held.push(() => Reflect.apply(original, this, args));
+      else Reflect.apply(original, this, args);
     };
     navigator.serviceWorker.addEventListener('controllerchange', () => { gate.observed = true; });
   });
@@ -96,7 +96,7 @@ test('activation waits for a two-finger layer transform begun after accepting th
   const centre = await layerCentre(page);
   const fingers = (spread: number) => [{ x: centre.x - spread, y: centre.y, id: 1 }, { x: centre.x + spread, y: centre.y, id: 2 }];
   const cdp = await page.context().newCDPSession(page);
-  const send = (type: string, touchPoints: { x: number; y: number; id: number }[]) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints });
+  const send = (type: 'touchStart' | 'touchMove' | 'touchEnd', touchPoints: { x: number; y: number; id: number }[]) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints });
   await send('touchStart', fingers(14).slice(0, 1));
   await send('touchStart', fingers(14));
   for (let spread = 20; spread <= 48; spread += 7) await send('touchMove', fingers(spread));

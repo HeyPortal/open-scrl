@@ -1,4 +1,4 @@
-import { expect, test, type Download, type Page } from '@playwright/test';
+import { expect, test, type Download, type Page } from './fixtures/test';
 import { readFile } from 'node:fs/promises';
 import { BlobReader, BlobWriter, ZipReader } from '@zip.js/zip.js';
 
@@ -51,7 +51,7 @@ test('selected JPEG exports preserve numbering, dimensions, file naming and the 
     const entries = await reader.getEntries();
     expect(entries.map((entry) => entry.filename)).toEqual(['01.jpg', '03.jpg']);
     for (const entry of entries) {
-      if (!entry.getData) throw new Error('Expected a file');
+      if (entry.directory) throw new Error('Expected a file');
       const blob = await entry.getData(new BlobWriter());
       const data = new Uint8Array(await blob.arrayBuffer());
       expect([...data.slice(0, 2)]).toEqual([0xff, 0xd8]);
@@ -95,8 +95,11 @@ test('cancelling a stalled worker prevents downloads and lets the next export su
         super(url, options);
         this.exporting = url.toString().includes('export.worker');
       }
-      postMessage(message: unknown, transfer: Transferable[]) {
-        if (!this.exporting || !gate.blocked) super.postMessage(message, transfer ?? []);
+      postMessage(message: unknown, options?: Transferable[] | StructuredSerializeOptions) {
+        if (!this.exporting || !gate.blocked) {
+          if (Array.isArray(options)) super.postMessage(message, options);
+          else super.postMessage(message, options);
+        }
       }
       terminate() { if (this.exporting) gate.terminated++; super.terminate(); }
     };
@@ -164,9 +167,10 @@ for (const viewport of [{ width: 320, height: 568 }, { width: 844, height: 390 }
       await sheet.getByRole('radio', { name: '2×', exact: true }).tap();
       const button = sheet.getByRole('button', { name: 'Save this slide' });
       await expect(button).toBeInViewport();
-      const bounds = await button.boundingBox();
-      expect(bounds!.height).toBeGreaterThanOrEqual(44);
-      expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(viewport.height);
+      await expect.poll(() => button.evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
+      await expect.poll(() => button.evaluate((element) =>
+        window.innerHeight - element.getBoundingClientRect().bottom,
+      )).toBeGreaterThanOrEqual(0);
       const download = page.waitForEvent('download');
       await button.tap();
       const result = await download;

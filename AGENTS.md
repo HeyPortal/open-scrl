@@ -22,6 +22,7 @@ bunx playwright test e2e/smoke.spec.ts
 
 - Use `bun run test`, never bare `bun test`: the latter starts Bun's own test runner, which doesn't load the Vitest config, jsdom environment or setup file.
 - `verify` does **not** run the Playwright tests; CI runs `verify`, `test:e2e`, then `test:pwa`. Run `bunx playwright install --with-deps chromium` once first.
+- Browser specs import `test` and `expect` from `e2e/fixtures/test.ts`; its automatic fixture checks uncaught errors across all tabs. Browser specs and both Playwright configs are included in `typecheck`. Keep layout assertions retryable through transitions; animation tests should sample controlled progress instead of counting rendered frames. See `docs/testing.md` for focused runs and Bun trace commands.
 - `bundle:check` fails if the initial entry chunk exceeds 120 KiB gzip, so heavy deps must stay in lazy chunks/workers (see `src/app/` lazy boundaries).
 
 ## Mac app commands

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures/test';
 import type { ImageLayer, ProjectDocumentV2 } from '../src/types';
 
 async function documentState(page: Page): Promise<ProjectDocumentV2> {

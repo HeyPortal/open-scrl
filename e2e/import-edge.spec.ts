@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures/test';
 import { createHash } from 'node:crypto';
 import type { ProjectDocumentV2 } from '../src/types';
 
@@ -70,10 +70,10 @@ test('a pending import as slides stays associated with its original project afte
     const gate = { held: [] as (() => void)[] };
     Object.assign(window, { importGate: gate });
     const original = Worker.prototype.postMessage;
-    Worker.prototype.postMessage = function (...args: Parameters<Worker['postMessage']>) {
+    Worker.prototype.postMessage = function (...args: [message: unknown, options?: Transferable[] | StructuredSerializeOptions]) {
       const message = args[0] as { type?: string; file?: File };
-      if (message.file && message.type === undefined) gate.held.push(() => original.apply(this, args));
-      else original.apply(this, args);
+      if (message.file && message.type === undefined) gate.held.push(() => Reflect.apply(original, this, args));
+      else Reflect.apply(original, this, args);
     };
   });
   await page.goto('/');

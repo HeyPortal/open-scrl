@@ -19,6 +19,8 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:pwa": "playwright test --config playwright.pwa.config.ts",
+    "test:trace": "playwright show-trace",
+    "test:report": "playwright show-report",
     "bundle:check": "bun scripts/check-bundle.mjs",
     "verify": "bun run typecheck && bun run lint && bun run test && bun run build && bun run bundle:check"
   },

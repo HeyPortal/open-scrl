@@ -126,6 +126,9 @@ bun run test:e2e   # editor tests against the dev server
 bun run test:pwa   # production offline and update checks
 ```
 
+See [Browser testing](docs/testing.md) for focused runs, stress checks, reports,
+and viewing failure traces with Bun.
+
 Run unit tests with `bun run test`, not `bun test`: the latter starts Bun's own test
 runner instead of Vitest.
 

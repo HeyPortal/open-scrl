@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures/test';
 import { readFile } from 'node:fs/promises';
 import { runtimeArtwork } from './fixtures/runtimeArtwork';
 
@@ -44,7 +44,7 @@ async function point(page: Page, selector: string) {
     const Konva = (window as unknown as { Konva: typeof import('konva').default }).Konva;
     const stage = Konva.stages[0];
     const node = selector.startsWith('Transformer ')
-      ? stage.findOne<Konva.Transformer>('Transformer')!.findOne(selector.split(' ')[1])!
+      ? stage.findOne<import('konva').default.Transformer>('Transformer')!.findOne(selector.split(' ')[1])!
       : stage.findOne(selector)!;
     const bounds = node.getClientRect(), container = stage.container().getBoundingClientRect();
     return { x: container.left + bounds.x + bounds.width / 2, y: container.top + bounds.y + bounds.height / 2 };

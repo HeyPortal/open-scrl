@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures/test';
 
 for (const mobile of [false, true]) {
   test.describe(mobile ? 'mobile fonts' : 'desktop fonts', () => {

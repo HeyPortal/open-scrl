@@ -1,15 +1,8 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures/test';
 
 const tinyPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
 /** Dock tab labels, in order. */
 const TOOL_TAB_LABELS = ['Photos', 'Grids', 'Text', 'Shapes', 'Canvas', 'Layers'];
-
-/** Collects uncaught page errors; each test asserts the list is empty at the end. */
-function trackPageErrors(page: Page) {
-  const errors: string[] = [];
-  page.on('pageerror', (error) => errors.push(error.stack ?? error.message));
-  return errors;
-}
 
 const dock = (page: Page) => page.getByRole('tablist', { name: 'Editor tools' });
 const dockTab = (page: Page, name: string) => dock(page).getByRole('tab', { name, exact: true });
@@ -39,7 +32,6 @@ test.describe('mobile editor', () => {
   test.use({ viewport: { width: 393, height: 852 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
 
   test('fresh profile shows the mobile home and "Create carousel" opens the mobile editor', async ({ page }) => {
-    const errors = trackPageErrors(page);
 
     await test.step('Mobile home instead of the desktop landing page', async () => {
       await page.goto('/');
@@ -56,12 +48,9 @@ test.describe('mobile editor', () => {
       await expect(dock(page).getByRole('tab')).toHaveText(TOOL_TAB_LABELS);
       await expect(page.getByRole('heading', { name: 'No carousels yet' })).toHaveCount(0);
     });
-
-    expect(errors).toEqual([]);
   });
 
   test('dock tabs open, switch, and close their sheets; the slide strip hides while a sheet is open', async ({ page }) => {
-    const errors = trackPageErrors(page);
     await createCarousel(page);
     await expect(addSlideButton(page)).toBeVisible();
 
@@ -97,12 +86,9 @@ test.describe('mobile editor', () => {
       await expect(dockTab(page, 'Shapes')).toHaveAttribute('aria-selected', 'false');
       await expect(addSlideButton(page)).toBeVisible();
     });
-
-    expect(errors).toEqual([]);
   });
 
   test('adding a shape selects it; the selection bar replaces the dock and Done restores it', async ({ page }) => {
-    const errors = trackPageErrors(page);
     await createCarousel(page);
 
     await test.step('Shape added from the Shapes sheet is selected and the selection bar shows', async () => {
@@ -116,7 +102,7 @@ test.describe('mobile editor', () => {
     });
 
     await test.step('No label is clipped, and More holds the arrange and lock actions', async () => {
-      const clipped = await selectionBar(page).evaluate((bar) =>
+      await expect.poll(() => selectionBar(page).evaluate((bar) =>
         [...bar.querySelectorAll('button')].filter((button) => {
           const label = button.querySelector('span');
           if (!label) return false;
@@ -124,8 +110,7 @@ test.describe('mobile editor', () => {
           const room = button.getBoundingClientRect();
           return box.left < room.left - 0.5 || box.right > room.right + 0.5;
         }).map((button) => button.textContent),
-      );
-      expect(clipped).toEqual([]);
+      )).toEqual([]);
 
       const more = selectionBar(page).getByRole('button', { name: 'More actions', exact: true });
       const menu = page.getByRole('menu', { name: 'More actions', exact: true });
@@ -169,12 +154,9 @@ test.describe('mobile editor', () => {
       await expect(dock(page)).toBeVisible();
       await expect(dockTab(page, 'Layers')).toHaveAttribute('aria-selected', 'false');
     });
-
-    expect(errors).toEqual([]);
   });
 
   test('top bar undo and redo revert and restore an added shape', async ({ page }) => {
-    const errors = trackPageErrors(page);
     await createCarousel(page);
     await expect(undoButton(page)).toBeDisabled();
 
@@ -201,12 +183,9 @@ test.describe('mobile editor', () => {
       await expect(sheetRegion(page, 'Layers').getByRole('option')).toHaveCount(1);
       await dockTab(page, 'Layers').tap();
     });
-
-    expect(errors).toEqual([]);
   });
 
   test('the slide strip adds a slide and the slide actions menu deletes it again', async ({ page }) => {
-    const errors = trackPageErrors(page);
     await createCarousel(page);
     await expect(page.getByRole('status', { name: 'Slide 1 of 1' })).toBeVisible();
 
@@ -230,8 +209,6 @@ test.describe('mobile editor', () => {
       await expect(page.getByRole('status', { name: 'Slide 1 of 1' })).toBeVisible();
       await expect(page.getByRole('button', { name: /^Slide \d/ })).toHaveCount(1);
     });
-
-    expect(errors).toEqual([]);
   });
 
   test('text can be edited by double-tapping the canvas and through its properties', async ({ page }) => {
@@ -240,7 +217,7 @@ test.describe('mobile editor', () => {
     await page.getByRole('button', { name: 'Add text box', exact: true }).tap();
     await page.getByRole('button', { name: 'Close Text', exact: true }).tap();
     const point = await page.evaluate(async () => {
-      const Konva = (window as Window & { Konva: typeof import('konva').default }).Konva;
+      const Konva = (window as unknown as Window & { Konva: typeof import('konva').default }).Konva;
       const stage = Konva.stages[0];
       const bounds = stage.findOne('.layer')!.getClientRect();
       const container = stage.container().getBoundingClientRect();
@@ -279,7 +256,6 @@ test.describe('mobile editor', () => {
   });
 
   test('text moved onto another slide stays reachable when selecting, dragging and editing', async ({ page }) => {
-    const errors = trackPageErrors(page);
     await createCarousel(page);
     await dockTab(page, 'Text').tap();
     await page.getByRole('button', { name: 'Your headline Headline · 120px', exact: true }).tap();
@@ -288,7 +264,7 @@ test.describe('mobile editor', () => {
     await page.getByRole('button', { name: 'Slide 1', exact: true }).tap();
 
     const frame = () => page.evaluate(() => {
-      const Konva = (window as Window & { Konva: typeof import('konva').default }).Konva;
+      const Konva = (window as unknown as Window & { Konva: typeof import('konva').default }).Konva;
       const stage = Konva.stages[0];
       const node = stage.findOne<import('konva').default.Group>('.layer');
       const shape = node?.findOne<import('konva').default.Shape>('Shape');
@@ -373,15 +349,13 @@ test.describe('mobile editor', () => {
     await page.touchscreen.tap(reopened.x, reopened.y);
     await expect(page.getByRole('status', { name: 'Selected: Text' })).toBeVisible();
     await expect.poll(() => page.getByTestId('canvas-scroll').evaluate((el) => el.scrollLeft)).toBeCloseTo(reopened.scroll, 0);
-    expect(errors).toEqual([]);
   });
 
   for (const layout of ['blank slide', 'filled grid'] as const) {
     for (const hitMap of ['normal', 'empty', 'wrong layer'] as const) {
       test(`touch selects a title over a photo on a ${layout} with a ${hitMap} hit map after reopening`, async ({ page }) => {
-        const errors = trackPageErrors(page);
         const point = (kind: 'image' | 'text') => page.evaluate((kind) => {
-          const Konva = (window as Window & { Konva: typeof import('konva').default }).Konva;
+          const Konva = (window as unknown as Window & { Konva: typeof import('konva').default }).Konva;
           const stage = Konva.stages[0];
           const nodes = stage.find('.layer');
           const node = (kind === 'image' ? nodes[0] : nodes.at(-1)) as import('konva').default.Group;
@@ -422,14 +396,14 @@ test.describe('mobile editor', () => {
 
         const selectBoth = async () => {
           await expect.poll(() => page.evaluate(() => {
-            const Konva = (window as Window & { Konva?: typeof import('konva').default }).Konva;
+            const Konva = (window as unknown as Window & { Konva?: typeof import('konva').default }).Konva;
             return Konva?.stages[0]?.find('.layer').length ?? 0;
           })).toBe(layout === 'filled grid' ? 3 : 2);
           // Match the phone trace: bitmap reads may miss everything or name the
           // photo underneath visible text. Touch must still follow the drawn stack.
           if (hitMap !== 'normal') await page.evaluate((hitMap) => {
-            const Konva = (window as Window & { Konva: typeof import('konva').default }).Konva;
-            Konva.Layer.prototype.getIntersection = () => hitMap === 'empty' ? null : Konva.stages[0].findOne('.layer')!.findOne('Shape')!;
+            const Konva = (window as unknown as Window & { Konva: typeof import('konva').default }).Konva;
+            Konva.Layer.prototype.getIntersection = () => hitMap === 'empty' ? null : Konva.stages[0].findOne<import('konva').default.Group>('.layer')!.findOne<import('konva').default.Shape>('Shape')!;
           }, hitMap);
           for (let i = 0; i < 3; i++) {
             const title = await point('text');
@@ -448,13 +422,11 @@ test.describe('mobile editor', () => {
         await page.getByRole('button', { name: 'Open Untitled', exact: true }).tap();
         await expect(dock(page)).toBeVisible();
         await selectBoth();
-        expect(errors).toEqual([]);
       });
     }
   }
 
   test('geometric touch hits respect rotated shape corners and thin targets', async ({ page }) => {
-    const errors = trackPageErrors(page);
     await createCarousel(page);
     await addRectangle(page);
     await selectionBar(page).getByRole('button', { name: 'Done', exact: true }).tap();
@@ -466,20 +438,20 @@ test.describe('mobile editor', () => {
       const { useEditor } = await import(path) as typeof import('../src/store/editor');
       const shapes = Object.values(useEditor.getState().doc.layers).filter((layer) => layer.kind === 'shape');
       useEditor.getState().updateLayer(shapes[1].id, { rotation: 90 });
-      const Konva = (window as Window & { Konva: typeof import('konva').default }).Konva;
+      const Konva = (window as unknown as Window & { Konva: typeof import('konva').default }).Konva;
       Konva.Layer.prototype.getIntersection = () => null;
       return shapes.map((shape) => shape.id);
     });
     const point = (id: string, x: number, y: number) => page.evaluate(({ id, x, y }) => {
-      const Konva = (window as Window & { Konva: typeof import('konva').default }).Konva;
+      const Konva = (window as unknown as Window & { Konva: typeof import('konva').default }).Konva;
       const stage = Konva.stages[0];
-      const shape = stage.findOne(`#${id}`)!.findOne<import('konva').default.Shape>('Shape')!;
+      const shape = stage.findOne<import('konva').default.Group>(`#${id}`)!.findOne<import('konva').default.Shape>('Shape')!;
       const p = shape.getAbsoluteTransform().point({ x: shape.width() * x, y: y < 0 ? y / Math.abs(shape.getAbsoluteScale().y) : shape.height() * y });
       const rect = stage.container().getBoundingClientRect();
       return { x: rect.left + p.x, y: rect.top + p.y };
     }, { id, x, y });
     const selected = () => page.evaluate(() => {
-      const Konva = (window as Window & { Konva: typeof import('konva').default }).Konva;
+      const Konva = (window as unknown as Window & { Konva: typeof import('konva').default }).Konva;
       return Konva.stages[0].findOne<import('konva').default.Transformer>('Transformer')!.nodes()[0]?.id();
     });
     await selectionBar(page).getByRole('button', { name: 'Done', exact: true }).tap();
@@ -499,7 +471,6 @@ test.describe('mobile editor', () => {
     const near = await point(divider!, .5, -10);
     await page.touchscreen.tap(near.x, near.y);
     await expect.poll(selected).toBe(divider);
-    expect(errors).toEqual([]);
   });
 
   test('grid photo frames can be selected by touching the canvas', async ({ page }) => {
@@ -508,7 +479,7 @@ test.describe('mobile editor', () => {
     await page.getByRole('button', { name: 'Start with 2 side grid', exact: true }).tap();
     await expect(dock(page)).toBeVisible();
     const point = await page.evaluate(async () => {
-      const Konva = (window as Window & { Konva: typeof import('konva').default }).Konva;
+      const Konva = (window as unknown as Window & { Konva: typeof import('konva').default }).Konva;
       const stage = Konva.stages[0];
       const bounds = stage.findOne('.layer')!.getClientRect();
       const container = stage.container().getBoundingClientRect();
@@ -519,7 +490,6 @@ test.describe('mobile editor', () => {
   });
 
   test('an imported photo can be selected, dragged and resized with an empty bitmap hit map', async ({ page }) => {
-    const errors = trackPageErrors(page);
     await page.addInitScript(() => {
       const state = window as Window & { dropPhotoTouchEnd?: boolean };
       window.addEventListener('touchend', (event) => {
@@ -542,13 +512,13 @@ test.describe('mobile editor', () => {
     await expect(selectionBar(page).getByRole('button', { name: 'Replace', exact: true })).toBeVisible();
 
     await page.evaluate(() => {
-      const Konva = (window as Window & { Konva: typeof import('konva').default }).Konva;
+      const Konva = (window as unknown as Window & { Konva: typeof import('konva').default }).Konva;
       Konva.Layer.prototype.getIntersection = () => null;
     });
 
     await selectionBar(page).getByRole('button', { name: 'Done', exact: true }).tap();
     const point = await page.evaluate(async () => {
-      const Konva = (window as Window & { Konva: typeof import('konva').default }).Konva;
+      const Konva = (window as unknown as Window & { Konva: typeof import('konva').default }).Konva;
       const stage = Konva.stages[0];
       const node = stage.findOne('.layer')!;
       const bounds = node.getClientRect();
@@ -569,7 +539,7 @@ test.describe('mobile editor', () => {
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ ...point, id: 9 }] });
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: point.x + 24, y: point.y + 18, id: 9 }] });
     const isDragging = () => page.evaluate(async () => {
-      const Konva = (window as Window & { Konva: typeof import('konva').default }).Konva;
+      const Konva = (window as unknown as Window & { Konva: typeof import('konva').default }).Konva;
       return Konva.isDragging();
     });
     await expect.poll(isDragging).toBe(true);
@@ -591,7 +561,7 @@ test.describe('mobile editor', () => {
     await expect.poll(isDragging).toBe(true);
     await expect.poll(photoFrame).toEqual(before);
     const resume = await page.evaluate(async () => {
-      const Konva = (window as Window & { Konva: typeof import('konva').default }).Konva;
+      const Konva = (window as unknown as Window & { Konva: typeof import('konva').default }).Konva;
       const stage = Konva.stages[0];
       const bounds = stage.findOne('.layer')!.getClientRect();
       const container = stage.container().getBoundingClientRect();
@@ -621,7 +591,7 @@ test.describe('mobile editor', () => {
       const moved = await photoFrame();
       await selectionBar(page).getByRole('button', { name: 'Done', exact: true }).tap();
       const nextPoint = await page.evaluate(async () => {
-        const Konva = (window as Window & { Konva: typeof import('konva').default }).Konva;
+        const Konva = (window as unknown as Window & { Konva: typeof import('konva').default }).Konva;
         const stage = Konva.stages[0];
         const bounds = stage.findOne('.layer')!.getClientRect();
         const container = stage.container().getBoundingClientRect();
@@ -641,9 +611,9 @@ test.describe('mobile editor', () => {
     await expect.poll(photoFrame).toEqual(before);
 
     const corner = await page.evaluate(async () => {
-      const Konva = (window as Window & { Konva: typeof import('konva').default }).Konva;
+      const Konva = (window as unknown as Window & { Konva: typeof import('konva').default }).Konva;
       const stage = Konva.stages[0];
-      const node = stage.findOne('Transformer')!.findOne('.bottom-right')!;
+      const node = stage.findOne<import('konva').default.Transformer>('Transformer')!.findOne('.bottom-right')!;
       const position = node.getAbsolutePosition();
       const container = stage.container().getBoundingClientRect();
       return { x: container.left + position.x, y: container.top + position.y };
@@ -675,12 +645,9 @@ test.describe('mobile editor', () => {
     await page.touchscreen.tap(point.x, point.y);
     await expect(page.getByRole('status', { name: 'Selected: Photo' })).toBeVisible();
     await cdp.detach();
-
-    expect(errors).toEqual([]);
   });
 
   test('a cancelled photo resize releases the handle and leaves the photo touchable', async ({ page }) => {
-    const errors = trackPageErrors(page);
     await createCarousel(page);
     await dockTab(page, 'Photos').tap();
     await page.locator('input[type=file]').setInputFiles({ name: 'tiny.png', mimeType: 'image/png', buffer: tinyPng });
@@ -695,14 +662,14 @@ test.describe('mobile editor', () => {
     });
     const before = await frame();
     const corner = await page.evaluate(async () => {
-      const Konva = (window as Window & { Konva: typeof import('konva').default }).Konva;
+      const Konva = (window as unknown as Window & { Konva: typeof import('konva').default }).Konva;
       const stage = Konva.stages[0];
-      const position = stage.findOne('Transformer')!.findOne('.bottom-right')!.getAbsolutePosition();
+      const position = stage.findOne<import('konva').default.Transformer>('Transformer')!.findOne('.bottom-right')!.getAbsolutePosition();
       const container = stage.container().getBoundingClientRect();
       return { x: container.left + position.x, y: container.top + position.y };
     });
     const transforming = () => page.evaluate(async () => {
-      const Konva = (window as Window & { Konva: typeof import('konva').default }).Konva;
+      const Konva = (window as unknown as Window & { Konva: typeof import('konva').default }).Konva;
       return Konva.isTransforming();
     });
     const cdp = await page.context().newCDPSession(page);
@@ -718,7 +685,7 @@ test.describe('mobile editor', () => {
     await expect.poll(frame).toEqual(before);
     await selectionBar(page).getByRole('button', { name: 'Done', exact: true }).tap();
     const centre = await page.evaluate(async () => {
-      const Konva = (window as Window & { Konva: typeof import('konva').default }).Konva;
+      const Konva = (window as unknown as Window & { Konva: typeof import('konva').default }).Konva;
       const stage = Konva.stages[0];
       const bounds = stage.findOne('.layer')!.getClientRect();
       const container = stage.container().getBoundingClientRect();
@@ -731,11 +698,9 @@ test.describe('mobile editor', () => {
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
     await expect.poll(frame).not.toEqual(before);
     await cdp.detach();
-    expect(errors).toEqual([]);
   });
 
   test('the Export sheet offers output settings and downloads a ZIP', async ({ page }) => {
-    const errors = trackPageErrors(page);
     await createCarousel(page);
 
     await test.step('Export opens the sheet with output settings', async () => {
@@ -759,12 +724,9 @@ test.describe('mobile editor', () => {
       expect(download.suggestedFilename()).toMatch(/\.zip$/);
       expect(await download.failure()).toBeNull();
     });
-
-    expect(errors).toEqual([]);
   });
 
   test('renaming in the Project sheet shows on the home list and reopens the project', async ({ page }) => {
-    const errors = trackPageErrors(page);
     await createCarousel(page);
 
     await test.step('Rename the project in the Project sheet', async () => {
@@ -785,8 +747,6 @@ test.describe('mobile editor', () => {
       await expect(page.getByRole('button', { name: 'Project settings: Beach trip', exact: true })).toBeVisible();
       await expect(dock(page)).toBeVisible();
     });
-
-    expect(errors).toEqual([]);
   });
 });
 
@@ -794,7 +754,6 @@ test.describe('desktop layout', () => {
   test.use({ viewport: { width: 1280, height: 800 }, isMobile: false, hasTouch: false });
 
   test('desktop landing page and editor render without the mobile dock', async ({ page }) => {
-    const errors = trackPageErrors(page);
 
     await test.step('Desktop landing page, not the mobile home', async () => {
       await page.goto('/');
@@ -813,7 +772,5 @@ test.describe('desktop layout', () => {
       await expect(page.getByRole('navigation', { name: 'Tools' })).toBeVisible();
       await expect(dock(page)).toHaveCount(0);
     });
-
-    expect(errors).toEqual([]);
   });
 });
