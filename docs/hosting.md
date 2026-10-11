@@ -7,9 +7,11 @@ and imported photos remain in the visitor's local browser storage.
 ## GitHub Pages
 
 The `deploy-pages` job in `.github/workflows/ci.yml` publishes `dist/` after
-verification succeeds on `main`. Branch pushes and pull requests run the checks
-without publishing. The checks include the editor suite and production PWA
-tests at both `/` and `/open-scrl/`.
+all verification jobs succeed on `main`. Pull requests and manual workflow runs
+on feature branches run the checks without publishing. The checks run in
+parallel, including two editor shards and separate production PWA jobs at both
+`/` and `/open-scrl/`. See [browser testing](testing.md) for the job structure
+and diagnostic artifacts.
 
 The deployment job installs Node 22 and the Bun version from `packageManager`,
 uses `bun install --frozen-lockfile`, and builds for the base path reported by

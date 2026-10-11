@@ -22,7 +22,8 @@ PWA suite builds `dist/` and starts the Bun test server with one worker because
 the tests change its service-worker revision. Both suites use fresh browser
 contexts per test, retain normal motion, and default to zero retries. CI rejects
 focused tests and flaky results, even if retries are requested on the command
-line. Run builds and PWA checks sequentially because they both write `dist/`.
+line. Run builds and PWA checks sequentially within one checkout because they
+all write `dist/`.
 
 The editor suite can reuse a local server at its configured port; CI always
 starts its own. Use an unused `SCRL_E2E_PORT` when working in multiple checkouts.
@@ -32,6 +33,32 @@ CI also runs the production suite at `/open-scrl/` to exercise GitHub Pages
 asset paths, the manifest launch URL, service-worker scope, offline editing,
 and prompted updates. Set `SCRL_BASE_PATH` to test another hosting path; include
 both leading and trailing slashes. The development editor suite runs at `/`.
+
+## CI parallelism
+
+CI runs five jobs concurrently: `bun run verify`, two editor shards, and the
+full PWA suite on separate runners for `/` and `/open-scrl/`. Editor shards use
+test-level parallelism so large files such as `mobile.spec.ts` can be divided:
+
+```bash
+CI=1 SCRL_E2E_PORT=5186 bun run test:e2e --fully-parallel --shard=1/2
+CI=1 SCRL_E2E_PORT=5186 bun run test:e2e --fully-parallel --shard=2/2
+```
+
+Run these commands sequentially within a checkout, copying the first shard's
+reports before the second writes to the same paths. Each shard still uses two
+workers. PWA suites retain one worker because
+their tests modify a shared service-worker revision on the test server; their
+separate CI runners isolate both the server and `dist/`.
+
+The final `verify` job runs even if a prerequisite fails and succeeds only when
+all code checks, editor shards, and PWA jobs succeed. GitHub Pages deployment
+depends on that gate. Matrix jobs finish independently so a failure in one shard does not
+cancel the other shard's diagnostics.
+
+CI runs on pull requests, pushes to `main`, and manual dispatch. Open a draft PR
+or use manual dispatch to test a feature branch. New PR updates cancel obsolete
+runs; `main` verification and deployment are not canceled by new pushes.
 
 To run a file or repeat a specific test, pass Playwright arguments directly to
 the Bun script:
@@ -48,9 +75,18 @@ PWA_PORT=5187 bun run test:pwa --grep 'offline'
 Screenshots, error context, attachments, and retained traces are written under
 `test-results/e2e/` and `test-results/pwa/`. HTML reports are written under
 `playwright-report/e2e/` and `playwright-report/pwa/`. Running one suite preserves
-the other suite's artifacts. CI uploads both artifact roots when a check fails.
+the other suite's artifacts. CI uploads the failing job's artifacts when a
+check fails, with distinct names for each editor shard and hosting path.
 The production suite with a non-root base path uses `test-results/pwa-pages/`
 and `playwright-report/pwa-pages/`, preserving the root PWA results too.
+
+Both configs also write `results.json` inside their HTML report directory.
+CI uploads these timing reports after successful and failed runs, retaining
+them for seven days. Download `e2e-timings-1`, `e2e-timings-2`,
+`pwa-timings-root`, or `pwa-timings-pages` from the workflow run to inspect test
+durations. Console output lists individual test timings too. HTML reports and
+retained failure traces are uploaded as `e2e-failure-artifacts-<shard>` or
+`pwa-failure-artifacts-<hosting>`; full successful HTML reports are kept locally.
 
 ```bash
 bun run test:report playwright-report/e2e
