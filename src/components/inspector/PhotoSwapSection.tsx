@@ -53,7 +53,7 @@ export function PhotoSwapSection({ ids }: { ids: string[] }) {
         <p className="text-[11px] leading-snug text-ink-faint">
           {ready ? moving ? 'The photo moves to the empty frame. Frame sizes and styling stay put.' : 'Each photo takes the other’s place. Frame sizes and styling stay put.' : 'Choose two photo frames with at least one photo and different contents.'}
         </p>
-        {failed && <p role="status" className="text-[11px] leading-snug text-red-300">These frames can’t swap right now.</p>}
+        {failed && <p role="status" className="text-[11px] leading-snug text-danger">These frames can’t swap right now.</p>}
       </Section>
     );
   }
@@ -78,7 +78,7 @@ export function PhotoSwapSection({ ids }: { ids: string[] }) {
       <p className="text-[11px] leading-snug text-ink-faint">
         {target?.empty ? 'The photo moves to the empty frame; this one becomes empty.' : 'Pick another frame to trade photos with, even on a different slide.'}
       </p>
-      {failed && <p role="status" className="text-[11px] leading-snug text-red-300">That frame isn’t available any more.</p>}
+      {failed && <p role="status" className="text-[11px] leading-snug text-danger">That frame isn’t available any more.</p>}
     </Section>
   );
 }

@@ -136,11 +136,11 @@ export function RotationDial({ value, onChange, disabled, size = 92, onInteracti
             y1={cy}
             x2={hx}
             y2={hy}
-            stroke="#7c5cff"
+            stroke="rgb(var(--c-accent))"
             strokeWidth={compact ? 2 : 2.5}
             strokeLinecap="round"
           />
-          <circle cx={cx} cy={cy} r={compact ? 3 : 5} fill="#18181c" stroke="#7c5cff" strokeWidth={1.5} />
+          <circle cx={cx} cy={cy} r={compact ? 3 : 5} fill="rgb(var(--c-bg-panel) / var(--c-bg-panel-alpha))" stroke="rgb(var(--c-accent))" strokeWidth={1.5} />
         </svg>
       </div>
       {!compact && (

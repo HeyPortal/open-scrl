@@ -25,7 +25,7 @@ export function ShadowSection({ layer }: { layer: Layer }) {
     <EffectSection title="Shadow" enabled={!!shadow} onToggle={(on) => updateLayer(layer.id, { shadow: on ? SHADOW_PRESETS[0].shadow : null })} hint="A drop shadow that follows the layer’s outline.">
       {shadow && (
         <>
-          <div className="grid grid-cols-4 gap-1">
+          <div className="insp-grid grid-cols-4 gap-1">
             {SHADOW_PRESETS.map((p) => {
               const active = sameShadow(p.shadow, shadow);
               return (

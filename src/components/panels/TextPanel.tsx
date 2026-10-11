@@ -37,28 +37,29 @@ export function TextPanel({ layout = 'sidebar' }: { layout?: 'sidebar' | 'sheet'
   const editing = selectedLayerId && selectedLayer?.kind === 'text';
 
   return (
-    <div className={sheet ? 'flex flex-col' : 'flex h-full flex-col'}>
+    <div className={sheet ? 'lib-panel flex flex-col' : 'lib-panel flex h-full flex-col'}>
       {!sheet && <PanelHeader title="Text" />}
       <div className={sheet ? 'px-4 pb-4 pt-1' : 'px-3 pb-3'}>
-        <button className={sheet ? 'flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-accent text-[15px] font-semibold text-white transition-colors active:bg-accent-hover' : 'btn btn-primary w-full'} onClick={() => addText(sheet ? 'Double-tap to edit' : undefined)}>
+        <button className={sheet ? 'flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-accent text-[15px] font-semibold text-accent-ink transition-colors active:bg-accent-hover' : 'btn btn-primary w-full'} onClick={() => addText(sheet ? 'Double-tap to edit' : undefined)}>
           <Plus size={sheet ? 18 : 16} aria-hidden /> Add text box
         </button>
       </div>
       <div className={`flex items-center justify-between border-t border-line pb-2 pt-3 ${sheet ? 'px-4' : 'px-3'}`}>
         <h3 className="section-title">Styles</h3>
-        <span className={`text-[11px] ${editing ? 'font-medium text-accent' : 'text-ink-faint'}`}>{editing ? 'Applies to selected text' : sheet ? 'Tap to add' : 'Click to add'}</span>
+        <span className={`text-[11px] ${editing ? 'font-medium text-accent' : 'text-ink-dim'}`}>{editing ? 'Applies to selected text' : sheet ? 'Tap to add' : 'Click to add'}</span>
       </div>
-      <div className={sheet ? 'flex flex-col gap-2 px-4 pb-4' : 'flex flex-col gap-2 overflow-auto px-3 pb-4 scrollbar-thin'}>
+      <div className={sheet ? 'flex flex-col gap-2 px-4 pb-4' : 'flex min-h-0 flex-1 flex-col gap-2 overflow-auto px-3 pb-4 scrollbar-thin'}>
         {PRESETS.map((p) => (
-          <button key={p.name} onClick={() => apply(p)} className={`tile text-left ${sheet ? 'px-4 py-3.5 active:bg-bg-hover' : 'px-3.5 py-3'}`}>
-            <div className="truncate leading-tight text-ink" style={{ fontSize: Math.max(13, Math.min(p.size / 5, 30)), fontWeight: p.weight }}>
+          <button key={p.name} onClick={() => apply(p)} className={`lib-tile relative rounded-lg bg-bg-inset text-left ${sheet ? 'min-h-[64px] px-4 py-3.5 active:bg-bg-hover' : 'px-3.5 py-3'}`}>
+            <div className="truncate pr-7 leading-tight text-ink" style={{ fontSize: Math.max(13, Math.min(p.size / 5, 30)), fontWeight: p.weight }}>
               {p.text.split('\n')[0]}
             </div>
-            <div className="mt-1 text-[11px] text-ink-faint">{p.name} · {p.size}px</div>
+            <div className="mt-1 text-[11px] text-ink-dim">{p.name} · {p.size}px</div>
+            <span className="lib-tile-add absolute right-2.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full bg-accent-soft text-accent" aria-hidden><Plus size={14} /></span>
           </button>
         ))}
       </div>
-      {!sheet && <p className="mt-auto border-t border-line px-3 py-3 text-[11px] leading-relaxed text-ink-faint">Tip: double-click text on the canvas to edit it in place.</p>}
+      {!sheet && <p className="mt-auto shrink-0 border-t border-line px-3 py-3 text-[11px] leading-relaxed text-ink-dim">Tip: double-click text on the canvas to edit it in place.</p>}
     </div>
   );
 }

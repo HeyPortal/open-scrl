@@ -2,16 +2,17 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Command, Search, X } from 'lucide-react';
 import { useEditorSession } from '@/editor/sessionStore';
 import { buildActions, formatBinding, isMac, type Action, type ActionGroup } from '@/app/actions';
+import { ExportDialog } from './export/ExportDialog';
 
 const GROUP_ORDER: ActionGroup[] = ['Insert', 'Edit', 'Arrange', 'Slide', 'View', 'Panels', 'Export', 'Project', 'Grids'];
 
 function Dialog({ label, onClose, className = '', children }: { label: string; onClose: () => void; className?: string; children: ReactNode }) {
   return (
     <div
-      className="fixed inset-0 z-[1050] flex items-start justify-center bg-black/55 px-4 pt-[12vh] backdrop-blur-[2px]"
+      className="studio-scrim"
       onPointerDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div role="dialog" aria-modal="true" aria-label={label} className={`w-full overflow-hidden rounded-xl border border-line-strong bg-bg-overlay shadow-lift ${className}`}>
+      <div role="dialog" aria-modal="true" aria-label={label} className={`studio-dialog ${className}`}>
         {children}
       </div>
     </div>
@@ -56,11 +57,11 @@ export function CommandPalette() {
 
   return (
     <Dialog label="Command palette" onClose={close} className="max-w-[560px]">
-      <div className="flex items-center gap-2.5 border-b border-line px-3.5">
-        <Search size={15} className="shrink-0 text-ink-faint" aria-hidden />
+      <div className="studio-palette-search">
+        <Search size={16} className="shrink-0 text-ink-faint" aria-hidden />
         <input
           autoFocus
-          className="h-11 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-ink-faint focus-visible:ring-0"
+          className="studio-palette-input"
           placeholder="Type a command…"
           aria-label="Search commands"
           value={query}
@@ -74,12 +75,17 @@ export function CommandPalette() {
         />
         <kbd className="kbd">Esc</kbd>
       </div>
-      <div ref={listRef} role="listbox" aria-label="Commands" className="max-h-[52vh] overflow-y-auto p-1.5 scrollbar-thin">
-        {results.length === 0 && <p className="px-3 py-8 text-center text-xs text-ink-faint">No matching commands.</p>}
+      <div ref={listRef} role="listbox" aria-label="Commands" className="studio-palette-list scrollbar-thin">
+        {results.length === 0 && (
+          <div className="studio-palette-empty">
+            <p className="text-sm text-ink-dim">No matching commands.</p>
+            <p className="mt-1 text-xs text-ink-faint">Try a shorter word, like “export” or “slide”.</p>
+          </div>
+        )}
         {results.map((action, index) => (
           <div key={action.id}>
             {(index === 0 || results[index - 1].group !== action.group) && (
-              <p className="px-2.5 pb-1 pt-2.5 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">{action.group}</p>
+              <p className="studio-palette-group">{action.group}</p>
             )}
             <button
               type="button"
@@ -87,23 +93,19 @@ export function CommandPalette() {
               aria-selected={index === active}
               data-index={index}
               data-active={index === active}
-              className="menu-item group h-8"
+              className="studio-palette-item"
               onMouseMove={() => setActive(index)}
               onClick={() => run(action)}
             >
               <span className="truncate">{action.label}</span>
-              {action.keys?.[0] && (
-                <span className="ml-auto flex items-center gap-0.5 text-[11px] text-ink-faint group-data-[active=true]:text-white/80">
-                  {formatBinding(action.keys[0]).join(' ')}
-                </span>
-              )}
+              {action.keys?.[0] && <span className="ml-auto"><Keys keys={formatBinding(action.keys[0])} /></span>}
             </button>
           </div>
         ))}
       </div>
-      <div className="flex items-center gap-3 border-t border-line px-3.5 py-2 text-[11px] text-ink-faint">
-        <span className="flex items-center gap-1"><Keys keys={['↑', '↓']} /> navigate</span>
-        <span className="flex items-center gap-1"><Keys keys={['↵']} /> run</span>
+      <div className="studio-palette-foot">
+        <span className="flex items-center gap-1.5"><Keys keys={['↑', '↓']} /> navigate</span>
+        <span className="flex items-center gap-1.5"><Keys keys={['↵']} /> run</span>
         <span className="ml-auto flex items-center gap-1"><Command size={11} aria-hidden /> {isMac ? '⌘K' : 'Ctrl K'} anytime</span>
       </div>
     </Dialog>
@@ -139,20 +141,23 @@ export function ShortcutsDialog() {
 
   return (
     <Dialog label="Keyboard shortcuts" onClose={close} className="max-w-[980px]">
-      <div className="flex items-center justify-between border-b border-line px-4 py-3">
+      <div className="studio-dialog-head">
         <h2 className="heading-md">Keyboard shortcuts</h2>
-        <button className="icon-btn" onClick={close} title="Close" aria-label="Close">
-          <X size={15} />
-        </button>
+        <div className="flex items-center gap-2">
+          <Keys keys={['Esc']} />
+          <button className="icon-btn" onClick={close} title="Close" aria-label="Close">
+            <X size={15} />
+          </button>
+        </div>
       </div>
-      <div className="grid max-h-[72vh] gap-x-8 gap-y-5 overflow-y-auto p-4 scrollbar-thin sm:grid-cols-2 lg:grid-cols-3">
+      <div className="studio-shortcuts scrollbar-thin">
         {groups.map(({ group, rows }) => (
           <section key={group}>
-            <h3 className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-ink-faint">{group}</h3>
+            <h3>{group}</h3>
             <ul>
               {rows.map((row) => (
-                <li key={row.label} className="flex h-7 items-center justify-between gap-3 text-xs text-ink-dim">
-                  <span className="truncate">{row.label}</span>
+                <li key={row.label}>
+                  <span>{row.label}</span>
                   <Keys keys={row.keys} />
                 </li>
               ))}
@@ -168,5 +173,6 @@ export function EditorOverlays() {
   const overlay = useEditorSession((s) => s.overlay);
   if (overlay === 'palette') return <CommandPalette />;
   if (overlay === 'shortcuts') return <ShortcutsDialog />;
+  if (overlay === 'export') return <ExportDialog />;
   return null;
 }

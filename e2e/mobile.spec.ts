@@ -46,8 +46,8 @@ test.describe('mobile editor', () => {
       await expect(page.getByRole('heading', { name: 'Open-SCRL', level: 1 })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Create carousel', exact: true })).toBeVisible();
       await expect(page.getByRole('heading', { name: 'No carousels yet' })).toBeVisible();
-      await expect(page.getByRole('heading', { name: 'New project' })).toHaveCount(0);
-      await expect(page.getByRole('button', { name: 'Create & open editor' })).toHaveCount(0);
+      await expect(page.locator('.home-phone')).toBeVisible();
+      await expect(page.locator('.home-desktop')).toHaveCount(0);
     });
 
     await test.step('"Create carousel" opens the mobile editor', async () => {
@@ -113,6 +113,36 @@ test.describe('mobile editor', () => {
       await expect(selectionBar(page).getByRole('button', { name: 'Duplicate', exact: true })).toBeVisible();
       await expect(selectionBar(page).getByRole('button', { name: 'Delete', exact: true })).toBeVisible();
       await expect(dock(page)).toHaveCount(0);
+    });
+
+    await test.step('No label is clipped, and More holds the arrange and lock actions', async () => {
+      const clipped = await selectionBar(page).evaluate((bar) =>
+        [...bar.querySelectorAll('button')].filter((button) => {
+          const label = button.querySelector('span');
+          if (!label) return false;
+          const box = label.getBoundingClientRect();
+          const room = button.getBoundingClientRect();
+          return box.left < room.left - 0.5 || box.right > room.right + 0.5;
+        }).map((button) => button.textContent),
+      );
+      expect(clipped).toEqual([]);
+
+      const more = selectionBar(page).getByRole('button', { name: 'More actions', exact: true });
+      const menu = page.getByRole('menu', { name: 'More actions', exact: true });
+      await more.tap();
+      for (const name of ['Forward', 'Backward', 'Lock']) await expect(menu.getByRole('menuitem', { name, exact: true })).toBeVisible();
+      const row = await menu.getByRole('menuitem', { name: 'Lock', exact: true }).boundingBox();
+      expect(row?.height).toBeGreaterThanOrEqual(44);
+      await page.keyboard.press('Escape');
+      await expect(menu).toHaveCount(0);
+      await expect(more).toBeFocused();
+
+      await more.tap();
+      await menu.getByRole('menuitem', { name: 'Lock', exact: true }).tap();
+      await expect(menu).toHaveCount(0);
+      await more.tap();
+      await menu.getByRole('menuitem', { name: 'Unlock', exact: true }).tap();
+      await expect(menu).toHaveCount(0);
     });
 
     await test.step('Duplicate adds a second layer', async () => {
@@ -362,6 +392,7 @@ test.describe('mobile editor', () => {
         }, kind);
         if (layout === 'filled grid') {
           await page.goto('/');
+          await page.locator('.home-grid-options > summary').tap();
           await page.getByRole('button', { name: 'Start with 2 side grid', exact: true }).tap();
           await expect(dock(page)).toBeVisible();
           const photo = await point('image');
@@ -473,6 +504,7 @@ test.describe('mobile editor', () => {
 
   test('grid photo frames can be selected by touching the canvas', async ({ page }) => {
     await page.goto('/');
+    await page.locator('.home-grid-options > summary').tap();
     await page.getByRole('button', { name: 'Start with 2 side grid', exact: true }).tap();
     await expect(dock(page)).toBeVisible();
     const point = await page.evaluate(async () => {
@@ -702,16 +734,20 @@ test.describe('mobile editor', () => {
     expect(errors).toEqual([]);
   });
 
-  test('the Export sheet offers three options and "Export carousel" downloads a ZIP', async ({ page }) => {
+  test('the Export sheet offers output settings and downloads a ZIP', async ({ page }) => {
     const errors = trackPageErrors(page);
     await createCarousel(page);
 
-    await test.step('Export opens the sheet with its three options', async () => {
+    await test.step('Export opens the sheet with output settings', async () => {
       await page.getByRole('button', { name: 'Export', exact: true }).tap();
       const exportSheet = sheetRegion(page, 'Export');
       await expect(exportSheet).toBeVisible();
       await expect(exportSheet.getByRole('button', { name: /^Export carousel/ })).toBeVisible();
+      await expect(exportSheet.getByRole('radiogroup', { name: 'Image format', exact: true })).toBeVisible();
+      await expect(exportSheet.getByRole('radiogroup', { name: 'Image resolution', exact: true })).toBeVisible();
+      await exportSheet.getByRole('radio', { name: 'This slide', exact: true }).tap();
       await expect(exportSheet.getByRole('button', { name: /^Save this slide/ })).toBeVisible();
+      await exportSheet.getByRole('radio', { name: 'All slides', exact: true }).tap();
       await expect(exportSheet.getByRole('button', { name: /^Preview on phone/ })).toBeVisible();
     });
 
@@ -740,7 +776,7 @@ test.describe('mobile editor', () => {
 
     await test.step('Back to projects lists the renamed project', async () => {
       await page.getByRole('button', { name: 'Back to projects', exact: true }).tap();
-      await expect(page.getByRole('heading', { name: 'Your projects' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Recent projects' })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Open Beach trip', exact: true })).toBeVisible();
     });
 
@@ -762,14 +798,17 @@ test.describe('desktop layout', () => {
 
     await test.step('Desktop landing page, not the mobile home', async () => {
       await page.goto('/');
-      await expect(page.getByRole('heading', { name: 'New project' })).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Create & open editor' })).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Create carousel', exact: true })).toHaveCount(0);
-      await expect(page.getByRole('heading', { name: 'Start from a grid' })).toHaveCount(0);
+      await expect(page.getByRole('heading', { name: 'Recent projects' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Create carousel' })).toBeVisible();
+      await expect(page.locator('.home-desktop')).toBeVisible();
+      await expect(page.locator('.home-phone')).toHaveCount(0);
+      // Desktop shares the phone's grid starters.
+      await page.locator('.home-grid-options > summary').click();
+      await expect(page.getByRole('region', { name: 'Grid layouts' })).toBeVisible();
     });
 
     await test.step('Desktop editor with the side tools, not the mobile dock', async () => {
-      await page.getByRole('button', { name: 'Create & open editor' }).click();
+      await page.getByRole('button', { name: 'Create carousel' }).click();
       await expect(page.getByTitle('Zoom out')).toBeVisible();
       await expect(page.getByRole('navigation', { name: 'Tools' })).toBeVisible();
       await expect(dock(page)).toHaveCount(0);

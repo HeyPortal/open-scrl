@@ -1,0 +1,58 @@
+/* Studio theme. See docs/design.md for the token contract. */
+:root {
+  color-scheme: dark;
+  --c-bg: 10 10 12;
+  --c-bg-rail: 24 24 28;
+  --c-bg-panel: 24 24 28;
+  --c-bg-inset: 35 35 41;
+  --c-bg-hover: 44 44 51;
+  --c-bg-overlay: 24 24 28;
+  --c-ink: 244 244 246;
+  --c-ink-dim: 161 161 173;
+  --c-ink-faint: 142 142 154;
+  --c-accent: 174 153 255;
+  --c-accent-hover: 196 181 255;
+  --c-accent-ink: 27 19 51;
+  /* Icon-inspired lilac controls; companion colors belong to decorative previews. */
+  --c-brand-lilac: 162 139 255;
+  --c-brand-blue: 125 187 255;
+  --c-brand-teal: 101 214 197;
+  --c-brand-pink: 242 155 203;
+  --c-line: 255 255 255;
+  --c-line-strong: 255 255 255;
+  --c-canvas-bg: 10 10 12;
+  --c-canvas-dot: 255 255 255;
+  --c-template: 52 52 60;
+  --c-danger-bg: 42 22 24;
+  --c-warning-bg: 42 34 20;
+  --c-danger-ink: 254 226 226;
+  --c-warning-ink: 254 243 199;
+  --c-preview-backdrop: 10 10 12;
+  --c-preview-bezel: 35 35 41;
+  --c-accent-soft: 174 153 255;
+  --c-accent-soft-alpha: 0.1411764705882353;
+  --c-bg-panel-alpha: 0.86;
+  --c-line-alpha: 0.0784313725490196;
+  --c-line-strong-alpha: 0.1411764705882353;
+  --c-canvas-dot-alpha: 0.035;
+  --radius-panel: 14px;
+  --radius-control: 8px;
+  --panel-gap: 10px;
+  --shadow-panel: 0 24px 60px -20px rgba(0,0,0,.8);
+  --shadow-slider: 0 0 0 1px rgba(0,0,0,.5), 0 1px 3px rgba(0,0,0,.5);
+  --c-accent-start: var(--c-brand-lilac);
+  --c-accent-end: var(--c-brand-blue);
+  --c-danger: 252 165 165;
+  --c-danger-icon: 248 113 113;
+  --c-warning: 251 191 36;
+  --c-success: 52 211 153;
+  --c-surface-ring: 255 255 255;
+  --c-text-edit-bg: 18 18 22;
+  --c-text-edit-ink: 255 255 255;
+  --shadow-soft: 0 1px 2px rgba(0,0,0,.4);
+  --shadow-lift: 0 0 0 1px rgba(255,255,255,.05), 0 16px 40px -12px rgba(0,0,0,.7);
+  --shadow-sheet: 0 -12px 32px -12px rgba(0,0,0,.7);
+  --shadow-mobile-menu: 0 -6px 24px -8px rgba(0,0,0,.7);
+  --shadow-preview: 0 40px 120px -30px rgba(0,0,0,.9), inset 0 0 0 1px rgba(255,255,255,.08);
+  --shadow-text-edit: 0 8px 24px rgba(0,0,0,.45);
+}

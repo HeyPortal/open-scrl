@@ -1,3 +1,4 @@
+import { canvasTheme } from '@/components/canvas/canvasTheme';
 import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react';
 import { Trash2 } from 'lucide-react';
 import type { Gradient, GradientStop, ImageMask } from '@/types';
@@ -128,16 +129,16 @@ export function GradientEditor({ value, onChange, gesture, presets }: { value: G
   return (
     <div className="space-y-2.5">
       {presets && (
-        <div className="grid grid-cols-6 gap-1.5">
+        <div className="insp-grid grid-cols-6 gap-1.5">
           {presets.map((p) => (
-            <button key={gradientCss(p)} type="button" className="aspect-square rounded ring-1 ring-inset ring-white/10 transition-transform hover:scale-110" style={{ background: gradientCss(p) }} onClick={() => { onChange(p); setSelected(0); }} aria-label="Use gradient preset" />
+            <button key={gradientCss(p)} type="button" className="aspect-square rounded ring-1 ring-inset ring-surface-ring/10 transition-transform hover:scale-110" style={{ background: gradientCss(p) }} onClick={() => { onChange(p); setSelected(0); }} aria-label="Use gradient preset" />
           ))}
         </div>
       )}
       <div className="px-2">
         <div
           ref={bar}
-          className="insp-gradient-bar relative h-6 cursor-copy rounded-md ring-1 ring-inset ring-white/15"
+          className="insp-gradient-bar relative h-6 cursor-copy rounded-md ring-1 ring-inset ring-surface-ring/15"
           style={{ background: gradientCss({ type: 'linear', angle: 90, stops }) }}
           onPointerDown={onBarDown}
           title="Click to add a color stop"
@@ -148,7 +149,7 @@ export function GradientEditor({ value, onChange, gesture, presets }: { value: G
               type="button"
               aria-label={`Color stop ${Math.round(s.offset * 100)}%`}
               aria-pressed={i === index}
-              className={`insp-gradient-stop absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 cursor-grab rounded-full ring-2 transition-shadow active:cursor-grabbing ${i === index ? 'ring-white shadow-[0_0_0_4px_rgba(124,92,255,0.6)]' : 'ring-white/80 shadow-soft'}`}
+              className={`insp-gradient-stop absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 cursor-grab rounded-full ring-2 transition-shadow active:cursor-grabbing ${i === index ? 'ring-white shadow-[0_0_0_4px_rgb(var(--c-accent)/0.6)]' : 'ring-white/80 shadow-soft'}`}
               style={{ left: `${s.offset * 100}%`, background: s.color }}
               onPointerDown={(e) => onStopDown(e, i)}
               onPointerMove={onStopMove}
@@ -195,7 +196,7 @@ function MaskGlyph({ mask, active }: { mask: ImageMask; active: boolean }) {
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     canvas.width = canvas.height = 22 * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 2 * dpr, 2 * dpr);
-    ctx.fillStyle = active ? '#7c5cff' : '#a0a0ab';
+    ctx.fillStyle = active ? canvasTheme.selection : canvasTheme.inkDim;
     ctx.fill(maskPath(mask, 18, 18, mask === 'rect' ? 4 : 1));
   }, [active, mask]);
   return <canvas ref={ref} style={{ width: 22, height: 22 }} aria-hidden />;
@@ -203,7 +204,7 @@ function MaskGlyph({ mask, active }: { mask: ImageMask; active: boolean }) {
 
 export function MaskPicker({ value, onChange }: { value: ImageMask; onChange: (mask: ImageMask) => void }) {
   return (
-    <div className="grid grid-cols-7 gap-1" role="radiogroup" aria-label="Photo shape">
+    <div className="insp-grid grid-cols-7 gap-1" role="radiogroup" aria-label="Photo shape">
       {IMAGE_MASKS.map(({ id, label }) => (
         <button key={id} type="button" role="radio" aria-checked={value === id} title={label} aria-label={label} onClick={() => onChange(id)}
           className={`flex aspect-square items-center justify-center rounded-md transition-colors ${value === id ? 'bg-accent-soft ring-1 ring-inset ring-accent' : 'bg-bg-inset hover:bg-bg-hover'}`}>

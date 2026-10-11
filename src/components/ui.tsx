@@ -7,10 +7,10 @@ export function PanelHeader({ title, hint, action }: { title: string; hint?: Rea
   return (
     <div className="px-3 pb-2.5 pt-3">
       <div className="flex h-7 items-center justify-between gap-2">
-        <h2 className="heading-md text-ink">{title}</h2>
+        <h2 className="heading-md min-w-0 truncate text-ink">{title}</h2>
         {action}
       </div>
-      {hint && <p className="mt-1 text-[11px] leading-relaxed text-ink-faint">{hint}</p>}
+      {hint && <p className="mt-1 text-[11px] leading-relaxed text-ink-dim">{hint}</p>}
     </div>
   );
 }
@@ -38,7 +38,7 @@ export function LinkedSliders({ linked, onToggle, top, bottom }: { linked: boole
   const border = linked ? 'border-accent' : 'border-line-strong';
   const fill = linked ? 'bg-accent' : 'bg-line-strong';
   return (
-    <div className="flex items-stretch gap-2.5">
+    <div className="flex items-stretch gap-2">
       <div className="min-w-0 flex-1 space-y-0.5">{top}{bottom}</div>
       <div className="mb-3.5 mt-[26px] flex shrink-0 items-stretch">
         <div className={`w-2 rounded-r-[3px] border-y border-r ${border}`} aria-hidden />
@@ -46,7 +46,7 @@ export function LinkedSliders({ linked, onToggle, top, bottom }: { linked: boole
           <span className={`h-px w-1.5 ${fill}`} aria-hidden />
           <button
             type="button"
-            className={`icon-btn ml-1 ${linked ? 'icon-btn-active' : ''}`}
+            className={`icon-btn ${linked ? 'icon-btn-active' : ''}`}
             title={linked ? 'Unlink gap and outer margin' : 'Link gap and outer margin'}
             aria-label="Link gap and outer margin"
             aria-pressed={linked}
@@ -61,7 +61,7 @@ export function LinkedSliders({ linked, onToggle, top, bottom }: { linked: boole
 }
 
 export function ValueChip({ children }: { children: ReactNode }) {
-  return <span className="text-[11px] tabular-nums text-ink-dim">{children}</span>;
+  return <span className="shrink-0 whitespace-nowrap text-[11px] tabular-nums text-ink-dim">{children}</span>;
 }
 
 export function fillPercent(value: number, min: number, max: number) {
@@ -104,7 +104,7 @@ export function Slider({
     <label className="block min-w-0">
       {(label || display !== undefined) && (
         <span className="mb-0.5 flex items-center justify-between gap-2">
-          <span className="field-label">{label}</span>
+          <span className="field-label min-w-0 truncate">{label}</span>
           {display !== undefined && <ValueChip>{display}</ValueChip>}
         </span>
       )}
@@ -232,7 +232,7 @@ export function NumberField({
 export function ColorField({ value, onChange, label }: { value: string; onChange: (hex: string) => void; label: string }) {
   return (
     <label className="flex h-7 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md border border-transparent bg-bg-inset px-1 transition-colors hover:border-line-strong focus-within:border-accent">
-      <span className="relative h-5 w-5 shrink-0 overflow-hidden rounded ring-1 ring-inset ring-white/15" style={{ backgroundColor: value }}>
+      <span className="relative h-5 w-5 shrink-0 overflow-hidden rounded ring-1 ring-inset ring-surface-ring/15" style={{ backgroundColor: value }}>
         <input
           type="color"
           className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
@@ -251,7 +251,7 @@ export function EmptyState({ icon, title, children }: { icon: ReactNode; title: 
     <div className="flex flex-col items-center px-5 py-8 text-center">
       <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-bg-inset text-ink-dim ring-1 ring-line-strong">{icon}</div>
       <p className="heading-sm text-ink">{title}</p>
-      {children && <div className="mt-1 text-[11px] leading-relaxed text-ink-faint">{children}</div>}
+      {children && <div className="mt-1 text-[11px] leading-relaxed text-ink-dim">{children}</div>}
     </div>
   );
 }

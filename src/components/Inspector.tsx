@@ -61,11 +61,11 @@ function LayerHeader({ layer }: { layer: Layer }) {
   const { label, Icon } = KIND_META[layer.kind];
   const selectGroup = () => useEditorSession.getState().selectLayers(groupMemberIds(useEditor.getState().doc, layer.id), layer.id);
   return (
-    <div className="flex items-center gap-2 border-b border-line px-3 py-2.5">
+    <div className="insp-layer-header flex items-center gap-2 border-b border-line px-3 py-2.5">
       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-accent-soft text-accent" title={label}>
         <Icon size={15} strokeWidth={1.9} aria-hidden />
       </span>
-      <div className="min-w-0 flex-1">
+      <div className="insp-header-title min-w-0 flex-1">
         {renaming ? (
           <input
             autoFocus
@@ -240,7 +240,7 @@ function ImageInspector({ layer }: { layer: ImageLayer }) {
         action={
           // On a phone the side panel doesn't exist; the host opens its own photo picker, or the link is hidden.
           touch && !touch.onReplacePhoto ? undefined : (
-            <button className="insp-link text-xs font-medium text-accent hover:text-accent-hover" onClick={touch ? touch.onReplacePhoto : () => setLeftPanel('photos')}>
+            <button className="insp-link text-xs font-medium text-accent hover:text-accent-hover" onClick={touch ? touch.onReplacePhoto : (() => setLeftPanel('photos'))}>
               {layer.assetId ? 'Replace' : 'Choose photo'}
             </button>
           )
@@ -287,7 +287,7 @@ function ImageInspector({ layer }: { layer: ImageLayer }) {
           />
         </div>
         <div className="flex items-start gap-3">
-          <div className="grid w-[84px] shrink-0 grid-cols-3 gap-1 rounded-lg bg-bg-inset p-1" role="group" aria-label="Focal point">
+          <div className="insp-grid w-[84px] shrink-0 grid-cols-3 gap-1 rounded-lg bg-bg-inset p-1" role="group" aria-label="Focal point">
             {FOCAL_POINTS.map((point) => {
               const active = point === activeFocalPoint;
               return (
@@ -298,7 +298,7 @@ function ImageInspector({ layer }: { layer: ImageLayer }) {
                   aria-label={point.label}
                   aria-pressed={active}
                   className={`flex aspect-square items-center justify-center rounded-md transition-colors ${
-                    active ? 'bg-accent text-white' : 'text-ink-faint hover:bg-bg-hover hover:text-ink-dim'
+                    active ? 'bg-accent text-accent-ink' : 'text-ink-faint hover:bg-bg-hover hover:text-ink-dim'
                   }`}
                   onClick={() => patch({ cropOffsetX: point.x, cropOffsetY: point.y })}
                 >
@@ -543,7 +543,7 @@ function SlideInspector({ onShowLayers }: { onShowLayers: () => void }) {
   return (
     <div>
       <div className="flex items-center gap-2.5 border-b border-line px-3 py-2.5">
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md ring-1 ring-inset ring-white/15" style={{ background: backgroundCss(slide.background) }}>
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md ring-1 ring-inset ring-surface-ring/15" style={{ background: backgroundCss(slide.background) }}>
           <span className="rounded bg-black/60 px-1 text-[10px] font-semibold tabular-nums text-white">{index + 1}</span>
         </span>
         <div className="min-w-0 flex-1">
@@ -553,7 +553,7 @@ function SlideInspector({ onShowLayers }: { onShowLayers: () => void }) {
       </div>
       {empty && !touch && (
         <Section title="Start this slide">
-          <div className="grid grid-cols-2 gap-1.5">
+          <div className="insp-grid grid-cols-2 gap-1.5">
             {quickStart.map(({ label, Icon, run }) => (
               <button key={label} className="tile flex h-14 flex-col items-center justify-center gap-1 text-[11px] text-ink-dim hover:text-ink" onClick={run}>
                 <Icon size={16} aria-hidden /> {label}
@@ -564,14 +564,14 @@ function SlideInspector({ onShowLayers }: { onShowLayers: () => void }) {
       )}
       <GridSection slideId={slideId} />
       <Section title="Background" action={touch ? undefined : <button className="text-[11px] font-medium text-accent hover:text-accent-hover" onClick={() => setLeftPanel('background')}>More</button>}>
-        <div className="grid grid-cols-8 gap-1.5">
+        <div className="insp-grid grid-cols-8 gap-1.5">
           {quick.map((bg) => {
             const active = sameBackground(slide.background, bg);
             return (
               <button
                 key={backgroundCss(bg)}
                 type="button"
-                className={`aspect-square rounded ring-1 ring-inset ring-white/10 transition-transform hover:scale-110 ${active ? 'outline outline-2 outline-offset-2 outline-accent' : ''}`}
+                className={`aspect-square rounded ring-1 ring-inset ring-surface-ring/10 transition-transform hover:scale-110 ${active ? 'outline outline-2 outline-offset-2 outline-accent' : ''}`}
                 style={{ background: backgroundCss(bg) }}
                 onClick={() => setBackground(bg)}
                 aria-label={`Use background ${backgroundLabel(bg)}`}
@@ -588,7 +588,7 @@ function SlideInspector({ onShowLayers }: { onShowLayers: () => void }) {
       </Section>
       <SlidePhotoActions slideId={slideId} />
       <Section title="Slide">
-        <div className="grid grid-cols-3 gap-1.5">
+        <div className="insp-grid grid-cols-3 gap-1.5">
           <button className="btn btn-secondary btn-sm" onClick={() => addSlide(slideId)} title="Add a slide after this one">
             <Plus size={13} className="shrink-0" aria-hidden /> Add
           </button>

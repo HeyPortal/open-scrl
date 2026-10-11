@@ -4,6 +4,7 @@ import { act } from 'react';
 import { newDocument, useDocumentStore } from '@/editor/documentStore';
 import { useEditorSession } from '@/editor/sessionStore';
 import type { ImageLayer, Layer, ShapeLayer, TextLayer } from '@/types';
+import { ContextMenuHost, useContextMenu } from '@/components/Menu';
 import { MobileSelectionBar } from './MobileSelectionBar';
 
 // The export pipeline loads Konva's Node build; it is not exercised here.
@@ -24,11 +25,26 @@ function seed(layers: Layer[], selected: string[]) {
 }
 
 const bar = (props: Partial<Parameters<typeof MobileSelectionBar>[0]> = {}) =>
-  render(<MobileSelectionBar onEdit={props.onEdit ?? vi.fn()} onReplacePhoto={props.onReplacePhoto ?? vi.fn()} />);
+  render(
+    <>
+      <MobileSelectionBar onEdit={props.onEdit ?? vi.fn()} onReplacePhoto={props.onReplacePhoto ?? vi.fn()} />
+      <ContextMenuHost />
+    </>,
+  );
 const button = (name: RegExp | string) => screen.getByRole('button', { name });
+const more = () => button('More actions');
+/** Opens the More menu and returns the item, for actions that sit behind it. */
+const moreItem = (name: string) => {
+  if (!screen.queryByRole('menu', { name: 'More actions' })) fireEvent.click(more());
+  return screen.getByRole('menuitem', { name });
+};
+const chooseMore = (name: string) => fireEvent.click(moreItem(name));
 
 beforeEach(() => seed([photo('a'), text('b'), shape('c')], ['a']));
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  useContextMenu.getState().close();
+});
 
 describe('MobileSelectionBar', () => {
   it('names a single layer by kind and offers Edit and Replace for a photo', () => {
@@ -62,29 +78,30 @@ describe('MobileSelectionBar', () => {
   it('disables Forward at the top of the stack and Backward at the bottom', () => {
     seed([photo('a'), text('b'), shape('c')], ['c']);
     bar();
-    expect(button('Forward')).toBeDisabled();
-    expect(button('Backward')).toBeEnabled();
+    expect(moreItem('Forward')).toBeDisabled();
+    expect(moreItem('Backward')).toBeEnabled();
     act(() => useEditorSession.getState().selectLayers(['a']));
-    expect(button('Forward')).toBeEnabled();
-    expect(button('Backward')).toBeDisabled();
+    expect(moreItem('Forward')).toBeEnabled();
+    expect(moreItem('Backward')).toBeDisabled();
   });
 
   it('moves layers through the stack', () => {
     seed([photo('a'), text('b'), shape('c')], ['a']);
     bar();
-    fireEvent.click(button('Forward'));
+    chooseMore('Forward');
     expect(useDocumentStore.getState().doc.slides[useDocumentStore.getState().doc.slideOrder[0]].layerOrder).toEqual(['b', 'a', 'c']);
   });
 
   it('toggles the lock and flips its label', () => {
     bar();
-    fireEvent.click(button('Lock'));
+    chooseMore('Lock');
     expect(useDocumentStore.getState().doc.layers.a.locked).toBe(true);
-    fireEvent.click(button('Unlock'));
+    chooseMore('Unlock');
     expect(useDocumentStore.getState().doc.layers.a.locked).toBe(false);
   });
 
   it('duplicates and selects the copy', () => {
+    seed([photo('a'), text('b'), shape('c')], ['c']);
     bar();
     fireEvent.click(button('Duplicate'));
     const { doc } = useDocumentStore.getState();
@@ -96,19 +113,21 @@ describe('MobileSelectionBar', () => {
   it('only offers Group for several layers, then Ungroup once grouped', () => {
     const view = bar();
     expect(screen.queryByRole('button', { name: /group/i })).toBeNull();
+    fireEvent.click(more());
+    expect(screen.queryByRole('menuitem', { name: /group/i })).toBeNull();
     view.unmount();
 
     act(() => useEditorSession.getState().selectLayers(['a', 'b']));
     bar();
     expect(screen.getByRole('status', { name: 'Selected: 2 layers' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Ungroup' })).toBeNull();
-    fireEvent.click(button('Group'));
+    expect(screen.queryByRole('menuitem', { name: 'Ungroup' })).toBeNull();
+    chooseMore('Group');
     const { layers } = useDocumentStore.getState().doc;
     expect(layers.a.groupId).toBeTruthy();
     expect(layers.a.groupId).toBe(layers.b.groupId);
     expect(screen.getByRole('status', { name: 'Selected: Group' })).toBeInTheDocument();
-    expect(button('Ungroup')).toBeEnabled();
-    expect(screen.queryByRole('button', { name: 'Group' })).toBeNull();
+    expect(moreItem('Ungroup')).toBeEnabled();
+    expect(screen.queryByRole('menuitem', { name: 'Group' })).toBeNull();
   });
 
   it('deletes the selection', () => {
@@ -130,7 +149,59 @@ describe('MobileSelectionBar', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it('keeps the common actions in the bar and the rest behind More', () => {
+    const view = bar();
+    // A photo swaps rather than duplicates: Edit, Replace and Delete stay, Duplicate moves under More.
+    for (const name of ['Edit', 'Replace', 'Delete', 'More actions']) expect(button(name)).toBeEnabled();
+    for (const name of ['Duplicate', 'Forward', 'Backward', 'Lock']) expect(screen.queryByRole('button', { name })).toBeNull();
+    expect(more()).toHaveAttribute('aria-haspopup', 'menu');
+    expect(more()).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(more());
+    expect(more()).toHaveAttribute('aria-expanded', 'true');
+    const items = screen.getAllByRole('menuitem').map((item) => item.textContent);
+    expect(items).toEqual(['Duplicate', 'Forward', 'Backward', 'Lock']);
+    view.unmount();
+    cleanup();
+
+    seed([photo('a'), text('b'), shape('c')], ['b']);
+    bar();
+    for (const name of ['Edit', 'Duplicate', 'Delete', 'More actions']) expect(button(name)).toBeEnabled();
+    fireEvent.click(more());
+    expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual(['Forward', 'Backward', 'Lock']);
+  });
+
+  it('closes More with Escape and returns focus to its button', () => {
+    bar();
+    more().focus();
+    fireEvent.click(more());
+    const menu = screen.getByRole('menu', { name: 'More actions' });
+    expect(menu).toHaveFocus();
+    fireEvent.keyDown(menu, { key: 'Escape' });
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(more()).toHaveFocus();
+    expect(more()).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('closes More on an outside tap, on a second tap of the button, and with the selection', () => {
+    bar();
+    fireEvent.click(more());
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+    fireEvent.pointerDown(document.body);
+    expect(screen.queryByRole('menu')).toBeNull();
+
+    fireEvent.click(more());
+    // The trigger's own tap is not an outside tap, so the click toggles the menu shut.
+    fireEvent.pointerDown(more());
+    fireEvent.click(more());
+    expect(screen.queryByRole('menu')).toBeNull();
+
+    fireEvent.click(more());
+    act(() => useEditorSession.getState().selectLayers([]));
+    expect(screen.queryByRole('menu')).toBeNull();
+  });
+
   it('gives a light haptic tap where supported', () => {
+    seed([photo('a'), text('b'), shape('c')], ['c']);
     const vibrate = vi.fn();
     Object.defineProperty(navigator, 'vibrate', { value: vibrate, configurable: true });
     try {

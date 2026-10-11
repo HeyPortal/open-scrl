@@ -1,4 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
+import { Loader2, RefreshCw } from 'lucide-react';
 import { useDocumentStore } from '@/editor/documentStore';
 import { editorActivity } from '@/editor/activity';
 import { UpdateController } from './updateController';
@@ -73,14 +74,14 @@ export function PwaUpdatePrompt({ flush, mobile = false }: { flush: () => Promis
   const message = state.status === 'error' ? state.error : updating ? 'Finishing your work before updating…' : 'A new version of Open-SCRL is ready.';
   const action = mobile ? 'btn h-11 flex-1 rounded-lg px-4 text-sm' : 'btn btn-sm shrink-0';
   // On phones the prompt is a full-width card (message above, 44px actions below) so the copy never
-  // squeezes into a narrow column beside the buttons; on desktop it stays one compact row.
-  return <div role="status" className={mobile
-    ? 'fixed bottom-[calc(env(safe-area-inset-bottom)+76px)] left-[max(0.75rem,env(safe-area-inset-left))] right-[max(0.75rem,env(safe-area-inset-right))] z-50 mx-auto flex max-w-md flex-col gap-3 rounded-lg border border-line bg-bg-panel p-3 text-sm text-ink shadow-lift'
-    : 'fixed bottom-5 left-1/2 z-50 flex max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-3 rounded-lg border border-line bg-bg-panel p-3 text-xs text-ink shadow-lift'}>
+  // squeezes into a narrow column beside the buttons; on desktop it stays one compact row. CSS keeps the
+  // phone card above the slide strip and dock, or beside the landscape tool rail.
+  return <div role="status" className={`studio-update${mobile ? ' studio-update-mobile' : ''}`}>
+    {updating ? <Loader2 size={15} className="studio-update-icon animate-spin" aria-hidden /> : <RefreshCw size={15} className="studio-update-icon" aria-hidden />}
     <span className="min-w-0 break-words">{message}</span>
-    <div className={mobile ? 'flex gap-2' : 'contents'}>
+    <div className={mobile ? 'studio-update-actions flex gap-2' : 'contents'}>
       <button className={`${action} btn-primary`} disabled={updating} onClick={() => controller.requestUpdate()}>{updating ? 'Updating…' : state.status === 'error' ? 'Retry update' : 'Reload to update'}</button>
-      {!updating && <button className={`${action} ${mobile ? 'btn-secondary' : ''}`} onClick={() => controller.dismiss()}>Later</button>}
+      {!updating && <button className={`${action} ${mobile ? 'btn-secondary' : 'btn-ghost'}`} onClick={() => controller.dismiss()}>Later</button>}
     </div>
   </div>;
 }

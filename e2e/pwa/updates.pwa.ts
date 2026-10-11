@@ -4,7 +4,7 @@ import type { ProjectDocumentV2 } from '../../src/types';
 const tinyPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
 async function install(page: Page) {
   await page.goto('/');
-  await expect(page.getByText('Your projects')).toBeVisible();
+  await expect(page.getByText('Recent projects')).toBeVisible();
   await page.evaluate(async () => { await navigator.serviceWorker.ready; });
   await page.reload();
   await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
@@ -165,7 +165,7 @@ test('another tab activating an update does not reload a busy tab or accept for 
   await deploy(other);
   await expect(other.getByRole('button', { name: 'Reload to update' })).toBeVisible();
   await other.getByRole('button', { name: 'Reload to update' }).click();
-  await expect(other.getByText('Your projects')).toBeVisible();
+  await expect(other.getByText('Recent projects')).toBeVisible();
   await expect(page.getByLabel('Project name')).toHaveValue('Other tab project');
   await expect(page.getByRole('button', { name: 'Reload to update' })).toHaveCount(0);
   await page.evaluate(() => (window as unknown as { importGate: { held: (() => void)[] } }).importGate.held.splice(0).forEach((resume) => resume()));
@@ -190,17 +190,20 @@ test('caches optional export tools with query strings for later offline use', as
   await install(page);
   await createProject(page, 'Cached tools');
   const firstDownload = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Export Carousel' }).click();
+  await page.getByRole('button', { name: 'Export Carousel', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Export', exact: true }).getByRole('button', { name: 'Export carousel', exact: true }).click();
   expect((await firstDownload).suggestedFilename()).toMatch(/_instagram\.zip$/);
   const cached = await page.evaluate(async () => (await (await caches.open('optional-editor-tools')).keys()).map((request) => request.url));
   expect(cached.some((url) => /export\.worker-.*\?cache-check=1$/.test(url))).toBe(true);
   expect(cached.some((url) => /\/zip-[^/]+\.js$/.test(url))).toBe(true);
+  await page.getByRole('button', { name: 'Close Export', exact: true }).click();
   await page.getByTitle('Projects').click();
   await context.setOffline(true);
   await page.reload();
   await page.getByRole('button', { name: /Cached tools/ }).click();
   const offlineDownload = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Export Carousel' }).click();
+  await page.getByRole('button', { name: 'Export Carousel', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Export', exact: true }).getByRole('button', { name: 'Export carousel', exact: true }).click();
   expect((await offlineDownload).suggestedFilename()).toMatch(/_instagram\.zip$/);
 });
 
@@ -226,7 +229,8 @@ for (const gesture of ['drag', 'transform'] as const) {
     const name = `${gesture} activation race`;
     await install(page);
     await createProject(page, name);
-    await page.getByRole('button', { name: 'Add rectangle', exact: true }).click();
+    await page.getByRole('button', { name: 'Main menu', exact: true }).click();
+    await page.getByRole('menuitem', { name: /^Add rectangle/ }).click();
     await delayActivation(page);
     const before = await savedLayer(page, name);
     expect(before).not.toBeNull();
@@ -238,7 +242,7 @@ for (const gesture of ['drag', 'transform'] as const) {
     await expect(page.getByTitle('Projects')).toBeVisible();
     expect(await savedLayer(page, name)).toEqual(before);
     await page.mouse.up();
-    await expect(page.getByText('Your projects')).toBeVisible();
+    await expect(page.getByText('Recent projects')).toBeVisible();
     const after = await savedLayer(page, name);
     expect(after).not.toBeNull();
     if (gesture === 'drag') expect(after!.x).not.toBe(before!.x);
@@ -252,7 +256,8 @@ test('activation waits for a text draft and saves its blur commit before reloadi
   const name = 'Text activation race';
   await install(page);
   await createProject(page, name);
-  await page.getByRole('button', { name: 'Add text', exact: true }).click();
+  await page.getByRole('button', { name: 'Main menu', exact: true }).click();
+  await page.getByRole('menuitem', { name: /^Add text/ }).click();
   await delayActivation(page);
   const point = await canvasPoint(page);
   await page.mouse.dblclick(point.x, point.y);
@@ -264,7 +269,7 @@ test('activation waits for a text draft and saves its blur commit before reloadi
   const before = await savedLayer(page, name);
   expect(before?.kind === 'text' && before.text).not.toBe('Saved after worker activation');
   await draft.evaluate((element) => element.blur());
-  await expect(page.getByText('Your projects')).toBeVisible();
+  await expect(page.getByText('Recent projects')).toBeVisible();
   const after = await savedLayer(page, name);
   expect(after?.kind === 'text' && after.text).toBe('Saved after worker activation');
 });

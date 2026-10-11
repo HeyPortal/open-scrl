@@ -120,7 +120,7 @@ export function SelectionInspector({ ids }: { ids: string[] }) {
       {ids.length === 2 && <PhotoSwapSection ids={ids} />}
 
       <Section title="Group">
-        <div className="grid grid-cols-2 gap-1.5">
+        <div className="insp-grid grid-cols-2 gap-1.5">
           <button type="button" className="btn btn-secondary btn-sm" disabled={!canGroup} onClick={() => groupLayers(ids)} title={`Group (${shortcut('group')})`}>
             <GroupIcon size={13} className="shrink-0" aria-hidden /> Group
           </button>
@@ -147,7 +147,7 @@ export function SelectionInspector({ ids }: { ids: string[] }) {
             </button>
           ))}
         </div>
-        <div className="grid grid-cols-2 gap-1.5">
+        <div className="insp-grid grid-cols-2 gap-1.5">
           <button type="button" className="btn btn-secondary btn-sm" disabled={units.length < 3} onClick={() => distributeSelection('horizontal')} title="Even horizontal spacing">
             <AlignHorizontalSpaceAround size={13} className="shrink-0" aria-hidden /> Space across
           </button>

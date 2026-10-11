@@ -1,9 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
+import { createHash } from 'node:crypto';
 import type { ProjectDocumentV2 } from '../src/types';
 
 async function createProject(page: Page, name: string) {
   await page.getByLabel('Project name').fill(name);
-  await page.getByRole('button', { name: /create.*open editor/i }).click();
+  await page.getByRole('button', { name: 'Create carousel', exact: true }).click();
   await expect(page.getByTitle('Projects', { exact: true })).toBeVisible();
 }
 
@@ -32,6 +33,37 @@ async function png(page: Page, name: string, color: string, width = 40, height =
   }, { fill: color, width, height });
   return { name, mimeType: 'image/png', buffer: Buffer.from(data, 'base64') };
 }
+
+test('images import, deduplicate and reopen on a plain HTTP network origin', async ({ page, context, baseURL }) => {
+  // Route a non-loopback hostname to the test server without changing its
+  // browser security context or requiring a machine-specific LAN address.
+  const previewOrigin = 'http://scrl-preview.test';
+  await context.route(`${previewOrigin}/**`, async (route) => {
+    const upstream = new URL(route.request().url());
+    upstream.host = new URL(baseURL!).host;
+    await route.fulfill({ response: await route.fetch({ url: upstream.href }) });
+  });
+  await page.goto(previewOrigin);
+  expect(await page.evaluate(() => ({ secure: isSecureContext, hashing: typeof crypto.subtle }))).toEqual({ secure: false, hashing: 'undefined' });
+  await createProject(page, 'Network import');
+  const file = await png(page, 'network.png', '#22c55e');
+  await page.locator('input[type=file]').setInputFiles(file);
+  await expect(page.getByAltText('network.png')).toBeVisible();
+  await expect(page.getByText('Imported 1 media file.', { exact: true })).toBeVisible();
+  await page.locator('input[type=file]').setInputFiles(file);
+  await expect(page.getByAltText('network.png')).toHaveCount(1);
+  await expect(page.getByText('1 duplicate file was already imported.', { exact: true })).toBeVisible();
+  await page.reload();
+  await page.getByRole('button', { name: 'Open Network import', exact: true }).click();
+  await expect(page.getByAltText('network.png')).toBeVisible();
+  const stored = await page.evaluate(async () => {
+    const path = '/src/assets/indexeddb/IndexedDbAssetRepository.ts';
+    const { assetRepository } = await import(path);
+    const metadata = await assetRepository.listMetadata();
+    return { count: metadata.length, hash: metadata[0].hash, size: (await assetRepository.readOriginal(metadata[0].id))?.size };
+  });
+  expect(stored).toEqual({ count: 1, hash: createHash('sha256').update(file.buffer).digest('hex'), size: file.buffer.length });
+});
 
 test('a pending import as slides stays associated with its original project after switching', async ({ page }) => {
   await page.addInitScript(() => {

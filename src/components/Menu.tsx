@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { create } from 'zustand';
 import { Check } from 'lucide-react';
@@ -9,7 +9,7 @@ export type MenuEntry =
 
 export function Shortcut({ keys }: { keys: string[] }) {
   return (
-    <span className="ml-auto flex items-center gap-0.5 pl-4 text-[11px] text-ink-faint group-data-[active=true]:text-white/80">
+    <span className="ml-auto flex items-center gap-0.5 pl-4 text-[11px] tabular-nums tracking-wide text-ink-faint group-data-[active=true]:text-ink-dim">
       {keys.map((key) => <span key={key}>{key}</span>)}
     </span>
   );
@@ -19,6 +19,8 @@ export function Shortcut({ keys }: { keys: string[] }) {
 export function MenuList({ items, onClose, label }: { items: MenuEntry[]; onClose: () => void; label?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(-1);
+  // Without icons or checks the label column starts at the item's edge instead of after an empty gutter.
+  const gutter = items.some((item) => !('separator' in item) && (item.icon || item.checked !== undefined));
   const selectable = items.map((item, index) => ('separator' in item || item.disabled ? -1 : index)).filter((i) => i >= 0);
 
   useEffect(() => { ref.current?.focus(); }, []);
@@ -59,14 +61,16 @@ export function MenuList({ items, onClose, label }: { items: MenuEntry[]; onClos
             type="button"
             disabled={item.disabled}
             data-active={active === index}
-            className={`menu-item group ${item.danger ? 'text-red-300 data-[active=true]:!bg-red-500 data-[active=true]:!text-white' : ''}`}
+            className={`menu-item group ${item.danger ? 'menu-item-danger' : ''}`}
             onMouseEnter={() => setActive(index)}
             onMouseLeave={() => setActive(-1)}
             onClick={() => { onClose(); item.onSelect(); }}
           >
-            <span className="flex w-4 shrink-0 items-center justify-center text-ink-dim group-data-[active=true]:text-white">
-              {item.checked ? <Check size={13} aria-hidden /> : item.icon}
-            </span>
+            {gutter && (
+              <span className="menu-item-icon flex w-4 shrink-0 items-center justify-center text-ink-dim group-data-[active=true]:text-ink">
+                {item.checked ? <Check size={13} aria-hidden /> : item.icon}
+              </span>
+            )}
             <span className="truncate">{item.label}</span>
             {item.shortcut && <Shortcut keys={item.shortcut} />}
           </button>
@@ -115,23 +119,35 @@ function Floating({ x, y, onClose, ignore, children }: { x: number; y: number; o
 }
 
 interface ContextMenuState {
-  menu: { x: number; y: number; items: MenuEntry[]; label: string } | null;
-  open: (x: number, y: number, items: MenuEntry[], label?: string) => void;
+  menu: { x: number; y: number; items: MenuEntry[]; label: string; trigger?: HTMLElement | null } | null;
+  /**
+   * `trigger` is the button that opened the menu: taps on it are not outside taps (so it can toggle the
+   * menu), and it regains focus when the menu closes while focus is still inside it or nowhere.
+   */
+  open: (x: number, y: number, items: MenuEntry[], label?: string, trigger?: HTMLElement | null) => void;
   close: () => void;
 }
 
-export const useContextMenu = create<ContextMenuState>((set) => ({
+export const useContextMenu = create<ContextMenuState>((set, get) => ({
   menu: null,
-  open: (x, y, items, label = 'Context menu') => set({ menu: { x, y, items, label } }),
-  close: () => set({ menu: null }),
+  open: (x, y, items, label = 'Context menu', trigger) => set({ menu: { x, y, items, label, trigger } }),
+  close: () => {
+    const trigger = get().menu?.trigger;
+    const active = document.activeElement;
+    set({ menu: null });
+    // An outside tap has already moved focus on; only reclaim it from the menu itself.
+    if (trigger?.isConnected && (!active || active === document.body || active.closest('[role="menu"]'))) trigger.focus();
+  },
 }));
 
 export function ContextMenuHost() {
   const menu = useContextMenu((s) => s.menu);
   const close = useContextMenu((s) => s.close);
+  const trigger = menu?.trigger;
+  const ignore = useMemo(() => ({ current: trigger ?? null }), [trigger]);
   if (!menu) return null;
   return (
-    <Floating x={menu.x} y={menu.y} onClose={close}>
+    <Floating x={menu.x} y={menu.y} onClose={close} ignore={ignore}>
       <MenuList items={menu.items} onClose={close} label={menu.label} />
     </Floating>
   );

@@ -11,7 +11,7 @@ export function MobileProjectPanel() {
   const setFormat = useEditor((s) => s.setFormat);
 
   return (
-    <div className="space-y-5 px-4 pb-4 pt-1">
+    <div className="space-y-5 px-4 pb-4 pt-2">
       <label className="block">
         <span className="mb-1.5 block text-[12px] font-medium text-ink-dim">Project name</span>
         <input
@@ -43,7 +43,7 @@ export function MobileProjectPanel() {
                 aria-checked={selected}
                 onClick={() => setFormat(f)}
                 className={`relative flex min-h-[60px] items-center gap-3 rounded-xl px-3 py-2 text-left ring-1 ring-inset transition-colors duration-150 ${
-                  selected ? 'bg-accent-soft ring-accent' : 'bg-bg-inset ring-transparent active:bg-bg-hover'
+                  selected ? 'bg-accent-soft ring-accent' : 'bg-bg-inset ring-line-strong active:bg-bg-hover'
                 }`}
               >
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center">

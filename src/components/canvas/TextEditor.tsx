@@ -68,7 +68,7 @@ export function TextEditor({ layer, stage, offsetX = 0, scale: scaleProp, viewpo
         lineHeight: layer.lineHeight,
         letterSpacing: layer.letterSpacing * scale,
         background: 'transparent',
-        border: '1px dashed #7c5cff',
+        border: '1px dashed rgb(var(--c-accent))',
         outline: 'none',
         resize: 'none',
         padding: 0,

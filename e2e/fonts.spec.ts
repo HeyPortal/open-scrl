@@ -4,7 +4,32 @@ for (const mobile of [false, true]) {
   test.describe(mobile ? 'mobile fonts' : 'desktop fonts', () => {
     test.use({ viewport: mobile ? { width: 393, height: 852 } : { width: 1280, height: 800 } });
 
-    test('UI waits for Inter and the font selector uses the bundled face', async ({ page }) => {
+    test('paints a dark page without visible loading text before the app downloads', async ({ page }) => {
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => { release = resolve; });
+      let requested!: () => void;
+      const entryRequested = new Promise<void>((resolve) => { requested = resolve; });
+      await page.route('**/src/main.tsx', async (route) => {
+        requested();
+        await gate;
+        await route.continue();
+      });
+      await page.goto('/', { waitUntil: 'commit' });
+      await entryRequested;
+      try {
+        await expect(page.locator('html')).toHaveCSS('background-color', 'rgb(10, 10, 12)');
+        await expect(page.locator('body')).toHaveCSS('margin', '0px');
+        const startup = page.getByRole('status', { name: 'Loading Open-SCRL', exact: true });
+        await expect(startup).toBeVisible();
+        await expect(startup).toHaveText('');
+        await expect(page.locator('#root')).toHaveCSS('height', `${page.viewportSize()!.height}px`);
+      } finally {
+        release();
+      }
+      await expect(page.getByRole('button', { name: 'Create carousel', exact: true })).toBeVisible();
+    });
+
+    test('UI waits for document Inter and uses Onest while the font selector keeps the document face', async ({ page }) => {
       let release!: () => void;
       const fontGate = new Promise<void>((resolve) => { release = resolve; });
       let requested!: () => void;
@@ -16,7 +41,7 @@ for (const mobile of [false, true]) {
       });
       await page.goto('/', { waitUntil: 'domcontentloaded' });
       await fontRequested;
-      const create = page.getByRole('button', { name: mobile ? 'Create carousel' : 'Create & open editor', exact: true });
+      const create = page.getByRole('button', { name: 'Create carousel', exact: true });
       try {
         await expect(create).toHaveCount(0);
         await expect(page.getByRole('status', { name: 'Loading Open-SCRL', exact: true })).toBeVisible();
@@ -31,9 +56,9 @@ for (const mobile of [false, true]) {
       await cdp.send('DOM.enable');
       await cdp.send('CSS.enable');
       const { root } = await cdp.send('DOM.getDocument');
-      const { nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: mobile ? '.mobile-home button[type="submit"]' : 'button.btn-primary' });
+      const { nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: mobile ? '.mobile-home button[type="submit"]' : 'button.home-create-button' });
       const { fonts } = await cdp.send('CSS.getPlatformFontsForNode', { nodeId });
-      expect(fonts.some((font) => font.isCustomFont && /Inter/.test(font.familyName) && font.glyphCount > 0)).toBe(true);
+      expect(fonts.some((font) => font.isCustomFont && /Onest/.test(font.familyName) && font.glyphCount > 0)).toBe(true);
       await cdp.detach();
 
       await create.click();
@@ -44,17 +69,47 @@ for (const mobile of [false, true]) {
         await page.getByRole('button', { name: 'Close Text', exact: true }).click();
         await page.getByRole('button', { name: 'Edit', exact: true }).click();
       } else {
-        await page.getByTitle('Text', { exact: true }).click();
+        await page.getByRole('button', { name: 'Text', exact: true }).click();
         await page.getByRole('button', { name: 'Add text box' }).click();
       }
       await expect(page.getByRole('combobox', { name: 'Font', exact: true })).toHaveCSS('font-family', '"Inter Variable"');
+    });
+
+    test('waits for Onest and renders the Bricolage wordmark from its bundled font', async ({ page }) => {
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => { release = resolve; });
+      let requested!: () => void;
+      const fontRequested = new Promise<void>((resolve) => { requested = resolve; });
+      await page.route('**/onest-latin-wght-normal.woff2', async (route) => {
+        requested();
+        await gate;
+        await route.continue();
+      });
+      await page.goto('/', { waitUntil: 'domcontentloaded' });
+      await fontRequested;
+      const create = page.getByRole('button', { name: 'Create carousel', exact: true });
+      try {
+        await expect(create).toHaveCount(0);
+        await expect(page.getByRole('status', { name: 'Loading Open-SCRL', exact: true })).toBeVisible();
+      } finally {
+        release();
+      }
+      await expect(create).toBeVisible();
+      const cdp = await page.context().newCDPSession(page);
+      await cdp.send('DOM.enable');
+      await cdp.send('CSS.enable');
+      const { root } = await cdp.send('DOM.getDocument');
+      const { nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: mobile ? '.home-phone-title' : '.home-brand-name' });
+      const { fonts } = await cdp.send('CSS.getPlatformFontsForNode', { nodeId });
+      expect(fonts.some((font) => font.isCustomFont && /Bricolage/.test(font.familyName) && font.glyphCount > 0)).toBe(true);
+      await cdp.detach();
     });
   });
 }
 
 test('Inter canvas rendering and worker exports match for normal and italic text', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Create & open editor', exact: true }).click();
+  await page.getByRole('button', { name: 'Create carousel', exact: true }).click();
   await expect(page.locator('.konvajs-content')).toBeVisible();
   const results = await page.evaluate(async () => {
     const editorPath = '/src/editor/documentStore.ts';

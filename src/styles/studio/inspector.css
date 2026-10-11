@@ -1,0 +1,126 @@
+/* Studio Properties card: the desktop Inspector, Layers tab and the no-selection pill. Scoped to the card so
+   Phone sheets keep their own touch styling. Labels and hints use ink-dim (not ink-faint), which
+   falls below WCAG AA on the dark panel. */
+
+/* Titles: the layer name and slide heading use the UI sans. */
+.studio-inspector-content :is(.insp-rename, p.text-xs.font-semibold) {
+  font-family: 'Onest Variable', sans-serif;
+  font-size: 16px;
+  line-height: 1.15;
+  font-weight: 600;
+  font-synthesis: none;
+  letter-spacing: -.01em;
+}
+.studio-inspector-content input.input[aria-label='Layer name'].font-semibold {
+  height: 30px;
+  padding: 0 6px;
+  font-family: 'Onest Variable', sans-serif;
+  font-size: 16px;
+  line-height: 1.15;
+  font-weight: 600;
+  font-synthesis: none;
+}
+
+/* Contrast: faint text becomes dim; hierarchy comes from size and weight instead. */
+.studio-inspector-content :is(.text-ink-faint, .field-label) {
+  color: rgb(var(--c-ink-dim));
+}
+
+/* Section headers. The scroll end padding and fade belong to chrome.css. */
+.studio-inspector-content .section-title {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.005em;
+}
+
+/* Direct-button grids use this instead of `.grid`: landing.css styles `section .grid > button` (the home
+   format picker), and Tailwind's @apply of `grid` in `.segmented` copies that rule onto segmented controls. */
+.insp-grid { display: grid; }
+
+/* Fields: 8px control radius to match the chrome; numeric and color fields share it. */
+.studio-inspector-content :is(label:has(input[type='number']), label:has(input[type='color']), .insp-chip) {
+  border-radius: var(--radius-control);
+}
+
+/* Segmented controls share the Background switch look (panels.css `.bg-modes`): a hairline track and a
+   clearly raised active segment. Also restates the background landing.css's leaked rule would set. */
+:is(.studio-inspector-content, .mobile-inspector) .segmented {
+  background: rgb(var(--c-bg-inset));
+  box-shadow: inset 0 0 0 1px rgb(var(--c-line) / var(--c-line-alpha));
+}
+.studio-inspector-content .segmented { padding: 3px; gap: 2px; border-radius: var(--radius-control); }
+:is(.studio-inspector-content, .mobile-inspector) .segmented > button,
+:is(.studio-inspector-content, .mobile-inspector) .segmented > button:hover {
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+.studio-inspector-content .segmented > button { border-radius: 6px; }
+:is(.studio-inspector-content, .mobile-inspector) .segmented > button:hover:not(:disabled) {
+  background: rgb(var(--c-bg-hover) / .6);
+  color: rgb(var(--c-ink));
+}
+:is(.studio-inspector-content, .mobile-inspector) .segmented > .segmented-btn-active,
+:is(.studio-inspector-content, .mobile-inspector) .segmented > .segmented-btn-active:hover:not(:disabled) {
+  background: rgb(var(--c-bg-hover));
+  color: rgb(var(--c-ink));
+  box-shadow: inset 0 0 0 1px rgb(var(--c-line-strong) / var(--c-line-strong-alpha)), var(--shadow-soft);
+}
+:is(.studio-inspector-content, .mobile-inspector) .segmented > [aria-checked='true'] { color: rgb(var(--c-ink)); }
+/* A switch tucked into a section header (Align to, Text fill) stays inside the 20px title row. */
+.studio-inspector-content section > div:first-child .segmented { padding: 2px; }
+.studio-inspector-content section > div:first-child .segmented-btn { height: 22px; }
+
+/* Switch: the off track gets a visible edge, since a faint white track disappears on the dark card. */
+:is(.studio-inspector-content, .mobile-inspector) [role='switch'][aria-checked='false'] {
+  background: rgb(var(--c-bg-inset));
+  box-shadow: inset 0 0 0 1px rgb(var(--c-ink-faint));
+}
+:is(.studio-inspector-content, .mobile-inspector) [role='switch'][aria-checked='false']:hover {
+  background: rgb(var(--c-bg-hover));
+}
+
+/* Tabs: a quiet hover state before the selected pill. */
+.studio-inspector-tabs > [role='tab'] {
+  font-size: 12px;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+.studio-inspector-tabs > [role='tab']:hover { color: rgb(var(--c-ink)); }
+
+/* Phone: the layer and slide titles use the same UI sans as the desktop card. */
+.mobile-inspector :is(.insp-rename, p.text-xs.font-semibold) {
+  font-family: 'Onest Variable', sans-serif;
+  font-size: 17px;
+  line-height: 1.15;
+  font-weight: 600;
+  font-synthesis: none;
+  letter-spacing: -.01em;
+}
+.mobile-inspector :is(.text-ink-faint, .field-label) { color: rgb(var(--c-ink-dim)); }
+
+/* Layers list: the selected row gets an accent edge and an 8px radius. */
+.studio-inspector-content [role='option'] { border-radius: var(--radius-control); }
+.studio-inspector-content [role='option'][aria-selected='true'] {
+  box-shadow: inset 2px 0 0 rgb(var(--c-accent));
+}
+
+/* No-selection pill: the Layers action reads as a control, not a caption. */
+.studio-properties-pill .btn {
+  height: 30px;
+  padding: 0 9px;
+  color: rgb(var(--c-ink));
+  font-weight: 500;
+}
+.studio-properties-pill .icon-btn { width: 30px; height: 30px; }
+
+/* Keyboard focus: a visible accent ring on the card's buttons and tabs. */
+.studio-inspector :is(button, [role='tab']):focus-visible {
+  outline: 2px solid rgb(var(--c-accent) / .7);
+  outline-offset: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-inspector *,
+  .studio-properties-pill * { transition: none; }
+}

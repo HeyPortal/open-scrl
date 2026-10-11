@@ -220,7 +220,7 @@ test.describe('update prompt layout on desktop', () => {
 
   test('stays a single compact row', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByText('Your projects')).toBeVisible();
+    await expect(page.getByText('Recent projects')).toBeVisible();
     await page.evaluate(async () => { await navigator.serviceWorker.ready; });
     await page.reload();
     await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);

@@ -20,7 +20,10 @@
 A free, open-source alternative to [SCRL](https://scrl.com), available as a web app for
 desktop and phones and a native Mac app.
 Lay your photos out across a row of slides, then export one file per slide in posting order.
-It's early, so expect rough edges.
+The web editor uses Studio’s dark stage, floating tool and Properties cards,
+lilac selection controls, and slide timeline on desktop, with touch sheets
+on phones. It's early, so expect rough edges.
+Create a carousel or pick up a saved project from the [home screen](docs/images/web-home.webp).
 
 ![The six slides exported from the sample project.](docs/images/export-strip.webp)
 
@@ -29,7 +32,7 @@ It's early, so expect rough edges.
 - 25 grid layouts, with gap and margin you can change after the photos are in
 - Text with outlines, shadows, gradients, and highlight boxes
 - Photo masks, borders, and blurred-photo backgrounds
-- GIFs and video export as MP4, everything else as PNG, all in one ZIP
+- [Export settings](docs/web-export.md) for PNG/JPEG, resolution, slide selection, and MP4 animations
 - A phone preview of the feed, story, and profile grid crop
 
 <table>
@@ -59,7 +62,7 @@ in the browser and waits for unfinished edits before offering an update.
 
 ## Mac app
 
-![The same project in Open-SCRL for Mac.](docs/images/mac-editor.webp)
+![A Florida carousel in Open-SCRL for Mac.](docs/images/mac-editor.webp)
 
 A separate SwiftUI app in [`macos/`](./macos). Projects are `.openscrl` files, and it adds
 Photos import, AirDrop sharing, and Blend Photos for seamless joins between pictures.
@@ -87,13 +90,19 @@ npm run test:pwa   # production offline and update checks
 
 Requires Node 22.12+. For the Mac app, open `macos/OpenSCRL.xcodeproj` in Xcode 27 and run it.
 
+For a phone preview on the same network, open the Network URL printed by Vite.
+Image imports and project storage also work at this HTTP preview address.
+
 See [web updates and offline tools](docs/web-updates.md) for reload and caching behavior.
 [AGENTS.md](./AGENTS.md) has a tour of the code, and the [changelog](./CHANGELOG.md) lists
 every release.
 
 ## Credits
 
-Screenshot photos are from Unsplash, all taken in Florida, by
+The web screenshots use Florida photos from Wikimedia Commons, with
+[photographer credits, source links, and licenses](docs/screenshot-credits.md).
+
+The Mac screenshot uses Florida photos from Unsplash by
 [John Maldonado](https://unsplash.com/photos/cATp9I27xsU),
 [Jota](https://unsplash.com/photos/q5kqK2HHdfw),
 [PhotoHound](https://unsplash.com/photos/zNR0WdLZ6vU),
@@ -107,4 +116,5 @@ Screenshot photos are from Unsplash, all taken in Florida, by
 
 ## License
 
-[MIT](./LICENSE). Not affiliated with SCRL or Instagram.
+[MIT](./LICENSE); [screenshot imagery has separate licenses](docs/screenshot-credits.md).
+Not affiliated with SCRL or Instagram.

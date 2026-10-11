@@ -1,147 +1,149 @@
-import { useState } from 'react';
-import { AlertTriangle, HardDrive, LayoutGrid } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { AlertTriangle, ChevronDown, Lock, Plus } from 'lucide-react';
+import { AppLogo } from '../AppLogo';
 import type { Format } from '@/types';
-import type { GridTemplate } from '@/lib/grids';
 import { FORMATS } from '@/lib/format';
 import { useEditor } from '@/store/editor';
-import type { ProjectSummary } from '@/store/editor';
-import { GridStarters, STARTER_GAP, STARTER_MARGIN } from './home/GridStarters';
+import { GridStarters } from '../home/GridStarters';
+import { BLANK, useHomeActions } from '../home/useHomeActions';
+import { useNow } from '../home/useNow';
 import { NewCarouselCard } from './home/NewCarouselCard';
 import { ProjectList } from './home/ProjectList';
 import './home/home.css';
 
 /** Scroll distance (px) after which the large title hands over to the compact bar. */
 const COLLAPSE_AT = 44;
+/** A visual viewport this much shorter than the layout viewport means the on-screen keyboard is up. */
+const KEYBOARD_INSET = 120;
 
-const BLANK = 'blank';
+const isTextField = (element: Element | null) =>
+  element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement || element instanceof HTMLSelectElement;
+
+/** True while the on-screen keyboard is likely open (visual viewport shrink, or a text field focused). */
+function useKeyboardOpen() {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    const update = () => {
+      const shrunk = viewport ? window.innerHeight - viewport.height > KEYBOARD_INSET : false;
+      setOpen(shrunk || isTextField(document.activeElement));
+    };
+    update();
+    viewport?.addEventListener('resize', update);
+    document.addEventListener('focusin', update);
+    document.addEventListener('focusout', update);
+    return () => {
+      viewport?.removeEventListener('resize', update);
+      document.removeEventListener('focusin', update);
+      document.removeEventListener('focusout', update);
+    };
+  }, []);
+  return open;
+}
 
 /** Mobile home screen: start a carousel and open saved projects. */
 export default function MobileHome() {
   const projects = useEditor((s) => s.projects);
-  const openProject = useEditor((s) => s.openProject);
-  const newProject = useEditor((s) => s.newProject);
+  const actions = useHomeActions();
+  const now = useNow();
 
   const [format, setFormat] = useState<Format>(FORMATS[0]);
   const [name, setName] = useState('');
-  // 'blank' or a grid template id while a project is being created.
-  const [creating, setCreating] = useState<string | null>(null);
-  const [openingId, setOpeningId] = useState<string | null>(null);
-  const [openError, setOpenError] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(false);
+  const [createVisible, setCreateVisible] = useState(true);
+  const keyboardOpen = useKeyboardOpen();
+  const scroller = useRef<HTMLElement>(null);
+  const createCard = useRef<HTMLFormElement>(null);
 
-  const busy = creating !== null || openingId !== null;
+  // The floating "New carousel" pill shows only while the create card is scrolled out of view.
+  useEffect(() => {
+    const root = scroller.current;
+    const target = createCard.current;
+    if (!root || !target || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(([entry]) => setCreateVisible(entry.isIntersecting), { root, threshold: 0 });
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, []);
 
-  const create = async (template?: GridTemplate) => {
-    if (busy) return;
-    setOpenError(null);
-    setCreating(template?.id ?? BLANK);
-    try {
-      await newProject(format, name);
-      // The new project is active and its first slide is selected, as on desktop's Grids panel.
-      if (template && useEditor.getState().activeProjectId) {
-        useEditor.getState().applyGrid(template, STARTER_GAP, STARTER_MARGIN);
-      }
-    } catch {
-      // saveToDisk reports failures through the store's saveError banner.
-    } finally {
-      setCreating(null);
-    }
+  const scrollToCreate = () => {
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    scroller.current?.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
   };
 
-  const open = async (project: ProjectSummary) => {
-    if (busy) return;
-    setOpenError(null);
-    setOpeningId(project.id);
-    try {
-      await openProject(project.id);
-      const { activeProjectId, readOnlyError } = useEditor.getState();
-      if (!activeProjectId && readOnlyError) setOpenError(readOnlyError);
-    } catch {
-      setOpenError('This project could not be opened. Your saved data has not been changed.');
-    } finally {
-      setOpeningId(null);
-    }
-  };
-
-  const hasProjects = projects.length > 0;
-  const gridStarters = (
-    <GridStarters
-      format={format}
-      pendingId={creating !== BLANK ? creating : null}
-      busy={busy}
-      onPick={(template) => void create(template)}
-    />
-  );
-  const projectList = <ProjectList projects={projects} openingId={openingId} busy={busy} onOpen={(project) => void open(project)} />;
+  const showPill = !createVisible && !keyboardOpen;
 
   return (
-    <div className="mobile-home relative h-[100dvh] w-full overflow-hidden bg-bg text-ink">
+    <div className="mobile-home home home-phone">
       {/* Compact bar: fades in over the content once the large title scrolls away. */}
-      <div
-        aria-hidden
-        className={`pointer-events-none absolute inset-x-0 top-0 z-20 flex items-end justify-center border-b bg-bg/85 backdrop-blur-xl transition-[opacity,border-color] duration-200 ease-out ${
-          collapsed ? 'border-line opacity-100' : 'border-transparent opacity-0'
-        }`}
-        style={{ height: 'calc(env(safe-area-inset-top) + 48px)' }}
-      >
-        <div className="flex h-12 items-center gap-2">
-          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-accent text-white">
-            <LayoutGrid size={13} strokeWidth={2.25} />
-          </span>
-          <span className="heading-md">Open-SCRL</span>
+      <div aria-hidden className="home-topbar" data-collapsed={collapsed}>
+        <div className="home-topbar-inner">
+          <AppLogo className="home-logo home-logo-sm" size={26} />
+          <span className="home-brand-name app-wordmark">Open-SCRL</span>
         </div>
       </div>
 
       <main
-        className="h-full overflow-y-auto overscroll-contain"
+        ref={scroller}
+        data-home-scroll
+        className="home-phone-scroll"
         onScroll={(event) => setCollapsed(event.currentTarget.scrollTop > COLLAPSE_AT)}
       >
-        <div
-          className="mx-auto w-full max-w-[560px]"
-          style={{
-            paddingTop: 'calc(env(safe-area-inset-top) + 20px)',
-            paddingBottom: 'calc(env(safe-area-inset-bottom) + 28px)',
-            paddingLeft: 'max(16px, env(safe-area-inset-left))',
-            paddingRight: 'max(16px, env(safe-area-inset-right))',
-          }}
-        >
-          <header className="mb-5">
-            <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-accent text-white shadow-[0_8px_20px_-8px_rgba(124,92,255,0.9)]">
-                <LayoutGrid size={22} strokeWidth={2.25} aria-hidden />
-              </span>
-              <h1 className="heading-hero">Open-SCRL</h1>
+        <div className="home-glow" aria-hidden />
+        <div className="home-phone-content">
+          <header className="home-phone-header">
+            <div className="home-phone-brand">
+              <AppLogo className="home-logo home-logo-lg" size={44} />
+              <h1 className="home-phone-title app-wordmark">Open-SCRL</h1>
             </div>
-            <p className="mt-2.5 text-[15px] leading-snug text-ink-dim">Carousels &amp; photo grids, saved on this device</p>
           </header>
 
-          {openError && (
-            <div role="alert" className="mb-4 flex items-start gap-2.5 rounded-2xl border border-red-500/30 bg-red-500/10 px-3.5 py-3 text-[13px] leading-snug text-red-100">
-              <AlertTriangle size={16} className="mt-px shrink-0 text-red-400" aria-hidden />
-              <span>{openError}</span>
+          {actions.openError && (
+            <div role="alert" className="home-alert">
+              <AlertTriangle size={16} aria-hidden />
+              <span>{actions.openError}</span>
             </div>
           )}
 
           <NewCarouselCard
+            ref={createCard}
             format={format}
             onFormatChange={setFormat}
             name={name}
             onNameChange={setName}
-            creating={creating === BLANK}
-            busy={busy}
-            onSubmit={() => void create()}
+            creating={actions.creating === BLANK}
+            busy={actions.busy}
+            onSubmit={() => void actions.create(format, name)}
           />
 
-          {hasProjects && projectList}
-          {gridStarters}
-          {!hasProjects && projectList}
+          <details className="home-grid-options">
+            <summary>Start from a grid layout<ChevronDown size={15} strokeWidth={2.25} aria-hidden /></summary>
+            <GridStarters
+              format={format}
+              pendingId={actions.creating !== BLANK ? actions.creating : null}
+              busy={actions.busy}
+              onPick={(template) => void actions.create(format, name, template)}
+            />
+          </details>
 
-          <footer className="mt-8 flex items-center justify-center gap-1.5 text-[12px] text-ink-faint">
-            <HardDrive size={12} aria-hidden />
-            Projects are stored locally in this browser.
+          <ProjectList
+            projects={projects}
+            openingId={actions.openingId}
+            busy={actions.busy}
+            now={now}
+            onOpen={(project) => void actions.open(project)}
+          />
+
+          <footer className="home-phone-footer">
+            <Lock size={12} strokeWidth={2.25} aria-hidden />
+            Saved on this device. Nothing is uploaded.
           </footer>
         </div>
       </main>
+
+      <button type="button" className="home-fab" data-visible={showPill} tabIndex={showPill ? 0 : -1} aria-hidden={!showPill} onClick={scrollToCreate}>
+        <Plus size={18} strokeWidth={2.5} aria-hidden />
+        New carousel
+      </button>
     </div>
   );
 }

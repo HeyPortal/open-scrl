@@ -1,0 +1,167 @@
+/* One export surface, shared by the desktop dialog and phone sheet: a panoramic stage, grouped
+   settings rows and a summary of the files you will get. */
+.export-scrim { align-items: center; padding: 24px 16px; }
+.export-dialog { max-width: 600px; max-height: calc(100dvh - 48px); display: flex; flex-direction: column; }
+.export-panel { display: flex; flex-direction: column; height: 100%; min-height: 0; text-align: left; }
+.export-fields { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 20px 20px; display: flex; flex-direction: column; gap: 16px; }
+.export-fields > * { flex-shrink: 0; }
+.export-dialog .export-fields { max-height: min(620px, calc(100dvh - 190px)); }
+.export-panel fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+.export-panel fieldset:disabled { opacity: .6; }
+.export-panel button:disabled { opacity: .45; cursor: not-allowed; }
+
+/* Panoramic stage ------------------------------------------------------------------------------ */
+.export-stage {
+  position: relative; overflow: hidden; border-radius: 16px;
+  background-color: rgb(var(--c-canvas-bg));
+  background-image:
+    radial-gradient(70% 90% at 0% 0%, rgb(var(--c-brand-lilac) / .16), transparent 60%),
+    radial-gradient(60% 80% at 100% 100%, rgb(var(--c-brand-teal) / .12), transparent 60%),
+    radial-gradient(rgb(var(--c-canvas-dot) / .07) .8px, transparent .8px);
+  background-size: auto, auto, 14px 14px;
+  box-shadow: inset 0 0 0 1px rgb(var(--c-line) / var(--c-line-alpha));
+}
+.export-pano { display: flex; overflow-x: auto; overscroll-behavior-x: contain; padding: 22px 22px 18px; scroll-padding: 0 22px; }
+.export-pano-strip {
+  display: flex; flex-shrink: 0; margin: 0 auto; border-radius: 4px; overflow: hidden;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / .06), 0 22px 44px -18px rgb(0 0 0 / .9), 0 6px 16px -8px rgb(0 0 0 / .6);
+}
+.export-pano-slide { position: relative; display: block; flex-shrink: 0; height: 100%; background: #fff; }
+.export-pano-slide canvas { position: relative; z-index: 0; }
+/* Seams stay legible without breaking the panorama. */
+.export-pano-slide + .export-pano-slide::before { content: ''; position: absolute; inset: 0 auto 0 0; z-index: 1; width: 1px; background: rgb(0 0 0 / .22); pointer-events: none; }
+.export-pano-slide::after { content: ''; position: absolute; inset: 0; z-index: 1; background: rgb(var(--c-canvas-bg) / .78); opacity: 0; transition: opacity 160ms ease-out; pointer-events: none; }
+.export-pano-slide[data-included='false']::after { opacity: 1; }
+.export-pano-number {
+  position: absolute; left: 6px; bottom: 6px; z-index: 2; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 99px;
+  display: grid; place-items: center; background: rgb(10 10 14 / .62); color: #fff; backdrop-filter: blur(6px);
+  font-size: 10.5px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums;
+}
+.export-pano-slide[data-included='false'] .export-pano-number { background: rgb(255 255 255 / .1); color: rgb(var(--c-ink-dim)); }
+label.export-pano-slide { cursor: pointer; }
+.export-pano-input { position: absolute; inset: 0; z-index: 4; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+label.export-pano-slide:hover::after { opacity: .35; }
+label.export-pano-slide[data-included='false']:hover::after { opacity: .6; }
+label.export-pano-slide:has(input:focus-visible) { z-index: 3; outline: 2px solid rgb(var(--c-accent)); outline-offset: -2px; }
+.export-pano-check {
+  position: absolute; top: 6px; right: 6px; z-index: 2; width: 20px; height: 20px; border-radius: 99px;
+  display: grid; place-items: center; color: rgb(var(--c-accent-ink));
+  background: rgb(10 10 14 / .45); box-shadow: inset 0 0 0 1.5px rgb(255 255 255 / .75);
+  transition: background-color 140ms ease-out, box-shadow 140ms ease-out;
+}
+.export-pano-slide[data-included='true'] .export-pano-check {
+  background: linear-gradient(140deg, rgb(var(--c-accent-start)), rgb(var(--c-accent-end)));
+  box-shadow: 0 2px 8px rgb(0 0 0 / .4);
+}
+.export-stage-caption { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 0 16px 12px; }
+.export-project { min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; color: rgb(var(--c-ink)); }
+.export-stage-caption > span { flex-shrink: 0; font-size: 12px; color: rgb(var(--c-ink-dim)); font-variant-numeric: tabular-nums; }
+
+/* Settings ----------------------------------------------------------------------------------- */
+.export-settings { display: flex; flex-direction: column; gap: 14px; }
+.export-scope { display: flex; flex-direction: column; gap: 8px; }
+.export-segments { display: grid; grid-auto-columns: minmax(0, 1fr); grid-auto-flow: column; gap: 2px; padding: 3px; border-radius: 12px; background: rgb(var(--c-bg-inset)); box-shadow: inset 0 0 0 1px rgb(var(--c-line) / var(--c-line-alpha)); }
+.export-segments label { position: relative; min-width: 0; cursor: pointer; }
+.export-segments input { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.export-segments input:disabled { cursor: not-allowed; }
+.export-segments span {
+  display: flex; align-items: center; justify-content: center; min-height: 38px; padding: 4px 8px; border-radius: 9px;
+  text-align: center; font-size: 12.5px; font-weight: 500; color: rgb(var(--c-ink-dim));
+  transition: background-color 140ms ease-out, color 140ms ease-out;
+}
+.export-segments label:hover input:not(:checked, :disabled) + span { color: rgb(var(--c-ink)); }
+.export-segments input:checked + span { background: rgb(var(--c-bg-hover)); color: rgb(var(--c-ink)); box-shadow: 0 1px 3px rgb(0 0 0 / .35), inset 0 1px 0 rgb(255 255 255 / .05); }
+.export-segments input:focus-visible + span { outline: 2px solid rgb(var(--c-accent)); outline-offset: 1px; }
+.export-segments input:disabled + span { opacity: .45; cursor: not-allowed; }
+.export-segments[data-compact] { width: 132px; flex-shrink: 0; }
+.export-segments[data-compact] span { min-height: 32px; padding: 2px 6px; border-radius: 8px; }
+
+.export-pick-actions { display: flex; align-items: center; gap: 4px; min-height: 32px; font-size: 12px; }
+.export-pick-actions > span { margin-right: auto; color: rgb(var(--c-ink-dim)); }
+.export-pick-actions button { min-height: 32px; padding: 0 10px; border-radius: 8px; font-weight: 500; color: rgb(var(--c-accent)); }
+.export-pick-actions button:hover { background: rgb(var(--c-accent) / .1); }
+
+.export-group { border-radius: 14px; background: rgb(var(--c-bg-inset) / .55); box-shadow: inset 0 0 0 1px rgb(var(--c-line) / var(--c-line-alpha)); }
+.export-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 56px; padding: 10px 12px 10px 14px; }
+.export-row + .export-row { border-top: 1px solid rgb(var(--c-line) / var(--c-line-alpha)); }
+.export-row-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.export-row-text > :first-child { font-size: 13px; font-weight: 500; color: rgb(var(--c-ink)); }
+.export-row-text small { font-size: 11.5px; line-height: 1.35; color: rgb(var(--c-ink-dim)); }
+
+.export-quality { display: flex; align-items: center; gap: 10px; width: 180px; flex-shrink: 0; }
+.export-quality input { flex: 1; min-width: 0; }
+.export-quality output { width: 36px; text-align: right; font-size: 12px; font-weight: 600; color: rgb(var(--c-ink)); font-variant-numeric: tabular-nums; }
+
+.export-filename-field {
+  display: flex; align-items: center; width: min(260px, 58%); height: 34px; padding: 0 10px; border-radius: 9px;
+  background: rgb(var(--c-bg)); box-shadow: inset 0 0 0 1px rgb(var(--c-line-strong) / var(--c-line-strong-alpha));
+  font-size: 13px; transition: box-shadow 140ms ease-out;
+}
+.export-filename-field:focus-within { box-shadow: inset 0 0 0 1.5px rgb(var(--c-accent)); }
+.export-filename-field input { flex: 1; min-width: 0; height: 100%; background: transparent; color: rgb(var(--c-ink)); outline: none; }
+.export-filename-field input::placeholder { color: rgb(var(--c-ink-faint)); }
+.export-filename-field span { flex-shrink: 0; max-width: 55%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: rgb(var(--c-ink-faint)); }
+
+/* Summary and feedback ----------------------------------------------------------------------- */
+.export-output { display: flex; align-items: center; gap: 12px; padding: 2px 2px 0; font-size: 12px; color: rgb(var(--c-ink-dim)); }
+.export-output > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.export-output p { margin: 0; font-size: 13px; font-weight: 600; color: rgb(var(--c-ink)); }
+.export-output-icon {
+  display: grid; place-items: center; flex-shrink: 0; width: 40px; height: 40px; border-radius: 12px; color: rgb(var(--c-ink));
+  background: linear-gradient(140deg, rgb(var(--c-brand-lilac) / .32), rgb(var(--c-brand-blue) / .2) 50%, rgb(var(--c-brand-teal) / .22));
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / .08);
+}
+.export-filename { white-space: nowrap; text-overflow: ellipsis; overflow: hidden; color: rgb(var(--c-ink-faint)); }
+.export-feedback { display: flex; align-items: center; gap: 8px; margin: 0; padding: 10px 12px; border-radius: 12px; background: rgb(var(--c-success) / .1); font-size: 12px; line-height: 1.5; color: rgb(var(--c-success)); }
+.export-feedback[data-tone='error'] { display: block; background: rgb(var(--c-danger-bg)); color: rgb(var(--c-danger)); }
+.export-feedback p { margin: 0; }
+.export-feedback button { margin-top: 6px; min-height: 36px; font-weight: 600; color: rgb(var(--c-accent)); }
+
+/* Footer ------------------------------------------------------------------------------------- */
+.export-footer { flex-shrink: 0; padding: 14px 20px 16px; border-top: 1px solid rgb(var(--c-line) / var(--c-line-alpha)); background: rgb(var(--c-bg-panel)); }
+.export-buttons { display: flex; gap: 10px; }
+.export-submit, .export-cancel, .export-preview { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; border-radius: 13px; padding: 0 14px; font-size: 14px; font-weight: 600; }
+.export-submit {
+  flex: 1; color: rgb(var(--c-accent-ink));
+  background: linear-gradient(120deg, rgb(var(--c-brand-lilac)), rgb(var(--c-brand-blue)) 70%, rgb(var(--c-brand-teal)));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / .35), 0 12px 28px -14px rgb(var(--c-brand-lilac) / .9);
+  transition: filter 140ms ease-out, transform 140ms ease-out;
+}
+.export-submit:hover:not(:disabled) { filter: brightness(1.07) saturate(1.05); }
+.export-submit:active:not(:disabled) { transform: translateY(1px); }
+.export-preview { width: 46px; padding: 0; background: rgb(var(--c-bg-inset)); color: rgb(var(--c-ink-dim)); box-shadow: inset 0 0 0 1px rgb(var(--c-line) / var(--c-line-alpha)); }
+.export-preview:hover { background: rgb(var(--c-bg-hover)); color: rgb(var(--c-ink)); }
+.export-cancel { width: 100%; margin-top: 12px; background: rgb(var(--c-bg-inset)); color: rgb(var(--c-ink)); }
+.export-progress { font-size: 12px; color: rgb(var(--c-ink-dim)); }
+.export-progress [role='progressbar'] { height: 6px; margin-top: 10px; overflow: hidden; border-radius: 99px; background: rgb(var(--c-bg-inset)); }
+.export-progress [role='progressbar'] > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, rgb(var(--c-brand-lilac)), rgb(var(--c-brand-blue)), rgb(var(--c-brand-teal))); transition: width 150ms ease-out; }
+.export-progress [data-indeterminate='true'] { width: 35%; animation: export-progress-pulse 1s ease-in-out infinite alternate; }
+@keyframes export-progress-pulse { to { transform: translateX(180%); } }
+
+/* Phone sheet -------------------------------------------------------------------------------- */
+.mobile-sheet-body:has(.export-panel) { overflow: hidden; padding-bottom: 0; }
+.mobile-sheet .export-fields { padding: 12px 16px 18px; gap: 14px; }
+.mobile-sheet .export-footer { padding: 12px 16px max(12px, env(safe-area-inset-bottom)); }
+.mobile-sheet .export-pano { padding: 16px 16px 14px; scroll-padding: 0 16px; }
+.mobile-sheet .export-stage-caption { padding: 0 14px 10px; }
+.mobile-sheet .export-segments span { min-height: 44px; }
+.mobile-sheet .export-segments[data-compact] span { min-height: 40px; }
+.mobile-sheet .export-filename-field { height: 40px; }
+.mobile-sheet .export-filename-field, .mobile-sheet .export-filename-field input { font-size: 16px; }
+.mobile-sheet .export-pick-actions button { min-height: 44px; }
+/* Narrow surfaces give the file name its own line. */
+.mobile-sheet .export-row:has(.export-filename-field) { flex-direction: column; align-items: stretch; gap: 8px; }
+.mobile-sheet .export-filename-field { width: 100%; }
+@media (max-width: 520px) {
+  .export-row:has(.export-filename-field) { flex-direction: column; align-items: stretch; gap: 8px; }
+  .export-filename-field { width: 100%; }
+}
+@media (max-width: 380px) {
+  .export-row { gap: 10px; padding-left: 12px; }
+  .export-segments[data-compact] { width: 112px; }
+  .export-quality { width: 140px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .export-progress [data-indeterminate='true'] { animation: none; }
+  .export-pano-slide::after, .export-submit { transition: none; }
+}

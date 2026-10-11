@@ -1,6 +1,6 @@
 # The mobile layout
 
-The web app has a touch-first layout for phones: its own home screen and editor. It uses the same projects and media as the desktop layout in that browser; rotating or resizing the window keeps the current project open. Projects stay on the device and are not synced between browsers or devices. This page describes how the phone layout works.
+The web app uses the dark Studio design with a touch-first layout for phones: its own home screen and editor. It uses the same projects and media as the desktop layout in that browser; rotating or resizing the window keeps the current project open. Projects stay on the device and are not synced between browsers or devices. This page describes how the phone layout works.
 
 | Home screen | Editor |
 | --- | --- |
@@ -12,15 +12,20 @@ The mobile layout is used when the browser window is 767 px wide or narrower, or
 
 ## Home screen
 
-An Open-SCRL loading screen appears while the app and its bundled fonts get ready, including on a slower first visit.
+The page keeps its dark background while the app and bundled fonts get ready, without a loading splash or default browser text.
 
-- **New carousel**: pick a canvas size (IG Portrait, IG Square, IG Story / Reels, IG Landscape, TikTok, or Pinterest), type a name, and tap **Create carousel**. A blank name keeps the project called Untitled.
-- **Start from a grid**: eight photo layouts, such as a 2 × 2 grid or a 1 + 2 layout. Tapping one creates a project in the chosen size with that grid already placed.
-- **Your projects**: each row shows the name, canvas size, slide count, and when it was last edited. Tap a row to open it. A search box appears once you have more than three projects.
+- **New carousel**: pick a canvas size from the cards (IG Portrait, IG Square, IG Story / Reels, IG Landscape, TikTok, or Pinterest; swipe sideways for the rest), type a name, and tap **Create carousel**. A blank name keeps the project called Untitled. Scrolling past the card shows a floating **New carousel** button above the bottom edge that scrolls back up to it; it hides while the keyboard is open.
+- **Start from a grid layout**: expand this section to choose from eight photo layouts, such as a 2 × 2 grid or a 1 + 2 layout. Tapping one creates a project in the chosen size with that grid already placed.
+- **Recent projects**: each row shows the opening slides as a small strip (two or three for portrait and story carousels), the name, canvas size, slide count, and when it was last edited ("Edited 2 hours ago"). Tap a row to open it. A search box appears once you have more than three projects, with **Clear search** when nothing matches. Previews are drawn on the device only for rows near the screen.
 
-The footer reads "Projects are stored locally in this browser." Clearing the site's data in that browser deletes them.
+The footer reads "Saved on this device. Nothing is uploaded." Clearing the site's data in that browser deletes them.
 
 ## Editor layout
+
+The top bar, slide strip, dock, selection bar and sheets are dark glass islands
+on a dotted stage, with lilac actions and selection outlines. They stay in flow
+so the canvas measures the space available. The home screen uses the Mac app
+icon with blue, teal and pink format previews and grid diagrams.
 
 - **Top bar**: the back chevron returns to the home screen. The project name opens the **Project** sheet, which renames the project, sets the canvas format, and has **Back to projects**. A dot after the name shows while changes are saving or after a save has failed. **Undo** and **Redo** are icon buttons, and **Export** opens the export sheet.
 - **Canvas**: the slides sit side by side with the selected one centered. A counter such as "2 / 5" appears below the canvas when there is room.
@@ -28,11 +33,11 @@ The footer reads "Projects are stored locally in this browser." Clearing the sit
 - **Dock**: six tabs, **Photos**, **Grids**, **Text**, **Shapes**, **Canvas**, and **Layers**. Each opens a sheet. Tap the active tab again to close its sheet.
 - **Selection bar**: replaces the dock while a layer is selected. See [Selecting and editing](#selecting-and-editing).
 
-A sheet rises from the dock and the canvas shrinks to make room. The slide strip hides while a sheet is open. Sheets open at half height. Drag the handle or title bar up to expand a sheet to full height, or down to collapse it. Drag further down, or tap the X, to close it. Tapping the handle or title bar toggles between half and full height.
+A sheet rises from the dock and the canvas shrinks to make room. The slide strip hides while a sheet is open. Most sheets open at half height; Export opens at full height. Drag the handle or title bar up to expand a sheet to full height, or down to collapse it. Drag further down, or tap the X, to close it. Tapping the handle or title bar toggles between half and full height.
 
 ## Adding photos, grids, text, shapes, and backgrounds
 
-- **Photos**: **Import media** opens the file picker for images, GIFs, and videos. **As slides** imports each file onto its own new slide, and panoramas span as many slides as they need. Tap a photo to add it to the current slide. The ⋯ button on a photo offers **Add to slide**, **Spread across N slides**, **New slide with this**, and **Remove from project**. When a photo frame is selected, the menu also offers to fill or replace it. Files stay on the device.
+- **Photos**: the large **Import media** drop zone opens the file picker for images, GIFs, and videos. **As slides** imports each file onto its own new slide, and panoramas span as many slides as they need. Tap a photo to add it to the current slide. The ⋯ button in a photo's corner offers **Add to slide**, **Spread across N slides**, **New slide with this**, and **Remove from project**. When a photo frame is selected, the menu also offers to fill or replace it. Files stay on the device.
 - **Grids**: tap a grid to apply it to the current slide. This replaces the slide's layers with empty photo frames. Open **Spacing** to set the gap and margin the grid uses. To fill an empty frame, select it and then tap a photo in **Photos**.
 - **Text**: **Add text box** adds a box that reads "Double-tap to edit". The style presets below it work two ways. With a text layer selected, a preset replaces that layer's text, size, and weight. Otherwise it adds a new box. Inter is bundled with the app, including italics, so it uses the same face while editing and in exported images and videos. Existing Inter text also uses the bundled face; its line wrapping may change from the previous fallback font.
 - **Shapes**: tap a shape to add it to the slide.
@@ -42,10 +47,10 @@ A sheet rises from the dock and the canvas shrinks to make room. The slide strip
 
 ## Selecting and editing
 
-Tap a layer on the canvas to select it. The selection bar starts with a label (Photo, Text, Shape, Group, or the number of layers) followed by the actions, which scroll sideways when they don't all fit:
+Tap a layer on the canvas to select it. The selection bar starts with a label (Photo, Text, Shape, Group, or the number of layers) followed by four actions and **Done**:
 
-- **Edit**, **Replace** (or **Add photo** on an empty frame), **Duplicate**, **Forward**, and **Backward**
-- **Lock** (or **Unlock**), **Group** and **Ungroup** when they apply, and **Delete**
+- **Edit**, **Delete**, and **Duplicate** (**Replace**, or **Add photo** on an empty frame, for a photo)
+- **More** opens a menu with **Forward**, **Backward**, and **Lock** (or **Unlock**), plus **Group** and **Ungroup** when they apply, and **Duplicate** for a photo. Escape or a tap outside closes it.
 - **Done** clears the selection.
 
 **Edit** opens a properties sheet titled Photo, Text, Shape, Layer, or "N layers". It holds the desktop inspector's controls with larger targets. In a photo's section, **Replace** (or **Choose photo** for an empty frame) opens **Photos**.
@@ -84,13 +89,19 @@ The **Layers** sheet lists the current slide's layers, top layer first. Tap a ro
 
 ## Export and phone preview
 
-**Export** in the top bar opens the export sheet, which shows the slide count, format, and pixel size. Everything is rendered on the device.
+**Export** in the top bar opens the full-height export sheet. It has the same
+[export settings](./web-export.md) as desktop. Everything is rendered on the device.
 
-- **Export carousel** downloads one ZIP named after the project with `_instagram` added. It holds `01.png`, `02.png`, and so on for still slides, and `01.mp4` for any slide with a GIF or video. A progress bar shows while it works.
-- **Save this slide** downloads the selected slide as a PNG named after the project and its slide number.
-- **Preview on phone** shows the project in a phone frame, in Feed (Story for story formats) or Profile grid. Swipe to move between slides, and close the preview with its close button.
+- The carousel appears as one panorama at the top. Slides left out of the export are dimmed.
+- **All slides** downloads a ZIP; **This slide** saves one file; **Choose slides** downloads a ZIP of the slides you tap in the panorama, keeping their original numbers.
+- Choose **PNG** or **JPEG**, a **1×** or **2×** size, and JPEG quality. Animated slides can stay **MP4** or become **Still** frames; MP4 keeps the original canvas size.
+- **File name** changes the download name. The summary shows the output size and name before export.
+- **Cancel export** stops a running export. Progress, completion, and errors appear in the sheet; after a failure you can retry.
+- The phone icon beside the export button opens **Preview on phone**, with Feed (Story for story formats) and Profile grid views. Swipe to move between slides.
 
-Images are exported at the canvas size (for example 1080 × 1350 for IG Portrait). Files download through the browser. Nothing is saved to Photos.
+<img src="./images/mobile-export.png" alt="The phone export sheet with slide selection, image format, and resolution controls." width="320" />
+
+Files download through the browser. Nothing is saved to Photos.
 
 ## Landscape
 

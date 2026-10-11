@@ -19,8 +19,8 @@
   overflow: hidden;
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
-  color: #ededf0;
-  background: #0f0f12;
+  color: rgb(var(--c-ink));
+  background: rgb(var(--c-bg));
   overscroll-behavior: none;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
@@ -94,10 +94,6 @@ body:has(.mobile-root) {
   }
   .mobile-root .mobile-sheet {
     flex: 1 1 auto;
-    border-top: 0;
-    border-left: 1px solid #34343c;
-    border-radius: 0;
-    box-shadow: none;
   }
   .mobile-dock span {
     font-size: 10px;

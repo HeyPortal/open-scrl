@@ -72,6 +72,11 @@ const isToggle = (e: { metaKey: boolean; ctrlKey: boolean }) => (isMac ? e.metaK
 
 type PanelLayout = 'sidebar' | 'sheet';
 
+/** Desktop row buttons stay 24 px; the pseudo-element widens the hit area to 28 px by the full 32 px row. */
+const DESKTOP_SIZE = '!h-6 !w-6 relative after:absolute after:-inset-x-0.5 after:-inset-y-1';
+/** Sheet row buttons draw at 40 px and hit at 44 px, so five actions still leave the name room. */
+const SHEET_SIZE = '!h-10 !w-10 relative after:absolute after:-inset-0.5';
+
 function RowShell({ id, selected, partly, depth, onClick, onContextMenu, children, label, layout }: {
   id: string;
   selected: boolean;
@@ -92,7 +97,7 @@ function RowShell({ id, selected, partly, depth, onClick, onContextMenu, childre
     <button
       {...attributes}
       {...listeners}
-      className={`flex shrink-0 cursor-grab touch-none items-center justify-center text-ink-faint hover:text-ink active:cursor-grabbing ${sheet ? 'h-11 w-7' : 'h-7 w-5'}`}
+      className={`flex shrink-0 cursor-grab touch-none items-center justify-center text-ink-faint hover:text-ink active:cursor-grabbing ${sheet ? 'h-11 w-7' : 'h-8 w-5'}`}
       aria-label={`Reorder ${label}`}
     >
       <GripVertical size={sheet ? 16 : 13} />
@@ -101,7 +106,7 @@ function RowShell({ id, selected, partly, depth, onClick, onContextMenu, childre
   return (
     <div ref={setNodeRef} style={style} className={sheet ? 'px-2' : 'px-1.5'}>
       <div
-        className={`group relative flex items-center gap-1.5 pl-0.5 pr-0.5 transition-colors ${sheet ? 'min-h-[52px] rounded-xl text-[14px]' : 'h-8 rounded-md text-xs'} ${
+        className={`layer-row group relative flex items-center gap-1.5 pl-0.5 pr-0.5 transition-colors ${sheet ? 'min-h-[52px] rounded-xl text-[14px]' : 'h-8 rounded-md text-xs'} ${
           selected ? 'bg-accent-soft' : partly ? 'bg-accent/[0.07] hover:bg-bg-hover' : 'hover:bg-bg-hover'
         } ${isDragging ? 'bg-bg-overlay shadow-lift' : ''}`}
         style={{ paddingLeft: depth ? 14 : undefined }}
@@ -119,7 +124,7 @@ function RowShell({ id, selected, partly, depth, onClick, onContextMenu, childre
 
 function ToggleButtons({ locked, visible, hoverOnly, onLock, onVisible, layout }: { locked: boolean; visible: boolean; hoverOnly: string; onLock: () => void; onVisible: () => void; layout: PanelLayout }) {
   const sheet = layout === 'sheet';
-  const size = sheet ? '!h-10 !w-10' : '!h-6 !w-6';
+  const size = sheet ? SHEET_SIZE : DESKTOP_SIZE;
   const icon = sheet ? 18 : 13;
   return (
     <>
@@ -152,7 +157,7 @@ function LayerRow({ row, selected, partly, onSelect, onEdit, layout }: {
   layout: PanelLayout;
 }) {
   const sheet = layout === 'sheet';
-  const size = sheet ? '!h-10 !w-10' : '!h-6 !w-6';
+  const size = sheet ? SHEET_SIZE : DESKTOP_SIZE;
   const icon = sheet ? 18 : 13;
   const layer = row.layer;
   const toggleVisible = useEditor((s) => s.toggleVisible);
@@ -185,8 +190,8 @@ function LayerRow({ row, selected, partly, onSelect, onEdit, layout }: {
           {handle}
           <span
             className={`flex shrink-0 items-center justify-center overflow-hidden ${sheet ? 'h-9 w-9 rounded-lg' : 'h-6 w-6 rounded'} ${
-              selected ? 'bg-accent text-white' : 'bg-bg-inset text-ink-dim'
-            } ${thumb ? 'ring-1 ring-inset ring-white/10' : ''}`}
+              selected ? 'bg-accent/25 text-accent' : 'bg-bg-inset text-ink-dim'
+            } ${thumb ? 'ring-1 ring-inset ring-surface-ring/10' : ''}`}
           >
             {thumb ? <img src={thumb} alt="" className="h-full w-full object-cover" draggable={false} /> : <Icon size={sheet ? 17 : 13} aria-hidden />}
           </span>
@@ -246,7 +251,7 @@ function GroupRow({ row, selected, partly, collapsed, onToggleCollapsed, onSelec
   layout: PanelLayout;
 }) {
   const sheet = layout === 'sheet';
-  const size = sheet ? '!h-10 !w-10' : '!h-6 !w-6';
+  const size = sheet ? SHEET_SIZE : DESKTOP_SIZE;
   const icon = sheet ? 18 : 13;
   const updateLayers = useEditor((s) => s.updateLayers);
   const ungroupLayers = useEditor((s) => s.ungroupLayers);
@@ -276,14 +281,14 @@ function GroupRow({ row, selected, partly, collapsed, onToggleCollapsed, onSelec
         <>
           {handle}
           <button
-            className={`-ml-1 flex shrink-0 items-center justify-center text-ink-faint hover:text-ink ${sheet ? 'h-10 w-7' : 'h-6 w-4'}`}
+            className={`flex shrink-0 items-center justify-center text-ink-faint hover:text-ink ${sheet ? '-ml-2 h-10 w-7' : '-ml-1 h-8 w-4 relative after:absolute after:-inset-x-1'}`}
             aria-label={collapsed ? 'Expand group' : 'Collapse group'}
             aria-expanded={!collapsed}
             onClick={(e) => { e.stopPropagation(); onToggleCollapsed(); }}
           >
             <ChevronRight size={sheet ? 16 : 12} className={`transition-transform ${collapsed ? '' : 'rotate-90'}`} aria-hidden />
           </button>
-          <span className={`flex shrink-0 items-center justify-center ${sheet ? 'h-9 w-9 rounded-lg' : 'h-6 w-6 rounded'} ${selected ? 'bg-accent text-white' : 'bg-bg-inset text-ink-dim'}`}>
+          <span className={`flex shrink-0 items-center justify-center ${sheet ? 'h-9 w-9 rounded-lg' : 'h-6 w-6 rounded'} ${selected ? 'bg-accent/25 text-accent' : 'bg-bg-inset text-ink-dim'}`}>
             <GroupIcon size={sheet ? 17 : 13} aria-hidden />
           </span>
           <span className={`min-w-0 flex-1 truncate pl-1 ${visible ? 'text-ink' : 'text-ink-faint line-through'} ${selected ? 'font-medium' : ''}`}>
@@ -418,7 +423,7 @@ export function LayersPanel({ onEditLayer, layout = 'sidebar', additive = false 
       <p className={`pb-2 pt-1 leading-relaxed text-ink-faint ${sheet ? 'px-4 text-[12px]' : 'px-3 text-[11px]'}`}>
         {sheet
           ? 'Top of the list is in front. Drag the handle to reorder, or turn on Select to pick several layers.'
-          : <>Top of the list is in front. Drag to reorder, {isMac ? '⌘' : 'Ctrl'}- or Shift-click to select several, right-click for more.</>}
+          : <>Top is in front. Drag to reorder. Select several with Shift or {isMac ? '⌘' : 'Ctrl'} click.</>}
       </p>
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setDraggingGroup(null)}>
         <SortableContext items={rows.map((r) => r.key)} strategy={verticalListSortingStrategy}>
