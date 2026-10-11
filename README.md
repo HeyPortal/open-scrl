@@ -26,6 +26,8 @@ lilac selection controls, and slide timeline on desktop, with touch sheets
 on phones. It's early, so expect rough edges.
 Create a carousel or pick up a saved project from the [home screen](docs/images/web-home.webp).
 
+[Open the web app](https://heyportal.github.io/open-scrl/).
+
 ![The six slides exported from the sample project.](docs/images/export-strip.webp)
 
 <sub>Slides 4 and 5 are one photo. Wide shots can span slides and line up at the seams.</sub>
@@ -128,6 +130,8 @@ bun run test:pwa   # production offline and update checks
 
 See [Browser testing](docs/testing.md) for focused runs, stress checks, reports,
 and viewing failure traces with Bun.
+
+See [Hosting](docs/hosting.md) for GitHub Pages deployment and other static hosts.
 
 Run unit tests with `bun run test`, not `bun test`: the latter starts Bun's own test
 runner instead of Vitest.

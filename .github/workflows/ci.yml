@@ -2,6 +2,7 @@ name: CI
 on:
   push:
   pull_request:
+  workflow_dispatch:
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -16,6 +17,10 @@ jobs:
       - run: bunx playwright install --with-deps chromium
       - run: bun run test:e2e
       - run: bun run test:pwa
+      - name: Test the GitHub Pages application path
+        run: bun run test:pwa
+        env:
+          SCRL_BASE_PATH: /open-scrl/
       - name: Upload browser-test failure artifacts
         if: failure()
         uses: actions/upload-artifact@v4
@@ -26,3 +31,37 @@ jobs:
             playwright-report/
           if-no-files-found: ignore
           retention-days: 7
+  deploy-pages:
+    needs: verify
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version-file: package.json }
+      - run: bun install --frozen-lockfile
+      - name: Configure GitHub Pages
+        id: pages
+        uses: actions/configure-pages@v6
+      - name: Build for the Pages URL and check the bundle
+        run: bun run build && bun run bundle:check
+        env:
+          SCRL_BASE_PATH: ${{ steps.pages.outputs.base_path }}/
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
