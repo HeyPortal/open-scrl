@@ -4,7 +4,7 @@ for (const mobile of [false, true]) {
   test.describe(mobile ? 'mobile fonts' : 'desktop fonts', () => {
     test.use({ viewport: mobile ? { width: 393, height: 852 } : { width: 1280, height: 800 } });
 
-    test('paints a dark page without visible loading text before the app downloads', async ({ page }) => {
+    test('shows a loading indicator before the app downloads', async ({ page }) => {
       let release!: () => void;
       const gate = new Promise<void>((resolve) => { release = resolve; });
       let requested!: () => void;
@@ -21,12 +21,38 @@ for (const mobile of [false, true]) {
         await expect(page.locator('body')).toHaveCSS('margin', '0px');
         const startup = page.getByRole('status', { name: 'Loading Open-SCRL', exact: true });
         await expect(startup).toBeVisible();
-        await expect(startup).toHaveText('');
+        await expect(startup).toContainText('Loading Open-SCRL…');
+        await expect(startup.locator('.app-loading-spinner')).toBeVisible();
+        await expect(startup.locator('.app-loading-spinner')).toHaveCSS('animation-name', 'app-loading-spin');
+        await page.emulateMedia({ reducedMotion: 'reduce' });
+        await expect(startup.locator('.app-loading-spinner')).toHaveCSS('animation-name', 'none');
         await expect(page.locator('#root')).toHaveCSS('height', `${page.viewportSize()!.height}px`);
       } finally {
         release();
       }
       await expect(page.getByRole('button', { name: 'Create carousel', exact: true })).toBeVisible();
+      await expect(page.getByRole('status', { name: 'Loading Open-SCRL', exact: true })).toHaveCount(0);
+    });
+
+    test('keeps a visible loading indicator while the editor downloads', async ({ page }) => {
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => { release = resolve; });
+      await page.route(`**/src/app/${mobile ? 'MobileEditorShell' : 'EditorShell'}.tsx`, async (route) => {
+        await gate;
+        await route.continue();
+      });
+      await page.goto('/');
+      await page.getByRole('button', { name: 'Create carousel', exact: true }).click();
+      const loading = page.getByRole('status', { name: 'Opening editor', exact: true });
+      try {
+        await expect(loading).toBeVisible();
+        await expect(loading).toContainText('Opening editor…');
+        await expect(loading.locator('.app-loading-spinner')).toBeVisible();
+      } finally {
+        release();
+      }
+      await expect(page.locator('.konvajs-content')).toBeVisible();
+      await expect(loading).toHaveCount(0);
     });
 
     test('UI waits for document Inter and uses Onest while the font selector keeps the document face', async ({ page }) => {
@@ -45,6 +71,7 @@ for (const mobile of [false, true]) {
       try {
         await expect(create).toHaveCount(0);
         await expect(page.getByRole('status', { name: 'Loading Open-SCRL', exact: true })).toBeVisible();
+        await expect(page.getByRole('status', { name: 'Loading Open-SCRL', exact: true })).toContainText('Loading Open-SCRL…');
       } finally {
         release();
       }

@@ -9,15 +9,38 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <title>Open-SCRL — Photo Grid &amp; Carousel Maker</title>
     <style>
-      /* Paint the app's background before JavaScript, styles or fonts arrive. */
+      /* Shared with AppLoading: keep startup visible before scripts, CSS or fonts arrive. */
       html { background: #0a0a0c; color-scheme: dark; }
       html, body, #root { width: 100%; height: 100%; margin: 0; }
-      .startup-placeholder { width: 100%; height: 100%; background: #0a0a0c; }
+      .app-loading {
+        box-sizing: border-box; width: 100%; height: 100%;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
+        background: #0a0a0c; color: #f4f4f6; text-align: center;
+        font-family: 'Onest Variable', system-ui, sans-serif;
+      }
+      .app-loading-logo { display: block; width: 48px; height: 48px; }
+      .app-loading-wordmark {
+        margin: 16px 0 20px; font-family: 'Bricolage Grotesque Variable', system-ui, sans-serif;
+        font-size: 26px; font-weight: 650; line-height: 1.2; letter-spacing: -.025em;
+      }
+      .app-loading-status { display: flex; align-items: center; gap: 10px; color: #a1a1ad; font-size: 14px; line-height: 1.5; }
+      .app-loading-spinner {
+        box-sizing: border-box; flex: none; width: 18px; height: 18px;
+        border: 2px solid #232329; border-top-color: #ae99ff; border-radius: 50%;
+        animation: app-loading-spin .9s linear infinite;
+      }
+      @keyframes app-loading-spin { to { transform: rotate(360deg); } }
+      @media (prefers-reduced-motion: reduce) { .app-loading-spinner { animation: none; } }
     </style>
   </head>
   <body>
     <div id="root">
-      <div role="status" aria-label="Loading Open-SCRL" class="startup-placeholder"></div>
+      <div role="status" aria-label="Loading Open-SCRL" class="app-loading">
+        <img class="app-loading-logo" src="/app-icon.png" width="48" height="48" alt="" aria-hidden="true" />
+        <p class="app-loading-wordmark">Open-SCRL</p>
+        <div class="app-loading-status"><span class="app-loading-spinner" aria-hidden="true"></span><span>Loading Open-SCRL…</span></div>
+      </div>
     </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
