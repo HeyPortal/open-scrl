@@ -103,6 +103,37 @@ test.describe('Studio desktop', () => {
     expect(errors).toEqual([]);
   });
 
+  test('the library card glides open and closed while the canvas frame follows', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Create carousel', exact: true }).click();
+    await page.getByRole('button', { name: 'Media', exact: true }).click();
+    await expect(page.locator('.studio-left-panel')).toHaveCount(0);
+    const stageWidth = () => page.locator('.studio-stage').evaluate((element) => element.getBoundingClientRect().width);
+    const closedWidth = await stageWidth();
+    // Sample the canvas frame every animation frame while the card opens.
+    const widths = await page.evaluate(async () => {
+      const stage = document.querySelector('.studio-stage')!;
+      const seen: number[] = [];
+      document.querySelector<HTMLButtonElement>('[aria-label="Grids"]')!.click();
+      const start = performance.now();
+      await new Promise<void>((resolve) => {
+        const tick = () => { seen.push(Math.round(stage.getBoundingClientRect().width)); if (performance.now() - start < 500) requestAnimationFrame(tick); else resolve(); };
+        requestAnimationFrame(tick);
+      });
+      return seen;
+    });
+    const openWidth = widths.at(-1)!;
+    expect(openWidth).toBeLessThan(closedWidth - 200);
+    expect(new Set(widths.filter((width) => width < closedWidth - 1 && width > openWidth + 1)).size).toBeGreaterThanOrEqual(3);
+    for (let index = 1; index < widths.length; index++) expect(widths[index]).toBeLessThanOrEqual(widths[index - 1]);
+
+    await page.getByRole('button', { name: 'Hide side panel', exact: true }).click();
+    // While it animates closed the card is inert and hidden from assistive technology.
+    await expect(page.getByRole('button', { name: 'Hide side panel', exact: true })).toHaveCount(0);
+    await expect(page.locator('.studio-left-panel')).toHaveCount(0);
+    await expect.poll(stageWidth).toBeCloseTo(closedWidth, 0);
+  });
+
   test('tool cards toggle, escape closes, and fit reserves panel and timeline space', async ({ page }) => {
     await page.goto('/');
     await page.getByRole('button', { name: 'Create carousel', exact: true }).click();

@@ -38,6 +38,10 @@ export default function EditorShell() {
   const dragHandlers = useEditorShellEvents();
   const panel = useEditorSession((s) => s.leftPanel);
   const panelOpen = useEditorSession((s) => s.leftPanelOpen);
+  // The library card animates its width open and closed, so the canvas frame (and its fit) glides
+  // instead of jumping. It stays mounted, inert, until its closing animation ends.
+  const [panelMounted, setPanelMounted] = useState(panelOpen);
+  if (panelOpen && !panelMounted) setPanelMounted(true);
   const selectedIds = useEditorSession((s) => s.selectedLayerIds);
   const [tab, setTab] = useState<'design' | 'layers'>('design');
   const [pinned, setPinned] = useState(false);
@@ -60,9 +64,11 @@ export default function EditorShell() {
         <span className="studio-dock-divider" aria-hidden />
         <button className="studio-tool" aria-label="Keyboard shortcuts" data-tip="Keyboard shortcuts  ?" onClick={() => runStudioAction('shortcuts')}><Keyboard size={18} aria-hidden /></button>
       </nav>
-      {panelOpen && <aside className="studio-left-panel studio-glass" aria-label={`${TOOLS.find((tool) => tool.id === panel)?.label ?? 'Tools'} panel`}>
-        <div className="studio-panel-heading"><span className="studio-panel-eyebrow">Library</span><button className="icon-btn" aria-label="Hide side panel" title="Hide side panel" onClick={() => useEditorSession.getState().setLeftPanelOpen(false)}><X size={15} aria-hidden /></button></div>
-        <div className="studio-panel-content"><StudioPanel panel={panel} /></div>
+      {panelMounted && <aside className="studio-left-panel studio-glass" data-state={panelOpen ? 'open' : 'closing'} inert={!panelOpen} aria-hidden={!panelOpen || undefined} aria-label={`${TOOLS.find((tool) => tool.id === panel)?.label ?? 'Tools'} panel`} onAnimationEnd={(event) => { if (event.target === event.currentTarget && event.animationName === 'studio-panel-close' && !useEditorSession.getState().leftPanelOpen) setPanelMounted(false); }}>
+        <div className="studio-left-panel-inner">
+          <div className="studio-panel-heading"><span className="studio-panel-eyebrow">Library</span><button className="icon-btn" aria-label="Hide side panel" title="Hide side panel" onClick={() => useEditorSession.getState().setLeftPanelOpen(false)}><X size={15} aria-hidden /></button></div>
+          <div className="studio-panel-content"><StudioPanel panel={panel} /></div>
+        </div>
       </aside>}
       <main ref={stageRef} className="studio-stage" aria-label="Canvas workspace"><Canvas width={size.width} height={size.height} /><StudioSelectionToolbar frameRef={stageRef} width={size.width} height={size.height} /></main>
       {inspectorOpen ? <aside className="studio-inspector studio-glass" aria-label="Properties">
