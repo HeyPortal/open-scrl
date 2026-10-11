@@ -11,7 +11,8 @@
 
 <p align="center">
   <a href="https://github.com/HeyPortal/open-scrl/actions/workflows/ci.yml"><img src="https://github.com/HeyPortal/open-scrl/actions/workflows/ci.yml/badge.svg" alt="CI status" /></a>
-  <a href="https://github.com/HeyPortal/open-scrl/releases"><img src="https://img.shields.io/github/v/release/HeyPortal/open-scrl?include_prereleases&label=mac%20release" alt="Latest Mac release" /></a>
+  <a href="https://github.com/HeyPortal/open-scrl/releases"><img src="https://img.shields.io/github/v/release/HeyPortal/open-scrl?include_prereleases&filter=web-v*&label=web%20release" alt="Latest web release" /></a>
+  <a href="https://github.com/HeyPortal/open-scrl/releases"><img src="https://img.shields.io/github/v/release/HeyPortal/open-scrl?include_prereleases&filter=macos-v*&label=mac%20release" alt="Latest Mac release" /></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-8b5cf6.svg" alt="MIT license" /></a>
 </p>
 
