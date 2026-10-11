@@ -86,9 +86,9 @@ export function ProjectsSection({ total, visible, query, onQueryChange, sort, on
   return (
     <section aria-labelledby="home-projects-title" className="home-section home-projects">
       <div className="home-toolbar" data-empty={total === 0}>
-        <h2 id="home-projects-title" className="home-section-title">
-          Your projects {total > 0 && <span className="home-count">{total}</span>}
-        </h2>
+        <h1 id="home-projects-title" className="home-section-title">
+          Recent projects {total > 0 && <span className="home-count">{total}</span>}
+        </h1>
         {total > 0 && (
           <div className="home-toolbar-controls">
             <label className="home-search">
@@ -114,16 +114,15 @@ export function ProjectsSection({ total, visible, query, onQueryChange, sort, on
 
       {total === 0 ? (
         <HomeEmpty
-          eyebrow="No carousels yet"
-          title="Your first carousel starts here"
+          title="No carousels yet"
           action={
             <button type="button" className="home-button home-button-ghost" onClick={onCreate}>
               <Plus size={15} strokeWidth={2.5} aria-hidden />
-              Start your first carousel
+              Create a carousel
             </button>
           }
         >
-          Pick a size above, or begin from a photo grid. Projects you make appear here.
+          Projects you create appear here.
         </HomeEmpty>
       ) : visible.length === 0 ? (
         <div className="home-nomatch" role="status">

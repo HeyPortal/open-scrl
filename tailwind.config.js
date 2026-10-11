@@ -46,11 +46,9 @@ export default {
       },
       borderRadius: { panel: 'var(--radius-panel)', control: 'var(--radius-control)' },
       fontFamily: {
-        // Fontsource registers the self-hosted Inter as 'Inter Variable'. Plain 'Inter' is deliberately
-        // not registered: resolveFontFamily maps that portable document name to the bundled face.
-        sans: ['"Inter Variable"', 'Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
-        // Serif for titles and headings only (see .heading-* in index.css). The fallbacks are ordinary
-        // text serifs, which run wider than the condensed Instrument Serif.
+        // Onest is the UI face. Document text keeps its independent bundled Inter mapping.
+        sans: ['"Onest Variable"', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+        // Instrument is reserved for project titles and occasional display accents.
         display: ['"Instrument Serif"', 'ui-serif', 'Georgia', '"Times New Roman"', 'serif'],
       },
       boxShadow: {

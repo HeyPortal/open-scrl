@@ -1,8 +1,3 @@
-:is(.heading-hero, .heading-lg, .heading-md, .heading-sm) {
-  font-family: 'Instrument Serif', serif;
-  font-weight: 400;
-  font-synthesis: none;
-}
 :is(button, a).btn,
 :is(input, select, textarea).input,
 button.icon-btn,
@@ -37,7 +32,7 @@ button.menu-item { border-radius: var(--radius-control); }
 .studio-publish-island { gap: 4px; }
 .studio-divider { flex-shrink: 0; width: 1px; height: 20px; background: rgb(var(--c-line-strong) / var(--c-line-strong-alpha)); margin: 0 4px; }
 .studio-menu-button { display: flex; align-items: center; gap: 4px; height: 32px; padding: 0 8px; color: rgb(var(--c-accent)); border-radius: var(--radius-control); transition: background-color .12s; }
-.input.studio-project-name { width: 165px; height: 32px; background: transparent; font-family: 'Instrument Serif', serif; font-weight: 400; font-synthesis: none; font-size: 22px; text-overflow: ellipsis; }
+.input.studio-project-name { width: 165px; height: 32px; background: transparent; font-family: 'Onest Variable', sans-serif; font-weight: 500; font-size: 17px; text-overflow: ellipsis; }
 .input.studio-project-name:hover:not(:focus) { background: rgb(var(--c-bg-hover) / .5); }
 .input.studio-project-name:focus { background: rgb(var(--c-bg-inset)); }
 .input.studio-format-chip {

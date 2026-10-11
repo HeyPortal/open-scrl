@@ -1,12 +1,12 @@
 import { forwardRef, useRef, type FormEvent } from 'react';
-import { ArrowRight, Check, Loader2 } from 'lucide-react';
+import { Check, Loader2 } from 'lucide-react';
 import type { Format } from '@/types';
 import { FORMATS } from '@/lib/format';
 import { fitBox } from '../home/projectDisplay';
 import { radioKeyTarget } from '../home/radioKeys';
 
 function FormatCard({ format, selected, onSelect, tabbable }: { format: Format; selected: boolean; onSelect: () => void; tabbable: boolean }) {
-  const box = fitBox(format, 58, 74);
+  const box = fitBox(format, 42, 56);
   return (
     <button
       type="button"
@@ -36,7 +36,7 @@ interface CreatePanelProps {
   onSubmit: () => void;
 }
 
-/** Hero panel: headline, name field and create button on the left, the format picker on the right. */
+/** Compact new-project controls, like the Mac welcome screen. */
 export const CreatePanel = forwardRef<HTMLInputElement, CreatePanelProps>(function CreatePanel(
   { name, onNameChange, format, onFormatChange, creating, busy, onSubmit },
   nameRef,
@@ -56,48 +56,32 @@ export const CreatePanel = forwardRef<HTMLInputElement, CreatePanelProps>(functi
   };
 
   return (
-    <form className="home-hero" onSubmit={submit} aria-labelledby="home-hero-title">
-      <div className="home-hero-copy">
-        <h1 id="home-hero-title" className="home-hero-title">
-          Make something worth <span>swiping.</span>
-        </h1>
-        <p className="home-hero-text">Carousels and photo grids for Instagram, TikTok and Pinterest. Everything stays on this device.</p>
-        <label className="home-field">
-          <span className="home-field-label">Project name</span>
-          <input
-            ref={nameRef}
-            className="home-input"
-            value={name}
-            onChange={(event) => onNameChange(event.target.value)}
-            placeholder="Untitled"
-            autoComplete="off"
-            maxLength={120}
-          />
-        </label>
-        <button type="submit" className="btn-primary home-button home-button-lg" disabled={busy} aria-busy={creating}>
-          {creating ? <Loader2 size={16} className="animate-spin" aria-hidden /> : null}
-          {creating ? 'Creating…' : 'Create & open editor'}
-          {!creating && <ArrowRight size={16} strokeWidth={2.25} aria-hidden />}
-        </button>
-      </div>
-
-      <div className="home-hero-formats">
-        <div className="home-formats-head">
-          <span className="home-field-label" id="format-label">Canvas format</span>
-          <span className="home-hero-hint">You can change it later in the editor</span>
-        </div>
+    <form className="home-new-panel" onSubmit={submit} aria-labelledby="home-new-title">
+      <h2 id="home-new-title" className="home-section-title">New carousel</h2>
+      <div className="home-new-formats">
+        <span className="home-field-label" id="format-label">Canvas format</span>
         <div className="home-formats" role="radiogroup" aria-labelledby="format-label" ref={group} onKeyDown={moveSelection}>
           {FORMATS.map((option, index) => (
-            <FormatCard
-              key={option.name}
-              format={option}
-              selected={index === selectedIndex}
-              tabbable={index === selectedIndex}
-              onSelect={() => onFormatChange(option)}
-            />
+            <FormatCard key={option.name} format={option} selected={index === selectedIndex} tabbable={index === selectedIndex} onSelect={() => onFormatChange(option)} />
           ))}
         </div>
       </div>
+      <label className="home-field">
+        <span className="home-field-label">Project name</span>
+        <input
+          ref={nameRef}
+          className="home-input"
+          value={name}
+          onChange={(event) => onNameChange(event.target.value)}
+          placeholder="Untitled"
+          autoComplete="off"
+          maxLength={120}
+        />
+      </label>
+      <button type="submit" className="btn-primary home-button home-button-lg" disabled={busy} aria-busy={creating}>
+        {creating ? <Loader2 size={16} className="animate-spin" aria-hidden /> : null}
+        {creating ? 'Creating…' : 'Create & open editor'}
+      </button>
     </form>
   );
 });

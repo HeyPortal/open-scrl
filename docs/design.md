@@ -1,15 +1,19 @@
 # Studio web design
 
 Studio is the web app’s design on desktop and phones: a deep dark dotted
-stage, lilac controls, floating glass panels, Inter controls and Instrument
-Serif titles. Blue, teal and pink join lilac in format previews, grid starters,
-empty-state artwork and fallback project covers. Selection and focus stay
-lilac; canvas alignment guides use blue.
+stage, lilac controls and floating glass panels. Blue, teal and pink join
+lilac in format previews, grid starters and fallback project covers.
+Selection and focus stay lilac; canvas alignment guides use blue.
 
-The Open-SCRL wordmark uses Bluu Next’s bold face, self-hosted through
-`@fontsource/bluu-next`. It appears in the desktop header, both phone home
-headers and the loading screen. The phone wordmark is 32px so the wider
-letterforms fit beside the icon at 320px. Other titles use Instrument Serif.
+Soft modern typography uses self-hosted Bricolage Grotesque for the Open-SCRL
+wordmark, Onest for interface text and headings, and Instrument Serif for
+saved-project titles. The phone wordmark is 28px. Instrument stays at weight
+400 without synthesized bold. Document text keeps its bundled Inter face;
+changing interface fonts does not change saved text layers or exports.
+
+The home screen follows the Mac welcome screen: compact creation controls
+beside recent projects on desktop, stacked on phones. Grid starters expand
+on request. Each saved project appears once, without a marketing hero.
 
 `src/index.css` imports `src/styles/studio/` directly. `tokens.css` defines
 all global `:root` values and `color-scheme: dark`; `chrome.css`, `panels.css`,

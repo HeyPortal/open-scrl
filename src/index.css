@@ -38,36 +38,32 @@
 
 @layer components {
   .app-wordmark {
-    font-family: 'Bluu Next', ui-serif, Georgia, serif;
-    font-weight: 700;
+    font-family: 'Bricolage Grotesque Variable', system-ui, sans-serif;
+    font-weight: 650;
     font-synthesis: none;
     letter-spacing: -0.025em;
   }
 
   /* Headings ------------------------------------------------------------ */
-  /* Instrument Serif, for titles and headings. It is a single-weight (400) condensed display face
-     with a small x-height, so it is set larger than the sans would be at the same visual size, and
-     it never gets a bold: font-weight is pinned to 400 and font-synthesis is off, so a parent's
-     font-semibold cannot make the browser fake one. Small text, controls, labels and numbers stay
-     in the sans. A heading that cannot grow to at least the -sm size without breaking its layout
-     should use the sans (font-semibold) instead. Tracking is slightly tight at the largest size
-     and normal to slightly open as the size drops, where the condensed forms need the air. */
+  /* Soft modern: crisp UI headings; Instrument remains an accent for project titles. */
   .font-display {
     font-weight: 400;
     font-synthesis: none;
     word-spacing: 0.06em;
   }
   .heading-hero {
-    @apply font-display text-[36px] leading-[1.02] tracking-[-0.01em];
+    @apply text-[32px] leading-[1.1] tracking-[-0.025em];
+    font-family: 'Bricolage Grotesque Variable', system-ui, sans-serif;
+    font-weight: 550;
   }
   .heading-lg {
-    @apply font-display text-[26px] leading-[1.1] tracking-normal;
+    @apply font-sans font-semibold text-[22px] leading-[1.2] tracking-[-0.015em];
   }
   .heading-md {
-    @apply font-display text-[22px] leading-[1.15] tracking-[0.005em];
+    @apply font-sans font-semibold text-[18px] leading-[1.25] tracking-[-0.01em];
   }
   .heading-sm {
-    @apply font-display text-[19px] leading-[1.2] tracking-[0.01em];
+    @apply font-sans font-semibold text-[16px] leading-[1.3] tracking-normal;
   }
 
   /* Buttons ------------------------------------------------------------- */

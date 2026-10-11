@@ -1,104 +1,29 @@
-# Studio home screen redesign
+# Studio home screen
 
-The home screen (desktop `LandingPage`, phone `MobileHome`) is the first thing people see. It should feel like
-the front of a creative studio, in the same visual language as the Studio editor: a dark stage with a faint
-grid, floating glass islands, lilac `#ae99ff` controls and blue, teal and pink previews, Instrument Serif titles (19px and up, weight 400, never
-bold; see AGENTS.md "Fonts") and Inter for everything else.
+The web home takes its structure from the Mac welcome screen: compact creation controls beside recent projects on desktop, and the same flow stacked on phones. There is no marketing hero or duplicate latest-project feature card.
 
-Functionality does not change. Everything the current home screens can do stays reachable: name and format for
-a new project, create and open, open an existing project, search, sort (Last edited / Date created / Name),
-grid and list views on desktop, grid starters on the phone, empty and no-match states, the phone's collapsing
-top bar, and the "saved on this device" privacy message. Keep existing accessible names that tests use
-(for example "Project name", "Canvas format" radiogroup, "Create & open editor" on desktop, "Create carousel"
-on the phone, "Search projects", "Sort projects", "Project view", project buttons named by project).
-Grid starters may be added to desktop because they reuse an existing phone feature.
+## Typography
+
+Soft modern pairs Bricolage Grotesque for the Open-SCRL wordmark with Onest for controls, labels and section headings. Instrument Serif remains an accent on saved-project titles, at weight 400 and 19px or larger. Fonts are self-hosted, including their Latin Extended subsets, and work offline. Document text continues to use its bundled Inter face independently of the interface fonts.
 
 ## Desktop
 
-1. **Header island.** Floating glass pill across the top (inset like the editor islands): Mac app icon and
-   "Open-SCRL" in Bluu Next on the left; on the right a quiet privacy chip ("Saved on this device") and a lilac
-   "New carousel" button that scrolls to and focuses the create panel.
-2. **Hero / create panel.** One wide glass panel:
-   - Left column: serif headline (about 44–52px), for example "Make something worth swiping.", one line of
-     supporting text, the project-name field and the lilac "Create & open editor" button.
-   - Right column: the format picker as large tactile cards. Each shows a proportional frame (the real aspect
-     ratio, softly lit), platform name and pixel size. Frames use lilac/blue, blue/teal and pink/lilac palettes; the selected card gets a lilac rim and glow. Six formats
-     fit in a 3×2 grid.
-   - Under the panel, a "Start from a grid" row of grid-starter tiles (reuse the phone's `GridStarters`
-     behavior and the chosen format).
-3. **Continue editing.** If there are projects, the most recently edited one gets a wide feature card: large
-   preview on the left, serif name, format · slide count, relative "Edited 2 hours ago", and an "Open" button.
-4. **All projects.** A sticky glass toolbar row with the serif section title and count pill, search, sort and the
-   grid/list toggle. Grid cards have a 4:5 preview well on the dark stage, serif name, and a two-line meta
-   (format · slides, then relative edited time). Hover lifts the card with a lilac hairline. The list view is
-   a single glass panel of 56px rows.
-5. **Previews.** Prefer a real preview of each project's first slide, rendered lazily only for cards on screen
-   and cached in memory, using the existing storage and preview-rendering code (for example `readProject` and
-   `SlidePreviewCanvas`). It must stay out of the initial chunk and must not slow first paint. If that is not
-   practical without changing storage or the document schema, keep the generated covers, framed in the real
-   aspect ratio, and say so.
-6. **Empty state.** No projects: an illustrated stack of three tilted frames with a lilac glow, "Your first
-   carousel starts here", and the create button. No search match: a compact message with a "Clear search" link.
-7. **Footer.** One quiet line: open source, MIT, files never leave the device.
+- The header carries the Mac app icon, wordmark, local-storage note and **New carousel** shortcut. The shortcut scrolls to and focuses the project-name field.
+- The left column has six proportional format cards, a project-name field and **Create & open editor**. Format cards support arrow-key selection. An empty name creates **Untitled**.
+- **Start from a grid** expands eight layouts below the creation controls. A chosen layout uses the selected format and name and applies the grid to the first slide.
+- **Recent projects** appears alongside creation, sorted by last edit by default. Search, sorting and remembered grid/list views remain available. Each project appears once, with its first-slide preview, format, slide count and edited time.
+- Empty and no-match states use short messages and an action to create or clear the search.
 
 ## Phone
 
-1. **Top bar.** Glass bar with the Mac icon and Bluu Next wordmark that compacts on scroll (keep the current collapsing
-   behavior), safe-area aware.
-2. **Create card.** Serif "New carousel", horizontally snapping format cards with proportional frames, name field,
-   lilac full-width "Create carousel" button. 44px minimum targets.
-3. **Start from a grid.** The existing grid starters, restyled as glass tiles.
-4. **Continue editing.** Feature card for the most recent project (preview, name, meta, relative time).
-5. **Your projects.** Search, then rows with a preview thumbnail, serif name, format · slides and relative time.
-6. **Floating "New" button.** When the create card has scrolled out of view, a lilac pill "New carousel"
-   floats above the bottom safe area and scrolls back to the create card.
-7. Empty state like desktop, scaled down.
+The Mac icon and wordmark sit above a compact **New carousel** form. Swipe the format cards sideways, enter a name and tap **Create carousel**. Grid starters are expandable; recent projects follow as thumbnail rows. Search appears with more than three projects.
 
-## Quality bar
+The compact top bar appears on scroll. When creation scrolls out of view, **New carousel** floats above the bottom safe area; it hides while the keyboard is open. These controls preserve the phone's existing scroll and keyboard behavior.
 
-AA contrast for text, visible focus rings, `prefers-reduced-motion` respected, no layout shift as previews load,
-smooth at 60fps while scrolling on a mid-range phone (avoid stacking many `backdrop-filter` layers in scrolling
-lists; use them on fixed chrome only).
+## Preview implementation
 
-## As built
+Shared pieces live in `src/components/home/`; desktop controls live in `src/components/landing/` and `src/styles/studio/landing.css`, while phone controls live in `src/components/mobile/home/`. Both screens create and open projects through `useHomeActions`.
 
-Shared pieces live in `src/components/home/` (`projectDisplay`, `useHomeActions`, `ProjectPreview`,
-`GridStarters`, `ContinueCard`, `HomeEmpty`, `home.css`); desktop-only pieces are in
-`src/components/landing/` and `src/styles/studio/landing.css`; the phone home keeps
-`src/components/mobile/home/`. Both screens create and open projects through `useHomeActions`, so
-the grid starters behave identically (project created, then the grid applied to its first slide).
+`ProjectPreview` uses a shared `IntersectionObserver` with a 320px margin and requests a render only when a card is near the viewport. `previewQueue` runs two jobs at a time and caches object URLs in a 96-entry LRU. `renderProjectPreview` remains a lazy chunk: it reads and migrates the document, compiles the scene and paints with `paintSlidePreview`, without writing to storage or taking editor activity holds. Decoded images count against the shared image-resource budget. Preview frames retain the format's aspect ratio while images load.
 
-**Real previews shipped.** Each card, row and feature card shows the project's first slide.
-
-- `ProjectPreview` registers its frame with one shared `IntersectionObserver` (320px margin) and
-  asks `previewQueue` for a render when it comes near the viewport. Jobs run two at a time after
-  `requestIdleCallback`, are dropped if the card unmounts first, and the resulting object URLs sit
-  in a 96-entry in-memory LRU keyed by project id, edit time, slide and size. A failed render is
-  cached as a failure, so a broken project is not retried on every scroll.
-- `renderProjectPreview` (a lazy chunk, loaded when the first card becomes visible) reads the
-  stored document with `readProject`, runs `migrateDocument` on a copy, builds the slide scene and
-  paints it with the editor's own `paintSlidePreview`. It writes nothing, never touches the editor
-  or asset stores and never takes an editor-activity hold, so it cannot block a PWA update.
-- Frames are sized by CSS container queries from the format's aspect ratio, so nothing shifts when
-  an image arrives. Until then a quiet shimmer shows; if rendering fails the tokenised generated
-  cover stays. After an edit the old image stays up until the new one is ready.
-- The desktop feature card also shows up to three following slides as a faded strip.
-- Decoded bitmaps go through the shared `imageResourceManager`, so they count against its existing
-  192 MiB budget and are evictable; they are not released when the home screen is left.
-
-**Deviations from the plan above**
-
-- Section title is "Your projects" (not "All projects"): tests and the phone already use that name.
-- Phone order is create card, Continue editing, grid starters, projects, so a returning user's
-  latest project is above the fold (the previous home also put projects before the starters).
-- The feature card's accessible name is "Continue editing" and the project name is in its
-  description. The same project is also in the list, and two buttons named after it would break
-  existing locators; project cards and rows are "Open <name>".
-- The empty-state heading keeps the accessible words "No carousels yet" as a small eyebrow above
-  the serif "Your first carousel starts here".
-- The default project name field is empty with an "Untitled" placeholder (as on the phone).
-- Desktop format cards support arrow keys (roving tabindex); the desktop create button also keeps
-  the `btn-primary` class that `e2e/fonts.spec.ts` selects.
-- The three phone-home rules that lived in `src/styles/studio/mobile.css` moved into the home CSS.
-- Relative times use `Intl.RelativeTimeFormat` ("5 minutes ago", "yesterday", "last week") and
-  refresh every minute while the page is visible; the absolute date is the `title`.
+Projects remain local to this browser. Storage, schema, canvas gestures and export rendering retain their existing contracts.

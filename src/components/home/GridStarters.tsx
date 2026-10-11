@@ -49,15 +49,7 @@ interface GridStartersProps {
 /** Photo-layout starters shared by both home screens; picking one creates a project with that grid applied. */
 export function GridStarters({ format, pendingId, busy, onPick, variant = 'phone' }: GridStartersProps) {
   return (
-    <section aria-labelledby="home-grids-title" className="home-section home-starters" data-variant={variant}>
-      <div className="home-section-head">
-        <div className="min-w-0">
-          <h2 id="home-grids-title" className="home-section-title">Start from a grid</h2>
-          <p className="home-section-sub">Photo layouts, ready to fill.</p>
-        </div>
-        <span className="home-section-aside">{format.name}</span>
-      </div>
-
+    <section aria-label="Grid layouts" className="home-starters" data-variant={variant}>
       <ul className="home-starters-list home-hscroll">
         {STARTER_TEMPLATES.map((template, index) => {
           const pending = pendingId === template.id;

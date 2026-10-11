@@ -15,9 +15,8 @@ The mobile layout is used when the browser window is 767 px wide or narrower, or
 An Open-SCRL loading screen appears while the app and its bundled fonts get ready, including on a slower first visit.
 
 - **New carousel**: pick a canvas size from the cards (IG Portrait, IG Square, IG Story / Reels, IG Landscape, TikTok, or Pinterest; swipe sideways for the rest), type a name, and tap **Create carousel**. A blank name keeps the project called Untitled. Scrolling past the card shows a floating **New carousel** button above the bottom edge that scrolls back up to it; it hides while the keyboard is open.
-- **Continue editing**: a larger card for the project you edited last, with a preview of its first slide and when it was last edited. Tap it to open the project.
-- **Start from a grid**: eight photo layouts, such as a 2 × 2 grid or a 1 + 2 layout. Tapping one creates a project in the chosen size with that grid already placed.
-- **Your projects**: each row shows a preview of the first slide, the name, canvas size, slide count, and when it was last edited ("Edited 2 hours ago"). Tap a row to open it. A search box appears once you have more than three projects, with **Clear search** when nothing matches. Previews are drawn on the device only for rows near the screen.
+- **Start from a grid**: expand this section to choose from eight photo layouts, such as a 2 × 2 grid or a 1 + 2 layout. Tapping one creates a project in the chosen size with that grid already placed.
+- **Recent projects**: each row shows a preview of the first slide, the name, canvas size, slide count, and when it was last edited ("Edited 2 hours ago"). Tap a row to open it. A search box appears once you have more than three projects, with **Clear search** when nothing matches. Previews are drawn on the device only for rows near the screen.
 
 The footer reads "Projects are stored locally in this browser." Clearing the site's data in that browser deletes them.
 

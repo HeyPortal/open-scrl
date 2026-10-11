@@ -4,7 +4,7 @@ for (const mobile of [false, true]) {
   test.describe(mobile ? 'mobile fonts' : 'desktop fonts', () => {
     test.use({ viewport: mobile ? { width: 393, height: 852 } : { width: 1280, height: 800 } });
 
-    test('UI waits for Inter and the font selector uses the bundled face', async ({ page }) => {
+    test('UI waits for document Inter and uses Onest while the font selector keeps the document face', async ({ page }) => {
       let release!: () => void;
       const fontGate = new Promise<void>((resolve) => { release = resolve; });
       let requested!: () => void;
@@ -33,7 +33,7 @@ for (const mobile of [false, true]) {
       const { root } = await cdp.send('DOM.getDocument');
       const { nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: mobile ? '.mobile-home button[type="submit"]' : 'button.btn-primary' });
       const { fonts } = await cdp.send('CSS.getPlatformFontsForNode', { nodeId });
-      expect(fonts.some((font) => font.isCustomFont && /Inter/.test(font.familyName) && font.glyphCount > 0)).toBe(true);
+      expect(fonts.some((font) => font.isCustomFont && /Onest/.test(font.familyName) && font.glyphCount > 0)).toBe(true);
       await cdp.detach();
 
       await create.click();
@@ -48,6 +48,36 @@ for (const mobile of [false, true]) {
         await page.getByRole('button', { name: 'Add text box' }).click();
       }
       await expect(page.getByRole('combobox', { name: 'Font', exact: true })).toHaveCSS('font-family', '"Inter Variable"');
+    });
+
+    test('waits for Onest and renders the Bricolage wordmark from its bundled font', async ({ page }) => {
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => { release = resolve; });
+      let requested!: () => void;
+      const fontRequested = new Promise<void>((resolve) => { requested = resolve; });
+      await page.route('**/onest-latin-wght-normal.woff2', async (route) => {
+        requested();
+        await gate;
+        await route.continue();
+      });
+      await page.goto('/', { waitUntil: 'domcontentloaded' });
+      await fontRequested;
+      const create = page.getByRole('button', { name: mobile ? 'Create carousel' : 'Create & open editor', exact: true });
+      try {
+        await expect(create).toHaveCount(0);
+        await expect(page.getByRole('status', { name: 'Loading Open-SCRL', exact: true })).toBeVisible();
+      } finally {
+        release();
+      }
+      await expect(create).toBeVisible();
+      const cdp = await page.context().newCDPSession(page);
+      await cdp.send('DOM.enable');
+      await cdp.send('CSS.enable');
+      const { root } = await cdp.send('DOM.getDocument');
+      const { nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: mobile ? '.home-phone-title' : '.home-brand-name' });
+      const { fonts } = await cdp.send('CSS.getPlatformFontsForNode', { nodeId });
+      expect(fonts.some((font) => font.isCustomFont && /Bricolage/.test(font.familyName) && font.glyphCount > 0)).toBe(true);
+      await cdp.detach();
     });
   });
 }

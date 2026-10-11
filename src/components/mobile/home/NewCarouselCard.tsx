@@ -1,5 +1,5 @@
 import { forwardRef } from 'react';
-import { ArrowRight, Check, Loader2 } from 'lucide-react';
+import { Check, Loader2 } from 'lucide-react';
 import type { Format } from '@/types';
 import { FORMATS } from '@/lib/format';
 import { fitBox } from '../../home/projectDisplay';
@@ -44,7 +44,6 @@ export const NewCarouselCard = forwardRef<HTMLFormElement, NewCarouselCardProps>
       }}
     >
       <h2 id="home-new-title" className="home-section-title">New carousel</h2>
-      <p className="home-section-sub">Pick a canvas size. You can change it later.</p>
 
       <div role="radiogroup" aria-label="Canvas format" className="home-formats home-hscroll">
         {FORMATS.map((option) => (
@@ -69,7 +68,6 @@ export const NewCarouselCard = forwardRef<HTMLFormElement, NewCarouselCardProps>
       <button type="submit" disabled={busy} aria-busy={creating} className="home-button home-button-lg home-create-button">
         {creating ? <Loader2 size={18} className="animate-spin" aria-hidden /> : null}
         {creating ? 'Creating…' : 'Create carousel'}
-        {!creating && <ArrowRight size={18} strokeWidth={2.25} aria-hidden />}
       </button>
     </form>
   );

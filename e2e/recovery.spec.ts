@@ -17,7 +17,7 @@ test('a failed project-library load can be retried without reloading the page', 
   await expect(page.getByRole('alert')).toContainText('projects could not be loaded');
   await page.evaluate(() => Object.assign(window, { failProjectOpen: false }));
   await page.getByRole('button', { name: 'Retry loading' }).click();
-  await expect(page.getByText('Your projects')).toBeVisible();
+  await expect(page.getByText('Recent projects')).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -96,7 +96,7 @@ test('a failed media-library load can be retried inside the editor', async ({ pa
     };
   });
   await page.goto('/');
-  await expect(page.getByText('Your projects')).toBeVisible();
+  await expect(page.getByText('Recent projects')).toBeVisible();
   await page.evaluate(() => Object.assign(window, { failMediaLoad: true }));
   await page.getByRole('button', { name: /create|start/i }).first().click();
   await expect(page.getByRole('button', { name: 'Retry media' })).toBeVisible();

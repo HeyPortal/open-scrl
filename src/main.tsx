@@ -12,8 +12,12 @@ if (import.meta.env.DEV && 'serviceWorker' in navigator) {
   });
 }
 
-// Mount after the UI font is ready so the first canvas measurements cannot cache a fallback.
-void loadInterFonts().catch((error: unknown) => console.error('Could not load Inter:', error)).then(() => {
+// Keep document Inter measurements and UI typography ready before mounting.
+void Promise.all([
+  loadInterFonts(),
+  document.fonts.load('400 16px "Onest Variable"'),
+  document.fonts.load('650 26px "Bricolage Grotesque Variable"'),
+]).catch((error: unknown) => console.error('Could not load bundled fonts:', error)).then(() => {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <App />

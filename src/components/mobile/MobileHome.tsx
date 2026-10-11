@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, HardDrive, Plus } from 'lucide-react';
 import { AppLogo } from '../AppLogo';
 import type { Format } from '@/types';
 import { FORMATS } from '@/lib/format';
 import { useEditor } from '@/store/editor';
-import { ContinueCard } from '../home/ContinueCard';
 import { GridStarters } from '../home/GridStarters';
 import { BLANK, useHomeActions } from '../home/useHomeActions';
 import { useNow } from '../home/useNow';
@@ -71,7 +70,6 @@ export default function MobileHome() {
     scroller.current?.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
   };
 
-  const latest = useMemo(() => projects.reduce<(typeof projects)[number] | undefined>((best, p) => (!best || p.updatedAt > best.updatedAt ? p : best), undefined), [projects]);
   const showPill = !createVisible && !keyboardOpen;
 
   return (
@@ -96,7 +94,6 @@ export default function MobileHome() {
               <AppLogo className="home-logo home-logo-lg" size={44} />
               <h1 className="home-phone-title app-wordmark">Open-SCRL</h1>
             </div>
-            <p>Carousels &amp; photo grids, saved on this device</p>
           </header>
 
           {actions.openError && (
@@ -117,23 +114,15 @@ export default function MobileHome() {
             onSubmit={() => void actions.create(format, name)}
           />
 
-          {latest && (
-            <ContinueCard
-              variant="phone"
-              project={latest}
-              now={now}
+          <details className="home-grid-options">
+            <summary>Start from a grid</summary>
+            <GridStarters
+              format={format}
+              pendingId={actions.creating !== BLANK ? actions.creating : null}
               busy={actions.busy}
-              isOpening={actions.openingId === latest.id}
-              onOpen={() => void actions.open(latest)}
+              onPick={(template) => void actions.create(format, name, template)}
             />
-          )}
-
-          <GridStarters
-            format={format}
-            pendingId={actions.creating !== BLANK ? actions.creating : null}
-            busy={actions.busy}
-            onPick={(template) => void actions.create(format, name, template)}
-          />
+          </details>
 
           <ProjectList
             projects={projects}

@@ -74,7 +74,7 @@
   background: radial-gradient(120% 100% at 50% 0%, rgb(var(--c-accent) / .28), transparent 65%), rgb(var(--c-bg-inset) / .7);
 }
 .media-dropzone span.media-dropzone-icon { width: 48px; height: 48px; margin-bottom: 6px; box-shadow: 0 0 0 6px rgb(var(--c-accent) / .14), 0 10px 30px -8px rgb(var(--c-accent) / .7); }
-.media-dropzone span.media-dropzone-title { font-family: 'Instrument Serif', ui-serif, Georgia, serif; font-size: 22px; font-weight: 400; font-synthesis: none; line-height: 1.1; }
+.media-dropzone span.media-dropzone-title { font-family: 'Onest Variable', sans-serif; font-size: 17px; font-weight: 600; font-synthesis: none; line-height: 1.1; }
 .media-dropzone span.media-dropzone-hint { font-size: 11.5px; }
 .media-dropzone span.media-dropzone-types { margin-top: 4px; font-size: 10px; letter-spacing: .08em; color: rgb(var(--c-ink-dim)); }
 .media-dropzone span.media-dropzone-private { font-size: 10.5px; color: rgb(var(--c-ink-dim)); }

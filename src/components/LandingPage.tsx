@@ -3,7 +3,6 @@ import { AlertTriangle } from 'lucide-react';
 import type { Format } from '@/types';
 import { FORMATS } from '@/lib/format';
 import { useEditor } from '@/store/editor';
-import { ContinueCard } from './home/ContinueCard';
 import { filterProjects, sortProjects, type SortKey } from './home/projectDisplay';
 import { useHomeActions } from './home/useHomeActions';
 import { useNow } from './home/useNow';
@@ -33,7 +32,6 @@ export function LandingPage() {
   const scroller = useRef<HTMLDivElement>(null);
   const nameInput = useRef<HTMLInputElement>(null);
 
-  const latest = useMemo(() => projects.reduce<(typeof projects)[number] | undefined>((best, p) => (!best || p.updatedAt > best.updatedAt ? p : best), undefined), [projects]);
   const visible = useMemo(() => sortProjects(filterProjects(projects, query), sort), [projects, query, sort]);
 
   const chooseView = (next: View) => {
@@ -58,37 +56,30 @@ export function LandingPage() {
             </div>
           )}
 
-          <CreatePanel
-            ref={nameInput}
-            name={name}
-            onNameChange={setName}
-            format={format}
-            onFormatChange={setFormat}
-            creating={actions.creating === 'blank'}
-            busy={actions.busy}
-            onSubmit={() => void actions.create(format, name)}
-          />
-
-          <Suspense fallback={<div className="home-section home-starters-skeleton" aria-hidden />}>
-            <GridStarters
-              variant="desktop"
+          <aside className="home-new-column" aria-label="Create a carousel">
+            <CreatePanel
+              ref={nameInput}
+              name={name}
+              onNameChange={setName}
               format={format}
-              pendingId={actions.creating !== 'blank' ? actions.creating : null}
+              onFormatChange={setFormat}
+              creating={actions.creating === 'blank'}
               busy={actions.busy}
-              onPick={(template) => void actions.create(format, name, template)}
+              onSubmit={() => void actions.create(format, name)}
             />
-          </Suspense>
-
-          {latest && (
-            <ContinueCard
-              variant="desktop"
-              project={latest}
-              now={now}
-              busy={actions.busy}
-              isOpening={actions.openingId === latest.id}
-              onOpen={() => void actions.open(latest)}
-            />
-          )}
+            <details className="home-grid-options">
+              <summary>Start from a grid</summary>
+              <Suspense fallback={<div className="home-starters-skeleton" aria-hidden />}>
+                <GridStarters
+                  variant="desktop"
+                  format={format}
+                  pendingId={actions.creating !== 'blank' ? actions.creating : null}
+                  busy={actions.busy}
+                  onPick={(template) => void actions.create(format, name, template)}
+                />
+              </Suspense>
+            </details>
+          </aside>
 
           <ProjectsSection
             total={projects.length}

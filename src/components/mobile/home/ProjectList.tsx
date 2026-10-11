@@ -67,7 +67,7 @@ export function ProjectList({ projects, openingId, busy, now, onOpen, onCreate }
   return (
     <section aria-labelledby="home-projects-title" className="home-section">
       <div className="home-section-head">
-        <h2 id="home-projects-title" className="home-section-title">Your projects</h2>
+        <h2 id="home-projects-title" className="home-section-title">Recent projects</h2>
         {projects.length > 0 && <span className="home-count">{projects.length}</span>}
       </div>
 
@@ -97,16 +97,15 @@ export function ProjectList({ projects, openingId, busy, now, onOpen, onCreate }
       <div className="home-plist">
         {projects.length === 0 ? (
           <HomeEmpty
-            eyebrow="No carousels yet"
-            title="Your first carousel starts here"
+            title="No carousels yet"
             action={
               <button type="button" className="home-button home-button-ghost" onClick={onCreate}>
                 <Plus size={16} strokeWidth={2.5} aria-hidden />
-                Start your first carousel
+                Create a carousel
               </button>
             }
           >
-            Pick a size above, or begin from a photo grid.
+            Projects you create appear here.
           </HomeEmpty>
         ) : visible.length === 0 ? (
           <div role="status" className="home-nomatch">

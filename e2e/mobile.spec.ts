@@ -392,6 +392,7 @@ test.describe('mobile editor', () => {
         }, kind);
         if (layout === 'filled grid') {
           await page.goto('/');
+          await page.locator('.home-grid-options > summary').tap();
           await page.getByRole('button', { name: 'Start with 2 side grid', exact: true }).tap();
           await expect(dock(page)).toBeVisible();
           const photo = await point('image');
@@ -503,6 +504,7 @@ test.describe('mobile editor', () => {
 
   test('grid photo frames can be selected by touching the canvas', async ({ page }) => {
     await page.goto('/');
+    await page.locator('.home-grid-options > summary').tap();
     await page.getByRole('button', { name: 'Start with 2 side grid', exact: true }).tap();
     await expect(dock(page)).toBeVisible();
     const point = await page.evaluate(async () => {
@@ -770,7 +772,7 @@ test.describe('mobile editor', () => {
 
     await test.step('Back to projects lists the renamed project', async () => {
       await page.getByRole('button', { name: 'Back to projects', exact: true }).tap();
-      await expect(page.getByRole('heading', { name: 'Your projects' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Recent projects' })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Open Beach trip', exact: true })).toBeVisible();
     });
 
@@ -792,11 +794,12 @@ test.describe('desktop layout', () => {
 
     await test.step('Desktop landing page, not the mobile home', async () => {
       await page.goto('/');
-      await expect(page.getByRole('heading', { name: 'Make something worth swiping.' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Recent projects' })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Create & open editor' })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Create carousel', exact: true })).toHaveCount(0);
       // Desktop shares the phone's grid starters.
-      await expect(page.getByRole('heading', { name: 'Start from a grid' })).toBeVisible();
+      await page.locator('.home-grid-options > summary').click();
+      await expect(page.getByRole('region', { name: 'Grid layouts' })).toBeVisible();
     });
 
     await test.step('Desktop editor with the side tools, not the mobile dock', async () => {

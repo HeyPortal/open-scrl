@@ -4,7 +4,7 @@ import type { ProjectDocumentV2 } from '../../src/types';
 const tinyPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
 async function install(page: Page) {
   await page.goto('/');
-  await expect(page.getByText('Your projects')).toBeVisible();
+  await expect(page.getByText('Recent projects')).toBeVisible();
   await page.evaluate(async () => { await navigator.serviceWorker.ready; });
   await page.reload();
   await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
@@ -165,7 +165,7 @@ test('another tab activating an update does not reload a busy tab or accept for 
   await deploy(other);
   await expect(other.getByRole('button', { name: 'Reload to update' })).toBeVisible();
   await other.getByRole('button', { name: 'Reload to update' }).click();
-  await expect(other.getByText('Your projects')).toBeVisible();
+  await expect(other.getByText('Recent projects')).toBeVisible();
   await expect(page.getByLabel('Project name')).toHaveValue('Other tab project');
   await expect(page.getByRole('button', { name: 'Reload to update' })).toHaveCount(0);
   await page.evaluate(() => (window as unknown as { importGate: { held: (() => void)[] } }).importGate.held.splice(0).forEach((resume) => resume()));
@@ -239,7 +239,7 @@ for (const gesture of ['drag', 'transform'] as const) {
     await expect(page.getByTitle('Projects')).toBeVisible();
     expect(await savedLayer(page, name)).toEqual(before);
     await page.mouse.up();
-    await expect(page.getByText('Your projects')).toBeVisible();
+    await expect(page.getByText('Recent projects')).toBeVisible();
     const after = await savedLayer(page, name);
     expect(after).not.toBeNull();
     if (gesture === 'drag') expect(after!.x).not.toBe(before!.x);
@@ -266,7 +266,7 @@ test('activation waits for a text draft and saves its blur commit before reloadi
   const before = await savedLayer(page, name);
   expect(before?.kind === 'text' && before.text).not.toBe('Saved after worker activation');
   await draft.evaluate((element) => element.blur());
-  await expect(page.getByText('Your projects')).toBeVisible();
+  await expect(page.getByText('Recent projects')).toBeVisible();
   const after = await savedLayer(page, name);
   expect(after?.kind === 'text' && after.text).toBe('Saved after worker activation');
 });

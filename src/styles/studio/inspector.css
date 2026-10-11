@@ -2,22 +2,22 @@
    Phone sheets keep their own touch styling. Labels and hints use ink-dim (not ink-faint), which
    falls below WCAG AA on the dark panel. */
 
-/* Titles: the layer name and slide heading use the serif identity (19px+, weight 400, no synthesis). */
+/* Titles: the layer name and slide heading use the UI sans. */
 .studio-inspector-content :is(.insp-rename, p.text-xs.font-semibold) {
-  font-family: 'Instrument Serif', serif;
-  font-size: 21px;
+  font-family: 'Onest Variable', sans-serif;
+  font-size: 16px;
   line-height: 1.15;
-  font-weight: 400;
+  font-weight: 600;
   font-synthesis: none;
-  letter-spacing: 0.01em;
+  letter-spacing: -.01em;
 }
 .studio-inspector-content input.input[aria-label='Layer name'].font-semibold {
   height: 30px;
   padding: 0 6px;
-  font-family: 'Instrument Serif', serif;
-  font-size: 21px;
+  font-family: 'Onest Variable', sans-serif;
+  font-size: 16px;
   line-height: 1.15;
-  font-weight: 400;
+  font-weight: 600;
   font-synthesis: none;
 }
 
@@ -88,14 +88,14 @@
 }
 .studio-inspector-tabs > [role='tab']:hover { color: rgb(var(--c-ink)); }
 
-/* Phone: the layer and slide titles use the same serif as the desktop card. */
+/* Phone: the layer and slide titles use the same UI sans as the desktop card. */
 .mobile-inspector :is(.insp-rename, p.text-xs.font-semibold) {
-  font-family: 'Instrument Serif', serif;
-  font-size: 22px;
+  font-family: 'Onest Variable', sans-serif;
+  font-size: 17px;
   line-height: 1.15;
-  font-weight: 400;
+  font-weight: 600;
   font-synthesis: none;
-  letter-spacing: 0.01em;
+  letter-spacing: -.01em;
 }
 .mobile-inspector :is(.text-ink-faint, .field-label) { color: rgb(var(--c-ink-dim)); }
 
