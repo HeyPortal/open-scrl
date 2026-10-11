@@ -157,11 +157,10 @@
 .home-alert svg { flex-shrink: 0; margin-top: 1px; color: rgb(var(--c-danger-icon)); }
 
 /* Hairline rings are drawn above the preview wells (an inset box-shadow would sit under them). */
-:is(.home-card, .home-starter, .home-format) { position: relative; --ring: rgb(var(--c-line) / var(--c-line-alpha)); }
-:is(.home-card, .home-starter, .home-format)::after {
+:is(.home-starter, .home-format) { position: relative; --ring: rgb(var(--c-line) / var(--c-line-alpha)); }
+:is(.home-starter, .home-format)::after {
   content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; box-shadow: inset 0 0 0 1px var(--ring);
 }
-:is(.home-card):hover:not(:disabled) { --ring: rgb(var(--c-accent) / .6); }
 .home-starter:hover:not(:disabled) { --ring: rgb(var(--c-accent) / .55); }
 .home-format:hover { --ring: rgb(var(--c-line-strong) / calc(var(--c-line-strong-alpha) * 1.8)); }
 .home-format[aria-checked='true'] { --ring: rgb(var(--c-accent)); }
@@ -179,6 +178,12 @@
 
 /* Secondary starting points stay out of the main project flow until requested. */
 .home-grid-options { margin-top: 18px; }
-.home-grid-options > summary { padding: 10px 0; font-size: 13px; font-weight: 500; color: rgb(var(--c-ink-dim)); cursor: pointer; }
+.home-grid-options > summary {
+  display: inline-flex; align-items: center; gap: 6px; padding: 10px 0; list-style: none;
+  font-size: 13px; font-weight: 500; color: rgb(var(--c-ink-dim)); cursor: pointer;
+}
+.home-grid-options > summary::-webkit-details-marker { display: none; }
+.home-grid-options > summary svg { transition: transform 180ms ease-out; }
+.home-grid-options[open] > summary svg { transform: rotate(180deg); }
 .home-grid-options > summary:hover { color: rgb(var(--c-ink)); }
 .home-grid-options > summary:focus-visible { outline: 2px solid rgb(var(--c-accent)); outline-offset: 3px; border-radius: 4px; }

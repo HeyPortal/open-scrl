@@ -17,7 +17,7 @@ async function state(page: Page) {
 
 async function setup(page: Page) {
   await page.goto('/');
-  await page.getByRole('button', { name: /create.*open editor/i }).click();
+  await page.getByRole('button', { name: 'Create carousel', exact: true }).click();
   await page.getByRole('button', { name: 'Slide design', exact: true }).click();
   const installedKonva = JSON.parse(await readFile(new URL('../node_modules/konva/package.json', import.meta.url), 'utf8')) as { version: string };
   // A reused dev server can otherwise validate a stale optimized dependency after an upgrade.

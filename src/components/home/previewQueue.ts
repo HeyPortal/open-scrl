@@ -1,5 +1,5 @@
 /**
- * Lazy first-slide previews for the home screen. Cards ask for a preview once they scroll near the
+ * Lazy slide previews (a slide or a strip of slides) for the home screen. Cards ask for a preview once they scroll near the
  * viewport; renders run two at a time after the browser is idle, and the resulting object URLs are
  * kept in a small in-memory cache keyed by project id, edit time and size. The renderer (storage,
  * painter, asset reads) is a dynamic import so none of it is in the initial chunk.
@@ -29,7 +29,7 @@ function remember(key: string, url: string) {
 }
 
 type Listener = (url: string) => void;
-interface Job { key: string; projectId: string; pixelWidth: number; slide: number; listeners: Set<Listener>; started: boolean }
+interface Job { key: string; projectId: string; pixelWidth: number; slide: number; count: number; listeners: Set<Listener>; started: boolean }
 
 const jobs = new Map<string, Job>();
 const waiting: Job[] = [];
@@ -46,7 +46,7 @@ async function run(job: Job) {
   let url = '';
   try {
     const { renderProjectPreview } = await import('./renderProjectPreview');
-    const blob = await renderProjectPreview(job.projectId, job.pixelWidth, job.slide);
+    const blob = await renderProjectPreview(job.projectId, job.pixelWidth, job.slide, job.count);
     if (blob) url = URL.createObjectURL(blob);
   } catch {
     // Leave the generated cover in place.
@@ -63,10 +63,10 @@ function pump() {
 }
 
 /** Queues a preview render. Returns a cancel function; a job nobody waits for is dropped before it starts. */
-export function requestPreview(key: string, projectId: string, pixelWidth: number, slide: number, listener: Listener): () => void {
+export function requestPreview(key: string, projectId: string, pixelWidth: number, slide: number, listener: Listener, count = 1): () => void {
   let job = jobs.get(key);
   if (!job) {
-    job = { key, projectId, pixelWidth, slide, listeners: new Set(), started: false };
+    job = { key, projectId, pixelWidth, slide, count, listeners: new Set(), started: false };
     jobs.set(key, job);
     waiting.push(job);
     whenIdle(pump);

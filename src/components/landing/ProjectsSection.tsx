@@ -1,9 +1,9 @@
 import { useId } from 'react';
-import { ArrowRight, LayoutGrid, List, Loader2, Plus, Search, X } from 'lucide-react';
+import { ArrowRight, LayoutGrid, List, Loader2, Search, X } from 'lucide-react';
 import type { ProjectSummary } from '@/store/editor';
 import { HomeEmpty } from '../home/HomeEmpty';
 import { ProjectPreview } from '../home/ProjectPreview';
-import { fullDate, projectMeta, relativeTime, type SortKey } from '../home/projectDisplay';
+import { fullDate, projectMeta, relativeTime, stripCount, type SortKey } from '../home/projectDisplay';
 
 export type View = 'grid' | 'list';
 
@@ -21,7 +21,7 @@ function ProjectCard({ project, now, busy, isOpening, onOpen }: ItemProps) {
     <li>
       <button type="button" className="home-card" onClick={onOpen} disabled={busy} aria-busy={isOpening} aria-label={`Open ${project.name}`} aria-describedby={metaId}>
         <span className="home-well home-card-well">
-          <ProjectPreview project={project} size="card" />
+          <ProjectPreview project={project} size="strip" count={stripCount(project.format, project.slideCount)} />
           {isOpening && (
             <span className="home-opening">
               <Loader2 size={20} className="animate-spin text-accent" aria-hidden />
@@ -30,8 +30,11 @@ function ProjectCard({ project, now, busy, isOpening, onOpen }: ItemProps) {
         </span>
         <span className="home-card-body" id={metaId}>
           <span className="home-card-name">{project.name}</span>
-          <span className="home-card-meta">{projectMeta(project)}</span>
-          <span className="home-card-time" title={fullDate(project.updatedAt)}>Edited {relativeTime(project.updatedAt, now)}</span>
+          <span className="home-card-meta">
+            {projectMeta(project)}
+            <span aria-hidden> · </span>
+            <span className="home-card-time" title={fullDate(project.updatedAt)}>Edited {relativeTime(project.updatedAt, now)}</span>
+          </span>
         </span>
       </button>
     </li>
@@ -70,11 +73,10 @@ interface ProjectsSectionProps {
   busy: boolean;
   openingId: string | null;
   onOpen: (project: ProjectSummary) => void;
-  onCreate: () => void;
 }
 
-/** "All projects": sticky toolbar (search, sort, view) over a card grid or a list, plus empty and no-match states. */
-export function ProjectsSection({ total, visible, query, onQueryChange, sort, onSortChange, view, onViewChange, now, busy, openingId, onOpen, onCreate }: ProjectsSectionProps) {
+/** Recent projects: a quiet toolbar (search, sort, view) over carousel-strip cards or a list, plus empty and no-match states. */
+export function ProjectsSection({ total, visible, query, onQueryChange, sort, onSortChange, view, onViewChange, now, busy, openingId, onOpen }: ProjectsSectionProps) {
   const itemProps = (project: ProjectSummary): ItemProps => ({
     project,
     now,
@@ -113,16 +115,8 @@ export function ProjectsSection({ total, visible, query, onQueryChange, sort, on
       </div>
 
       {total === 0 ? (
-        <HomeEmpty
-          title="No carousels yet"
-          action={
-            <button type="button" className="home-button home-button-ghost" onClick={onCreate}>
-              <Plus size={15} strokeWidth={2.5} aria-hidden />
-              Create a carousel
-            </button>
-          }
-        >
-          Projects you create appear here.
+        <HomeEmpty title="No carousels yet">
+          Carousels you create appear here.
         </HomeEmpty>
       ) : visible.length === 0 ? (
         <div className="home-nomatch" role="status">

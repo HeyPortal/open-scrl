@@ -4,8 +4,8 @@ import { coverFor } from './projectDisplay';
 import './home.css';
 import { observeVisible, peekPreview, requestPreview } from './previewQueue';
 
-/** Longest rendered edge in device pixels. Cards are about 200px wide, the feature card larger, thumbnails small. */
-const LONG_EDGE = { thumb: 168, card: 480, feature: 640 } as const;
+/** Longest rendered edge of each slide in device pixels: strips repeat it per slide, thumbnails stay small. */
+const LONG_EDGE = { thumb: 168, strip: 300, card: 480, feature: 640 } as const;
 export type PreviewSize = keyof typeof LONG_EDGE;
 
 interface ProjectPreviewProps {
@@ -13,6 +13,8 @@ interface ProjectPreviewProps {
   size: PreviewSize;
   /** Zero-based slide to show; the first by default. */
   slide?: number;
+  /** Consecutive slides drawn edge to edge as one strip; one by default. */
+  count?: number;
 }
 
 /**
@@ -21,11 +23,12 @@ interface ProjectPreviewProps {
  * Until the preview is ready the frame shows a quiet placeholder; if it cannot be rendered the
  * generated cover stays.
  */
-export function ProjectPreview({ project, size, slide = 0 }: ProjectPreviewProps) {
+export function ProjectPreview({ project, size, slide = 0, count = 1 }: ProjectPreviewProps) {
   const { id, updatedAt, format } = project;
-  const ratio = format.width / format.height;
-  const pixelWidth = Math.max(1, Math.round(LONG_EDGE[size] * Math.min(1, ratio)));
-  const key = `${id}:${updatedAt}:${slide}:${pixelWidth}`;
+  const slideRatio = format.width / format.height;
+  const ratio = slideRatio * count;
+  const pixelWidth = Math.max(1, Math.round(LONG_EDGE[size] * Math.min(1, slideRatio)));
+  const key = `${id}:${updatedAt}:${slide}:${count}:${pixelWidth}`;
   const frame = useRef<HTMLSpanElement>(null);
   const [state, setState] = useState<{ key: string; url: string | undefined }>(() => ({ key, url: peekPreview(key) }));
   const fresh = state.key === key ? state.url : peekPreview(key);
@@ -39,17 +42,17 @@ export function ProjectPreview({ project, size, slide = 0 }: ProjectPreviewProps
     if (!element || peekPreview(key) !== undefined) return;
     let cancel: (() => void) | undefined;
     const stop = observeVisible(element, () => {
-      cancel = requestPreview(key, id, pixelWidth, slide, (next) => setState({ key, url: next }));
+      cancel = requestPreview(key, id, pixelWidth, slide, (next) => setState({ key, url: next }), count);
     });
     return () => {
       stop();
       cancel?.();
     };
-  }, [key, id, pixelWidth, slide]);
+  }, [key, id, pixelWidth, slide, count]);
 
   const status = url ? 'ready' : fresh === '' ? 'failed' : 'loading';
   return (
-    <span ref={frame} className="home-frame" data-status={status} style={{ '--r': ratio } as CSSProperties} aria-hidden>
+    <span ref={frame} className="home-frame" data-status={status} data-slides={count > 1 ? count : undefined} style={{ '--r': ratio, '--n': count } as CSSProperties} aria-hidden>
       {status === 'failed' && <span className="home-frame-cover" style={{ background: coverFor(id) }} />}
       {url && <img className="home-frame-img" src={url} alt="" draggable={false} decoding="async" />}
     </span>

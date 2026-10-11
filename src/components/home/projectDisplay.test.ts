@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ProjectSummary } from '@/store/editor';
-import { coverFor, filterProjects, projectMeta, relativeTime, sortProjects } from './projectDisplay';
+import { coverFor, filterProjects, projectMeta, relativeTime, sortProjects, stripCount } from './projectDisplay';
 
 const ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyz';
 
@@ -111,5 +111,17 @@ describe('projectMeta', () => {
   it('pluralises slides', () => {
     expect(projectMeta(project('a', 'IG Square', 1, 1, 1))).toBe('IG Square · 1 slide');
     expect(projectMeta(project('a', 'IG Square', 1, 1, 6))).toBe('IG Square · 6 slides');
+  });
+});
+
+describe('stripCount', () => {
+  it('shows more slides for taller formats, capped by the project and the card', () => {
+    expect(stripCount({ width: 1080, height: 1350 }, 6)).toBe(3);
+    expect(stripCount({ width: 1080, height: 1920 }, 6)).toBe(4);
+    expect(stripCount({ width: 1080, height: 1080 }, 6)).toBe(2);
+    expect(stripCount({ width: 1080, height: 566 }, 6)).toBe(1);
+    expect(stripCount({ width: 1080, height: 1920 }, 2)).toBe(2);
+    expect(stripCount({ width: 1080, height: 1350 }, 1)).toBe(1);
+    expect(stripCount({ width: 1080, height: 1350 }, 0)).toBe(1);
   });
 });

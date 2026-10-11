@@ -17,7 +17,7 @@ function frameStyle(layer: ImageLayer) {
 
 async function setup(page: Page) {
   await page.goto('/');
-  await page.getByRole('button', { name: /create.*open editor/i }).click();
+  await page.getByRole('button', { name: 'Create carousel', exact: true }).click();
   await expect(page.getByTitle('Zoom out')).toBeVisible();
   const images = await page.evaluate(() => ['Red', 'Blue', 'Green', 'Yellow'].map((name, index) => {
     const canvas = document.createElement('canvas'); canvas.width = 400; canvas.height = 300;

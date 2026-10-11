@@ -53,7 +53,7 @@ test.describe('Studio desktop', () => {
     await expect(page.getByLabel('Design style')).toHaveCount(0);
     await expect(page.locator('html')).not.toHaveAttribute('data-style');
     await screenshot(page, 'desktop-home');
-    await page.getByRole('button', { name: 'Create & open editor', exact: true }).click();
+    await page.getByRole('button', { name: 'Create carousel', exact: true }).click();
     await expect(page.locator('.studio-stage .konvajs-content')).toBeVisible();
     await expect(page.getByRole('region', { name: 'Slide timeline' })).toBeVisible();
     await screenshot(page, 'desktop-editor-empty');
@@ -105,7 +105,7 @@ test.describe('Studio desktop', () => {
 
   test('tool cards toggle, escape closes, and fit reserves panel and timeline space', async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('button', { name: 'Create & open editor', exact: true }).click();
+    await page.getByRole('button', { name: 'Create carousel', exact: true }).click();
     await page.getByRole('button', { name: 'Media', exact: true }).click();
     await expect(page.locator('.studio-left-panel')).toHaveCount(0);
     await page.getByRole('button', { name: 'Grids', exact: true }).click();

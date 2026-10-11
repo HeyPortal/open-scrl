@@ -13,7 +13,7 @@ interface Seed { name: string; format?: string; slides?: number }
 async function seedProjects(page: Page, projects: Seed[]) {
   // App loads the project index after its fonts are ready. Seeding before
   // that load completes lets its stale snapshot replace the new summaries.
-  await expect(page.getByRole('button', { name: /^(Create & open editor|Create carousel)$/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Create carousel' })).toBeVisible();
   await page.evaluate(async (list) => {
     const editorModule = '/src/store/editor.ts';
     const formatModule = '/src/lib/format.ts';
@@ -47,7 +47,7 @@ test.describe('desktop home', () => {
     await expect(formats.getByRole('radio', { name: /IG Portrait/ })).toHaveAttribute('aria-checked', 'false');
 
     await page.getByLabel('Project name').fill('New project test');
-    await page.getByRole('button', { name: 'Create & open editor', exact: true }).click();
+    await page.getByRole('button', { name: 'Create carousel', exact: true }).click();
     await expect(page.getByTitle('Zoom out')).toBeVisible();
     await expect(page.getByLabel('Project name')).toHaveValue('New project test');
     await expect(page.getByLabel('Canvas format')).toHaveValue('IG Square');
@@ -65,14 +65,14 @@ test.describe('desktop home', () => {
     await expect(formats.getByRole('radio', { name: /Pinterest/ })).toHaveAttribute('aria-checked', 'true');
   });
 
-  test('empty profile offers creation and focuses the name field', async ({ page }) => {
+  test('empty profile shows a quiet empty state under the create row', async ({ page }) => {
     const errors = trackPageErrors(page);
     await page.goto('/');
     await expect(page.getByRole('heading', { name: 'No carousels yet' })).toBeVisible();
     await expect(page.getByRole('region', { name: 'Continue editing' })).toHaveCount(0);
     await expect(page.getByLabel('Search projects')).toHaveCount(0);
-    await page.getByRole('button', { name: 'Create a carousel' }).click();
-    await expect(page.getByLabel('Project name')).toBeFocused();
+    await expect(page.getByRole('button', { name: 'Create carousel', exact: true })).toBeInViewport();
+    await expect(page.getByRole('button', { name: 'New carousel', exact: true })).toHaveCount(0);
     expect(errors).toEqual([]);
   });
 

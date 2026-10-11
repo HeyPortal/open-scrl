@@ -46,8 +46,8 @@ test.describe('mobile editor', () => {
       await expect(page.getByRole('heading', { name: 'Open-SCRL', level: 1 })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Create carousel', exact: true })).toBeVisible();
       await expect(page.getByRole('heading', { name: 'No carousels yet' })).toBeVisible();
-      await expect(page.getByRole('heading', { name: 'Make something worth swiping.' })).toHaveCount(0);
-      await expect(page.getByRole('button', { name: 'Create & open editor' })).toHaveCount(0);
+      await expect(page.locator('.home-phone')).toBeVisible();
+      await expect(page.locator('.home-desktop')).toHaveCount(0);
     });
 
     await test.step('"Create carousel" opens the mobile editor', async () => {
@@ -799,15 +799,16 @@ test.describe('desktop layout', () => {
     await test.step('Desktop landing page, not the mobile home', async () => {
       await page.goto('/');
       await expect(page.getByRole('heading', { name: 'Recent projects' })).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Create & open editor' })).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Create carousel', exact: true })).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Create carousel' })).toBeVisible();
+      await expect(page.locator('.home-desktop')).toBeVisible();
+      await expect(page.locator('.home-phone')).toHaveCount(0);
       // Desktop shares the phone's grid starters.
       await page.locator('.home-grid-options > summary').click();
       await expect(page.getByRole('region', { name: 'Grid layouts' })).toBeVisible();
     });
 
     await test.step('Desktop editor with the side tools, not the mobile dock', async () => {
-      await page.getByRole('button', { name: 'Create & open editor' }).click();
+      await page.getByRole('button', { name: 'Create carousel' }).click();
       await expect(page.getByTitle('Zoom out')).toBeVisible();
       await expect(page.getByRole('navigation', { name: 'Tools' })).toBeVisible();
       await expect(dock(page)).toHaveCount(0);

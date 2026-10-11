@@ -4,7 +4,7 @@ import type { ProjectDocumentV2 } from '../src/types';
 
 async function createProject(page: Page, name: string) {
   await page.getByLabel('Project name').fill(name);
-  await page.getByRole('button', { name: /create.*open editor/i }).click();
+  await page.getByRole('button', { name: 'Create carousel', exact: true }).click();
   await expect(page.getByTitle('Projects', { exact: true })).toBeVisible();
 }
 

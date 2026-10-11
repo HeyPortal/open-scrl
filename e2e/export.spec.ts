@@ -15,9 +15,9 @@ async function imageInfo(page: Page, data: Uint8Array) {
     return result;
   }, [...data]);
 }
-async function create(page: Page, mobile = false) {
+async function create(page: Page) {
   await page.goto('/');
-  await page.getByRole('button', { name: mobile ? 'Create carousel' : 'Create & open editor', exact: true }).click();
+  await page.getByRole('button', { name: 'Create carousel', exact: true }).click();
 }
 async function open(page: Page) {
   await page.getByRole('button', { name: 'Export Carousel', exact: true }).click();
@@ -156,7 +156,7 @@ for (const viewport of [{ width: 320, height: 568 }, { width: 844, height: 390 }
   test.describe(`phone export at ${viewport.width}×${viewport.height}`, () => {
     test.use({ viewport, isMobile: true, hasTouch: true });
     test('keeps the action visible and saves the current slide as JPEG', async ({ page }) => {
-      await create(page, true);
+      await create(page);
       await page.getByRole('button', { name: 'Export', exact: true }).tap();
       const sheet = page.getByRole('region', { name: 'Export', exact: true });
       await sheet.getByRole('radio', { name: 'This slide', exact: true }).tap();
@@ -180,7 +180,7 @@ for (const mobile of [false, true]) {
   test.describe(`${mobile ? 'phone' : 'desktop'} export preview`, () => {
     test.use(mobile ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } : { viewport: { width: 1280, height: 800 } });
     test('lays the carousel out as a panorama and picks slides from it without changing the editor or document', async ({ page }) => {
-      await create(page, mobile);
+      await create(page);
       const original = await page.evaluate(async () => {
         const path = '/src/editor/documentStore.ts';
         const { useDocumentStore } = await import(path) as typeof import('../src/editor/documentStore');

@@ -11,9 +11,10 @@ saved-project titles. The phone wordmark is 28px. Instrument stays at weight
 400 without synthesized bold. Document text keeps its bundled Inter face;
 changing interface fonts does not change saved text layers or exports.
 
-The home screen follows the Mac welcome screen: compact creation controls
-beside recent projects on desktop, stacked on phones. Grid starters expand
-on request. Each saved project appears once, without a marketing hero.
+The home screen is one calm column on desktop and phones: a format row with
+name and Create, expandable grid starters, then recent projects shown as
+strips of their opening slides. A soft brand glow replaces the dotted stage
+there; there is no marketing hero.
 
 `src/index.css` imports `src/styles/studio/` directly. `tokens.css` defines
 all global `:root` values and `color-scheme: dark`; `chrome.css`, `panels.css`,

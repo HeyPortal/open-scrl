@@ -1,9 +1,9 @@
 import { useId, useMemo, useState } from 'react';
-import { ChevronRight, Loader2, Plus, Search, X } from 'lucide-react';
+import { ChevronRight, Loader2, Search, X } from 'lucide-react';
 import type { ProjectSummary } from '@/store/editor';
 import { HomeEmpty } from '../../home/HomeEmpty';
 import { ProjectPreview } from '../../home/ProjectPreview';
-import { filterProjects, fullDate, projectMeta, relativeTime } from '../../home/projectDisplay';
+import { filterProjects, fullDate, projectMeta, relativeTime, stripCount } from '../../home/projectDisplay';
 
 /** Search only earns its space once the list is long enough to need it. */
 const SEARCH_THRESHOLD = 3;
@@ -30,7 +30,7 @@ function ProjectRow({ project, isOpening, busy, now, onOpen }: ProjectRowProps) 
         className="home-prow"
       >
         <span className="home-well home-prow-well">
-          <ProjectPreview project={project} size="thumb" />
+          <ProjectPreview project={project} size="thumb" count={stripCount(project.format, project.slideCount, 1.8, 3)} />
           {isOpening && (
             <span className="home-opening">
               <Loader2 size={18} className="animate-spin text-accent" aria-hidden />
@@ -54,11 +54,9 @@ interface ProjectListProps {
   busy: boolean;
   now: number;
   onOpen: (project: ProjectSummary) => void;
-  /** Empty state action: scroll back to the create card. */
-  onCreate: () => void;
 }
 
-export function ProjectList({ projects, openingId, busy, now, onOpen, onCreate }: ProjectListProps) {
+export function ProjectList({ projects, openingId, busy, now, onOpen }: ProjectListProps) {
   const [query, setQuery] = useState('');
   const showSearch = projects.length > SEARCH_THRESHOLD;
   const term = showSearch ? query : '';
@@ -96,16 +94,8 @@ export function ProjectList({ projects, openingId, busy, now, onOpen, onCreate }
 
       <div className="home-plist">
         {projects.length === 0 ? (
-          <HomeEmpty
-            title="No carousels yet"
-            action={
-              <button type="button" className="home-button home-button-ghost" onClick={onCreate}>
-                <Plus size={16} strokeWidth={2.5} aria-hidden />
-                Create a carousel
-              </button>
-            }
-          >
-            Projects you create appear here.
+          <HomeEmpty title="No carousels yet">
+            Carousels you create appear here.
           </HomeEmpty>
         ) : visible.length === 0 ? (
           <div role="status" className="home-nomatch">

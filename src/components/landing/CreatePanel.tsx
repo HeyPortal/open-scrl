@@ -1,12 +1,12 @@
-import { forwardRef, useRef, type FormEvent } from 'react';
-import { Check, Loader2 } from 'lucide-react';
+import { forwardRef, useRef, type FormEvent, type ReactNode } from 'react';
+import { ArrowRight, Check, Loader2 } from 'lucide-react';
 import type { Format } from '@/types';
 import { FORMATS } from '@/lib/format';
 import { fitBox } from '../home/projectDisplay';
 import { radioKeyTarget } from '../home/radioKeys';
 
 function FormatCard({ format, selected, onSelect, tabbable }: { format: Format; selected: boolean; onSelect: () => void; tabbable: boolean }) {
-  const box = fitBox(format, 42, 56);
+  const box = fitBox(format, 48, 60);
   return (
     <button
       type="button"
@@ -34,11 +34,13 @@ interface CreatePanelProps {
   creating: boolean;
   busy: boolean;
   onSubmit: () => void;
+  /** Secondary starting points shown under the main row. */
+  children?: ReactNode;
 }
 
-/** Compact new-project controls, like the Mac welcome screen. */
+/** Pick a size, name it, create: one row of format tiles over one row of input and action. */
 export const CreatePanel = forwardRef<HTMLInputElement, CreatePanelProps>(function CreatePanel(
-  { name, onNameChange, format, onFormatChange, creating, busy, onSubmit },
+  { name, onNameChange, format, onFormatChange, creating, busy, onSubmit, children },
   nameRef,
 ) {
   const group = useRef<HTMLDivElement>(null);
@@ -56,32 +58,38 @@ export const CreatePanel = forwardRef<HTMLInputElement, CreatePanelProps>(functi
   };
 
   return (
-    <form className="home-new-panel" onSubmit={submit} aria-labelledby="home-new-title">
-      <h2 id="home-new-title" className="home-section-title">New carousel</h2>
-      <div className="home-new-formats">
-        <span className="home-field-label" id="format-label">Canvas format</span>
-        <div className="home-formats" role="radiogroup" aria-labelledby="format-label" ref={group} onKeyDown={moveSelection}>
+    <section className="home-new" aria-label="Create a carousel">
+      <form className="home-new-panel" onSubmit={submit} aria-labelledby="home-new-title">
+        <div className="home-section-head">
+          <h2 id="home-new-title" className="home-section-title">New carousel</h2>
+          <span className="home-section-aside">Sizes can be changed later</span>
+        </div>
+        <div className="home-formats" role="radiogroup" aria-label="Canvas format" ref={group} onKeyDown={moveSelection}>
           {FORMATS.map((option, index) => (
             <FormatCard key={option.name} format={option} selected={index === selectedIndex} tabbable={index === selectedIndex} onSelect={() => onFormatChange(option)} />
           ))}
         </div>
-      </div>
-      <label className="home-field">
-        <span className="home-field-label">Project name</span>
-        <input
-          ref={nameRef}
-          className="home-input"
-          value={name}
-          onChange={(event) => onNameChange(event.target.value)}
-          placeholder="Untitled"
-          autoComplete="off"
-          maxLength={120}
-        />
-      </label>
-      <button type="submit" className="btn-primary home-button home-button-lg" disabled={busy} aria-busy={creating}>
-        {creating ? <Loader2 size={16} className="animate-spin" aria-hidden /> : null}
-        {creating ? 'Creating…' : 'Create & open editor'}
-      </button>
-    </form>
+        <div className="home-new-row">
+          <label className="home-field">
+            <span className="sr-only">Project name</span>
+            <input
+              ref={nameRef}
+              className="home-input"
+              value={name}
+              onChange={(event) => onNameChange(event.target.value)}
+              placeholder="Untitled"
+              autoComplete="off"
+              maxLength={120}
+            />
+          </label>
+          <button type="submit" className="home-button home-button-lg home-create-button" disabled={busy} aria-busy={creating}>
+            {creating ? <Loader2 size={16} className="animate-spin" aria-hidden /> : null}
+            {creating ? 'Creating…' : 'Create carousel'}
+            {!creating && <ArrowRight size={16} strokeWidth={2.25} aria-hidden />}
+          </button>
+        </div>
+      </form>
+      {children}
+    </section>
   );
 });

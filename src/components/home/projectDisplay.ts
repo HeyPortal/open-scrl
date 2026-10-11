@@ -23,6 +23,16 @@ export function coverFor(id: string) {
   return `linear-gradient(${angle}deg, rgb(var(--c-brand-${start}) / .5), rgb(var(--c-brand-${end}) / .28) 55%, rgb(var(--c-bg-hover)))`;
 }
 
+/**
+ * How many leading slides a project card shows as one strip: as many as keep the strip no wider than
+ * `maxRatio` times its height, at most `max` and never more than the project has. A landscape
+ * project shows one slide, portrait carousels three and stories four.
+ */
+export function stripCount(format: Pick<Format, 'width' | 'height'>, slideCount: number, maxRatio = 2.6, max = 4) {
+  const fit = Math.floor(maxRatio / (format.width / format.height));
+  return Math.max(1, Math.min(max, fit, slideCount));
+}
+
 /** Largest box with the format's aspect ratio that fits inside maxW x maxH. */
 export function fitBox(format: Pick<Format, 'width' | 'height'>, maxW: number, maxH: number) {
   const ratio = format.width / format.height;

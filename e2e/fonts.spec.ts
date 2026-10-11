@@ -26,7 +26,7 @@ for (const mobile of [false, true]) {
       } finally {
         release();
       }
-      await expect(page.getByRole('button', { name: mobile ? 'Create carousel' : 'Create & open editor', exact: true })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Create carousel', exact: true })).toBeVisible();
     });
 
     test('UI waits for document Inter and uses Onest while the font selector keeps the document face', async ({ page }) => {
@@ -41,7 +41,7 @@ for (const mobile of [false, true]) {
       });
       await page.goto('/', { waitUntil: 'domcontentloaded' });
       await fontRequested;
-      const create = page.getByRole('button', { name: mobile ? 'Create carousel' : 'Create & open editor', exact: true });
+      const create = page.getByRole('button', { name: 'Create carousel', exact: true });
       try {
         await expect(create).toHaveCount(0);
         await expect(page.getByRole('status', { name: 'Loading Open-SCRL', exact: true })).toBeVisible();
@@ -56,7 +56,7 @@ for (const mobile of [false, true]) {
       await cdp.send('DOM.enable');
       await cdp.send('CSS.enable');
       const { root } = await cdp.send('DOM.getDocument');
-      const { nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: mobile ? '.mobile-home button[type="submit"]' : 'button.btn-primary' });
+      const { nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: mobile ? '.mobile-home button[type="submit"]' : 'button.home-create-button' });
       const { fonts } = await cdp.send('CSS.getPlatformFontsForNode', { nodeId });
       expect(fonts.some((font) => font.isCustomFont && /Onest/.test(font.familyName) && font.glyphCount > 0)).toBe(true);
       await cdp.detach();
@@ -87,7 +87,7 @@ for (const mobile of [false, true]) {
       });
       await page.goto('/', { waitUntil: 'domcontentloaded' });
       await fontRequested;
-      const create = page.getByRole('button', { name: mobile ? 'Create carousel' : 'Create & open editor', exact: true });
+      const create = page.getByRole('button', { name: 'Create carousel', exact: true });
       try {
         await expect(create).toHaveCount(0);
         await expect(page.getByRole('status', { name: 'Loading Open-SCRL', exact: true })).toBeVisible();
@@ -109,7 +109,7 @@ for (const mobile of [false, true]) {
 
 test('Inter canvas rendering and worker exports match for normal and italic text', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Create & open editor', exact: true }).click();
+  await page.getByRole('button', { name: 'Create carousel', exact: true }).click();
   await expect(page.locator('.konvajs-content')).toBeVisible();
   const results = await page.evaluate(async () => {
     const editorPath = '/src/editor/documentStore.ts';

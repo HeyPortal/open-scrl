@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { AlertTriangle, HardDrive, Plus } from 'lucide-react';
+import { AlertTriangle, ChevronDown, Lock, Plus } from 'lucide-react';
 import { AppLogo } from '../AppLogo';
 import type { Format } from '@/types';
 import { FORMATS } from '@/lib/format';
@@ -88,6 +88,7 @@ export default function MobileHome() {
         className="home-phone-scroll"
         onScroll={(event) => setCollapsed(event.currentTarget.scrollTop > COLLAPSE_AT)}
       >
+        <div className="home-glow" aria-hidden />
         <div className="home-phone-content">
           <header className="home-phone-header">
             <div className="home-phone-brand">
@@ -115,7 +116,7 @@ export default function MobileHome() {
           />
 
           <details className="home-grid-options">
-            <summary>Start from a grid</summary>
+            <summary>Start from a grid layout<ChevronDown size={15} strokeWidth={2.25} aria-hidden /></summary>
             <GridStarters
               format={format}
               pendingId={actions.creating !== BLANK ? actions.creating : null}
@@ -130,12 +131,11 @@ export default function MobileHome() {
             busy={actions.busy}
             now={now}
             onOpen={(project) => void actions.open(project)}
-            onCreate={scrollToCreate}
           />
 
           <footer className="home-phone-footer">
-            <HardDrive size={12} aria-hidden />
-            Projects are stored locally in this browser.
+            <Lock size={12} strokeWidth={2.25} aria-hidden />
+            Saved on this device. Nothing is uploaded.
           </footer>
         </div>
       </main>
