@@ -44,7 +44,7 @@ zoom, fit, wide view and quick Slide PNG export. The top-bar Export button
 opens shared [export settings](web-export.md) in a desktop dialog; on phones
 they appear in a full-height sheet with a fixed action footer.
 
-Cards occupy measured flex space rather than covering the fitted canvas.
+Cards occupy measured flex space rather than covering the fitted canvas. The library card animates its width open and closed, so the canvas frame narrows and refits smoothly instead of jumping; while closing it is inert.
 `useStageMeasurement` observes the canvas frame; each editor mounts shared
 shortcuts, drag/drop fallback and `EditorShellServices` once. The desktop
 selection toolbar follows rotated world bounds, owning slides, scrolling

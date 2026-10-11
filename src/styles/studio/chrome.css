@@ -66,7 +66,15 @@ button.studio-split-caret:hover, button.studio-split-caret[aria-expanded='true']
 .studio-tool-active[data-tip]::after { display: none; }
 @media (hover: hover) { .studio-tool[data-tip]:hover::after { opacity: 1; transform: translate(0, -50%); transition-delay: .3s; } }
 .studio-dock-divider { height: 1px; width: 24px; background: rgb(var(--c-line-strong) / var(--c-line-strong-alpha)); margin: 4px 0; }
-.studio-left-panel { display: flex; flex-direction: column; flex-shrink: 0; width: 300px; overflow: hidden; animation: studio-panel-in 140ms ease-out; }
+.studio-left-panel {
+  --studio-panel-w: 300px;
+  display: flex; flex-shrink: 0; width: var(--studio-panel-w); overflow: hidden;
+  animation: studio-panel-open 300ms cubic-bezier(.22, 1, .36, 1);
+}
+/* Width (and the workspace gap) animate so the canvas frame narrows smoothly and the canvas refits
+   frame by frame; the contents keep their full width and are revealed rather than squeezed. */
+.studio-left-panel[data-state='closing'] { animation: studio-panel-close 240ms cubic-bezier(.4, 0, .2, 1) forwards; pointer-events: none; }
+.studio-left-panel-inner { display: flex; flex-direction: column; flex-shrink: 0; width: var(--studio-panel-w); min-height: 0; animation: studio-panel-content-in 300ms cubic-bezier(.22, 1, .36, 1); }
 .studio-panel-heading { display: flex; align-items: center; justify-content: space-between; padding: 6px 8px 6px 14px; min-height: 44px; border-bottom: 1px solid rgb(var(--c-line) / var(--c-line-alpha)); }
 .studio-panel-eyebrow { font-size: 10.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: rgb(var(--c-ink-faint)); }
 .studio-panel-content { flex: 1; min-height: 0; overflow: hidden; }
@@ -107,7 +115,9 @@ button.studio-split-caret:hover, button.studio-split-caret[aria-expanded='true']
 .studio-zoom .studio-fit { width: auto; padding: 0 8px; font-size: 11px; font-weight: 500; }
 .studio-view-footer { display: flex; align-items: center; padding-left: 8px; margin-left: 4px; border-left: 1px solid rgb(var(--c-line) / var(--c-line-alpha)); }
 @keyframes studio-inspector-in { from { opacity: 0; transform: translateX(8px); } }
-@keyframes studio-panel-in { from { opacity: 0; transform: translateX(-8px); } }
+@keyframes studio-panel-open { from { width: 0; margin-right: -10px; opacity: 0; } 35% { opacity: 1; } }
+@keyframes studio-panel-close { to { width: 0; margin-right: -10px; opacity: 0; } }
+@keyframes studio-panel-content-in { from { transform: translateX(-16px); } }
 @keyframes studio-fade-in { from { opacity: 0; } }
 @media (min-width: 1280px) {
   .studio-top-row { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
@@ -115,7 +125,7 @@ button.studio-split-caret:hover, button.studio-split-caret[aria-expanded='true']
   .studio-publish-island { grid-column: 3; margin-left: 0; justify-self: end; }
 }
 @media (max-width: 1150px) {
-  .studio-left-panel { width: 260px; }
+  .studio-left-panel { --studio-panel-w: 260px; }
   .studio-inspector { width: 260px; }
   .studio-search > span { display: none; }
   .input.studio-project-name { width: 125px; }
@@ -127,12 +137,14 @@ button.studio-split-caret:hover, button.studio-split-caret[aria-expanded='true']
   .studio-top-row { flex-wrap: wrap; justify-content: flex-start; }
   .studio-command-island { margin-left: 0; }
   .studio-publish-island { margin-left: 0; }
-  .studio-left-panel { width: 220px; }
+  .studio-left-panel { --studio-panel-w: 220px; }
   .studio-inspector { width: 240px; }
   .studio-timeline { grid-template-columns: 120px minmax(0, 1fr) auto; gap: 8px; margin-left: 0; padding: 10px; }
   .studio-view-controls { padding-left: 8px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .studio-inspector, .studio-left-panel, .studio-properties-pill, .studio-selection-toolbar { animation: none; }
+  .studio-inspector, .studio-left-panel-inner, .studio-properties-pill, .studio-selection-toolbar { animation: none; }
+  /* Keep a near-instant animation so the closing panel still unmounts on animationend. */
+  .studio-left-panel, .studio-left-panel[data-state='closing'] { animation-duration: 1ms; }
   .studio-tool, .studio-tool[data-tip]::after { transition: none; }
 }
