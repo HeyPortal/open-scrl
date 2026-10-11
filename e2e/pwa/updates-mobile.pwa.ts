@@ -9,7 +9,7 @@ test.use({ viewport: { width: 393, height: 852 }, isMobile: true, hasTouch: true
 const dock = (page: Page) => page.getByRole('tablist', { name: 'Editor tools' });
 
 async function install(page: Page) {
-  await page.goto('/');
+  await page.goto('./');
   await expect(page.getByRole('button', { name: 'Create carousel', exact: true })).toBeVisible();
   await page.evaluate(async () => { await navigator.serviceWorker.ready; });
   await page.reload();
@@ -17,7 +17,7 @@ async function install(page: Page) {
 }
 
 async function deploy(page: Page) {
-  await page.request.post('/__pwa/version');
+  await page.request.post('./__pwa/version');
   await page.evaluate(async () => { await (await navigator.serviceWorker.getRegistration())?.update(); });
   await expect.poll(() => page.evaluate(async () => !!(await navigator.serviceWorker.getRegistration())?.waiting)).toBe(true);
 }
@@ -219,7 +219,7 @@ test.describe('update prompt layout on desktop', () => {
   test.use({ viewport: { width: 1280, height: 800 }, isMobile: false, hasTouch: false, deviceScaleFactor: 1 });
 
   test('stays a single compact row', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('./');
     await expect(page.getByText('Recent projects')).toBeVisible();
     await page.evaluate(async () => { await navigator.serviceWorker.ready; });
     await page.reload();

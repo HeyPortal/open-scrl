@@ -3,14 +3,14 @@ import type { ProjectDocumentV2 } from '../../src/types';
 
 const tinyPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
 async function install(page: Page) {
-  await page.goto('/');
+  await page.goto('./');
   await expect(page.getByText('Recent projects')).toBeVisible();
   await page.evaluate(async () => { await navigator.serviceWorker.ready; });
   await page.reload();
   await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
 }
 async function deploy(page: Page) {
-  await page.request.post('/__pwa/version');
+  await page.request.post('./__pwa/version');
   await page.evaluate(async () => { await (await navigator.serviceWorker.getRegistration())?.update(); });
   await expect.poll(() => page.evaluate(async () => !!(await navigator.serviceWorker.getRegistration())?.waiting)).toBe(true);
 }
@@ -161,7 +161,7 @@ test('another tab activating an update does not reload a busy tab or accept for 
   await createProject(page, 'Other tab project');
   await page.locator('input[type=file]').setInputFiles({ name: 'tiny.png', mimeType: 'image/png', buffer: tinyPng });
   const other = await context.newPage();
-  await other.goto('/');
+  await other.goto('./');
   await deploy(other);
   await expect(other.getByRole('button', { name: 'Reload to update' })).toBeVisible();
   await other.getByRole('button', { name: 'Reload to update' }).click();

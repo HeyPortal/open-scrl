@@ -14,6 +14,7 @@ bunx playwright install --with-deps chromium
 bun run verify
 SCRL_E2E_PORT=5186 bun run test:e2e
 PWA_PORT=5187 bun run test:pwa
+SCRL_BASE_PATH=/open-scrl/ PWA_PORT=5187 bun run test:pwa
 ```
 
 The editor suite starts Vite, using two workers locally and in CI. The production
@@ -26,6 +27,11 @@ line. Run builds and PWA checks sequentially because they both write `dist/`.
 The editor suite can reuse a local server at its configured port; CI always
 starts its own. Use an unused `SCRL_E2E_PORT` when working in multiple checkouts.
 The PWA suite always starts its own production server.
+
+CI also runs the production suite at `/open-scrl/` to exercise GitHub Pages
+asset paths, the manifest launch URL, service-worker scope, offline editing,
+and prompted updates. Set `SCRL_BASE_PATH` to test another hosting path; include
+both leading and trailing slashes. The development editor suite runs at `/`.
 
 To run a file or repeat a specific test, pass Playwright arguments directly to
 the Bun script:
@@ -43,6 +49,8 @@ Screenshots, error context, attachments, and retained traces are written under
 `test-results/e2e/` and `test-results/pwa/`. HTML reports are written under
 `playwright-report/e2e/` and `playwright-report/pwa/`. Running one suite preserves
 the other suite's artifacts. CI uploads both artifact roots when a check fails.
+The production suite with a non-root base path uses `test-results/pwa-pages/`
+and `playwright-report/pwa-pages/`, preserving the root PWA results too.
 
 ```bash
 bun run test:report playwright-report/e2e
