@@ -1,4 +1,4 @@
-import { expect, test, type CDPSession, type Page } from '@playwright/test';
+import { expect, test, type CDPSession, type Page } from './fixtures/test';
 
 // The mobile canvas has its own gesture and text-editing code. These checks make sure unfinished
 // work there holds back a waiting app update (editorActivity) exactly like the desktop canvas does.
@@ -219,7 +219,7 @@ test.describe('mobile editor pending work', () => {
       await expect(inline(page)).toHaveCount(0);
       await expect.poll(() => activity(page)).toBe(0);
       const discarded = await state(page);
-      expect(discarded.doc.layers[id].text).toBe(before.doc.layers[id].text);
+      expect(discarded.doc.layers[id]).toEqual(before.doc.layers[id]);
       expect(discarded.history).toBe(before.history);
 
       const point = await layerCentre(page);
@@ -231,7 +231,7 @@ test.describe('mobile editor pending work', () => {
       await page.getByRole('button', { name: 'Done editing text', exact: true }).tap();
       await expect(inline(page)).toHaveCount(0);
       await expect.poll(() => activity(page)).toBe(0);
-      expect((await state(page)).doc.layers[id].text).toBe('Keep me');
+      expect((await state(page)).doc.layers[id]).toMatchObject({ kind: 'text', text: 'Keep me' });
     });
 
     test('a draft survives its field going away within the project', async ({ page }) => {
@@ -248,7 +248,7 @@ test.describe('mobile editor pending work', () => {
       });
       await expect(inline(page)).toHaveCount(0);
       await expect.poll(() => activity(page)).toBe(0);
-      expect((await state(page)).doc.layers[id].text).toBe('Kept without a blur');
+      expect((await state(page)).doc.layers[id]).toMatchObject({ kind: 'text', text: 'Kept without a blur' });
     });
 
     test('switching projects drops the draft without touching either document', async ({ page }) => {
@@ -270,7 +270,7 @@ test.describe('mobile editor pending work', () => {
       await expect(inline(page)).toHaveCount(0);
       await expect.poll(() => activity(page)).toBe(0);
       const [id] = Object.keys(source.doc.layers);
-      expect((await state(page)).doc.layers[id].text).toBe(source.doc.layers[id].text);
+      expect((await state(page)).doc.layers[id]).toEqual(source.doc.layers[id]);
       await page.evaluate(async (destinationId) => {
         const path = '/src/editor/documentStore.ts';
         const { useDocumentStore } = await import(path) as typeof import('../src/editor/documentStore');

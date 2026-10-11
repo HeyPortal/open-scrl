@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures/test';
 import { readFile, writeFile } from 'node:fs/promises';
 import type { ProjectDocumentV2 } from '../src/types';
 import { runtimeArtwork } from './fixtures/runtimeArtwork';
@@ -59,8 +59,8 @@ async function setup(page: Page) {
   // Wait for the bitmap lease to reach the live scene, without relying on a fixed delay.
   await expect.poll(() => page.evaluate(async () => {
     const Konva = (window as unknown as { Konva: typeof import('konva').default }).Konva;
-    const photo = Konva.stages[0]?.findOne('#runtime-photo');
-    return photo?.findOne<Konva.Shape>('Shape')?.perfectDrawEnabled();
+    const photo = Konva.stages[0]?.findOne<import('konva').default.Group>('#runtime-photo');
+    return photo?.findOne<import('konva').default.Shape>('Shape')?.perfectDrawEnabled();
   })).toBe(false);
   return fixture;
 }
@@ -70,7 +70,7 @@ async function point(page: Page, selector: string, local?: { x: number; y: numbe
     const Konva = (window as unknown as { Konva: typeof import('konva').default }).Konva;
     const stage = Konva.stages[0];
     const node = selector.startsWith('Transformer ')
-      ? stage.findOne<Konva.Transformer>('Transformer')!.findOne(selector.split(' ')[1])!
+      ? stage.findOne<import('konva').default.Transformer>('Transformer')!.findOne(selector.split(' ')[1])!
       : stage.findOne(selector)!;
     const bounds = node.getClientRect();
     const p = local ? node.getAbsoluteTransform().point(local) : { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
@@ -93,8 +93,6 @@ async function undo(page: Page, layers: ProjectDocumentV2['layers']) {
 }
 
 test('native canvas gestures commit once and keep refs attached through undo and grouping', async ({ page }) => {
-  const errors: string[] = [];
-  page.on('pageerror', (error) => errors.push(error.message));
   await setup(page);
   const initial = await state(page);
 
@@ -159,7 +157,6 @@ test('native canvas gestures commit once and keep refs attached through undo and
   const locked = await point(page, '#runtime-locked'); await page.mouse.click(locked.x, locked.y);
   await drag(page, '#runtime-locked', 25, 20);
   expect((await state(page)).doc.layers['runtime-locked']).toEqual(initial.doc.layers['runtime-locked']);
-  expect(errors).toEqual([]);
 });
 
 /** Compares Konva's custom scene with the independent export renderer at project resolution. */
@@ -197,8 +194,6 @@ async function fidelity(page: Page) {
 }
 
 test('custom artwork, crop, text editing, phone preview and remount retain fidelity', async ({ page }, testInfo) => {
-  const errors: string[] = [];
-  page.on('pageerror', (error) => errors.push(error.message));
   await setup(page);
   const before = await state(page);
   let comparison = await fidelity(page);
@@ -250,7 +245,6 @@ test('custom artwork, crop, text editing, phone preview and remount retain fidel
     const Konva = (window as unknown as { Konva: typeof import('konva').default }).Konva;
     return Konva.stages.length;
   })).toBe(1);
-  expect(errors).toEqual([]);
 });
 
 test('native touch pan and pinch keep the stage and viewport in sync', async ({ page, browserName }) => {

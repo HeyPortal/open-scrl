@@ -43,6 +43,23 @@ Create a carousel or pick up a saved project from the [home screen](docs/images/
   </tr>
 </table>
 
+## What's new in 2.0
+
+[Open-SCRL 2.0 for Web](https://github.com/HeyPortal/open-scrl/releases/tag/web-v2.0.0)
+is a redesign of the web app on desktop and phones:
+
+- **A new look.** A calm dark design with floating tool and Properties cards, a slide
+  timeline, and the Mac app's icon as the web logo.
+- **Home screen.** Create a carousel from one row or start from a photo grid. Recent
+  projects show as strips of their opening slides, with search, sorting, and grid or
+  list views.
+- **Export.** Preview the whole carousel as one panorama, pick slides, choose PNG or
+  JPEG, size and quality, rename the download, and cancel at any time.
+- **Phone editor.** Touch sheets, pinch to zoom, two-finger scale and rotate, and more
+  reliable photo and text selection.
+- **Safer updates.** Updates wait until saving, imports, exports, and edits in
+  progress have finished.
+
 ## On your phone
 
 The web app has its own phone home screen and editor, with photo and grid tools in
@@ -81,22 +98,58 @@ two apps can't open each other's projects yet.
 
 ## Development
 
+### Web app
+
+You need [Bun](https://bun.sh) 1.4 or later and Node 22.12 or later. Bun installs
+packages and runs the scripts; Vite, Vitest, and Playwright still run on Node.
+
 ```bash
-npm ci
-npm run dev        # http://localhost:5173
-npm run verify     # typecheck, lint, tests, build
-npm run test:e2e   # Playwright (run `npx playwright install chromium` first)
-npm run test:pwa   # production offline and update checks
+git clone https://github.com/HeyPortal/open-scrl.git
+cd open-scrl
+bun install
+bun run dev        # http://localhost:5173
 ```
 
-Requires Node 22.12+. For the Mac app, open `macos/OpenSCRL.xcodeproj` in Xcode 27 and run it.
+To build and check the production app:
+
+```bash
+bun run build      # typecheck and build into dist/
+bun run preview    # serve dist/ locally
+bun run verify     # typecheck, lint, unit tests, build, and bundle size check
+```
+
+Browser tests use Playwright with Chromium. Install the browser once, then run them:
+
+```bash
+bunx playwright install --with-deps chromium
+bun run test:e2e   # editor tests against the dev server
+bun run test:pwa   # production offline and update checks
+```
+
+See [Browser testing](docs/testing.md) for focused runs, stress checks, reports,
+and viewing failure traces with Bun.
+
+Run unit tests with `bun run test`, not `bun test`: the latter starts Bun's own test
+runner instead of Vitest.
+
+### Mac app
+
+Open `macos/OpenSCRL.xcodeproj` in Xcode 27 on macOS 27 and run it, or build from the
+command line:
+
+```bash
+cd macos
+xcodebuild -project OpenSCRL.xcodeproj -scheme OpenSCRL -configuration Release -derivedDataPath build build
+Scripts/make-dmg.sh   # package the build as macos/build/dmg/Open-SCRL-<version>.dmg
+```
 
 For a phone preview on the same network, open the Network URL printed by Vite.
 Image imports and project storage also work at this HTTP preview address.
 
 See [web updates and offline tools](docs/web-updates.md) for reload and caching behavior.
-[AGENTS.md](./AGENTS.md) has a tour of the code, and the [changelog](./CHANGELOG.md) lists
-every release.
+[AGENTS.md](./AGENTS.md) has a tour of the code. The [changelog](./CHANGELOG.md) lists
+every Mac release, and web release notes are on the
+[Releases page](https://github.com/HeyPortal/open-scrl/releases).
 
 ## Credits
 

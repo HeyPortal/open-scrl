@@ -8,17 +8,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 22, cache: npm }
-      - run: npm ci
-      - run: npm run verify
-      - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e
-      - run: npm run test:pwa
+        with: { node-version: 22 }
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version-file: package.json }
+      - run: bun install --frozen-lockfile
+      - run: bun run verify
+      - run: bunx playwright install --with-deps chromium
+      - run: bun run test:e2e
+      - run: bun run test:pwa
       - name: Upload browser-test failure artifacts
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-failure-artifacts
-          path: test-results/
+          path: |
+            test-results/
+            playwright-report/
           if-no-files-found: ignore
           retention-days: 7

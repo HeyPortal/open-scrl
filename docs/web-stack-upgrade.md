@@ -123,12 +123,12 @@ Early activation-test failures were incorrect title locators; accessible button
 roles fixed those tests. Final logs supersede those preliminary runs. The
 cross-browser, codec, installation, and hashed-deployment limits below remain.
 
-Run the normal browser suite with `npm run test:e2e`. A dedicated port avoids
+Run the normal browser suite with `bun run test:e2e`. A dedicated port avoids
 reusing a different worktree's dev server:
 
 ```bash
-SCRL_E2E_PORT=5186 npm run test:e2e
-SCRL_E2E_PORT=5186 SCRL_E2E_BROWSERS=chromium,firefox,webkit npm run test:e2e
+SCRL_E2E_PORT=5186 bun run test:e2e
+SCRL_E2E_PORT=5186 SCRL_E2E_BROWSERS=chromium,firefox,webkit bun run test:e2e
 ```
 
 The touch test uses Chromium CDP and is explicitly skipped on other engines.
@@ -136,7 +136,7 @@ Firefox and WebKit were installed on this host but failed before test execution:
 Firefox lacks GTK3 and a sufficiently new NSS; WebKit lacks GTK4, GStreamer, and
 other runtime libraries. Cross-browser application behavior remains unverified
 here. On a supported host, install them with
-`npx playwright install --with-deps chromium firefox webkit`.
+`bunx playwright install --with-deps chromium firefox webkit`.
 
 ## Mobile integration — 2026-10-10
 

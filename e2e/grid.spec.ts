@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures/test';
 
 test('adjusts the gap and outer margin of an inserted grid from the slide inspector', async ({ page }) => {
   await page.goto('/');

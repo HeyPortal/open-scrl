@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from '../fixtures/test';
 import type { ProjectDocumentV2 } from '../../src/types';
 
 const tinyPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
@@ -25,9 +25,9 @@ async function delayActivation(page: Page) {
     const gate = { held: [] as (() => void)[], observed: false, pause: true };
     Object.assign(window, { activationGate: gate });
     const original = ServiceWorker.prototype.postMessage;
-    ServiceWorker.prototype.postMessage = function (...args: Parameters<ServiceWorker['postMessage']>) {
-      if (gate.pause && (args[0] as { type?: string }).type === 'SKIP_WAITING') gate.held.push(() => original.apply(this, args));
-      else original.apply(this, args);
+    ServiceWorker.prototype.postMessage = function (...args: [message: unknown, options?: Transferable[] | StructuredSerializeOptions]) {
+      if (gate.pause && (args[0] as { type?: string }).type === 'SKIP_WAITING') gate.held.push(() => Reflect.apply(original, this, args));
+      else Reflect.apply(original, this, args);
     };
     navigator.serviceWorker.addEventListener('controllerchange', () => { gate.observed = true; });
   });
@@ -93,10 +93,10 @@ test('waits for an active import and export before offering reload', async ({ pa
     const state = { pauseImport: true, pauseExport: false, held: [] as (() => void)[] };
     Object.assign(window, { workerGate: state });
     const original = Worker.prototype.postMessage;
-    Worker.prototype.postMessage = function (...args: Parameters<Worker['postMessage']>) {
+    Worker.prototype.postMessage = function (...args: [message: unknown, options?: Transferable[] | StructuredSerializeOptions]) {
       const message = args[0] as { type?: string };
-      if ((state.pauseImport && message.type === undefined) || (state.pauseExport && message.type === 'start')) state.held.push(() => original.apply(this, args));
-      else original.apply(this, args);
+      if ((state.pauseImport && message.type === undefined) || (state.pauseExport && message.type === 'start')) state.held.push(() => Reflect.apply(original, this, args));
+      else Reflect.apply(original, this, args);
     };
   });
   await install(page);
@@ -131,7 +131,7 @@ test('a failed save blocks activation until the existing save retry succeeds', a
     const original = IDBDatabase.prototype.transaction;
     IDBDatabase.prototype.transaction = function (...args) {
       if (this.name === 'open-scrl' && args[1] === 'readwrite' && (window as unknown as { failProjectSave?: boolean }).failProjectSave) throw new DOMException('Quota exceeded', 'QuotaExceededError');
-      return original.apply(this, args);
+      return Reflect.apply(original, this, args);
     };
   });
   await install(page);
@@ -155,7 +155,7 @@ test('another tab activating an update does not reload a busy tab or accept for 
     const gate = { held: [] as (() => void)[] };
     Object.assign(window, { importGate: gate });
     const original = Worker.prototype.postMessage;
-    Worker.prototype.postMessage = function (...args: Parameters<Worker['postMessage']>) { gate.held.push(() => original.apply(this, args)); };
+    Worker.prototype.postMessage = function (...args: [message: unknown, options?: Transferable[] | StructuredSerializeOptions]) { gate.held.push(() => Reflect.apply(original, this, args)); };
   });
   await install(page);
   await createProject(page, 'Other tab project');

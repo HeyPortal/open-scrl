@@ -1,11 +1,8 @@
-import { expect, test, type Page } from '@playwright/test';
-import { mkdir } from 'node:fs/promises';
-
-const shots = '/tmp/redesign-shots/studio';
-
+import { expect, test, type Page } from './fixtures/test';
 async function screenshot(page: Page, name: string) {
-  await mkdir(shots, { recursive: true });
-  await page.screenshot({ path: `${shots}/${name}.png` });
+  const path = test.info().outputPath(`${name}.png`);
+  await page.screenshot({ path });
+  await test.info().attach(name, { path, contentType: 'image/png' });
 }
 
 /** A full-size image exercises decoding, thumbnails and export without external media. */
@@ -47,8 +44,6 @@ test.describe('Studio desktop', () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
   test('floating islands keep editing, ordering, preview and export reachable', async ({ page }) => {
-    const errors: string[] = [];
-    page.on('pageerror', (error) => errors.push(error.message));
     await page.goto('/?style=classic');
     await expect(page.getByLabel('Design style')).toHaveCount(0);
     await expect(page.locator('html')).not.toHaveAttribute('data-style');
@@ -100,7 +95,6 @@ test.describe('Studio desktop', () => {
     await page.getByRole('button', { name: 'Export Carousel', exact: true }).click();
     await page.getByRole('dialog', { name: 'Export', exact: true }).getByRole('button', { name: 'Export carousel', exact: true }).click();
     expect((await download).suggestedFilename()).toMatch(/\.zip$/);
-    expect(errors).toEqual([]);
   });
 
   test('the library card glides open and closed while the canvas frame follows', async ({ page }) => {
@@ -110,19 +104,41 @@ test.describe('Studio desktop', () => {
     await expect(page.locator('.studio-left-panel')).toHaveCount(0);
     const stageWidth = () => page.locator('.studio-stage').evaluate((element) => element.getBoundingClientRect().width);
     const closedWidth = await stageWidth();
-    // Sample the canvas frame every animation frame while the card opens.
-    const widths = await page.evaluate(async () => {
+    // Step through the real CSS animation at fixed progress points. A busy
+    // runner may skip painted frames, so frame counts cannot measure smoothness.
+    const { widths, duration } = await page.evaluate(async () => {
       const stage = document.querySelector('.studio-stage')!;
-      const seen: number[] = [];
-      document.querySelector<HTMLButtonElement>('[aria-label="Grids"]')!.click();
-      const start = performance.now();
-      await new Promise<void>((resolve) => {
-        const tick = () => { seen.push(Math.round(stage.getBoundingClientRect().width)); if (performance.now() - start < 500) requestAnimationFrame(tick); else resolve(); };
-        requestAnimationFrame(tick);
+      // Observe the mount before the first paint so the animation cannot finish
+      // before we pause it, even when the browser is under load.
+      const opening = new Promise<Animation>((resolve, reject) => {
+        const observer = new MutationObserver(() => {
+          const panel = document.querySelector('.studio-left-panel');
+          if (!panel) return;
+          observer.disconnect();
+          const animation = panel.getAnimations().find((item) =>
+            item instanceof CSSAnimation && item.animationName === 'studio-panel-open',
+          );
+          if (!animation) { reject(new Error('Library opening animation is missing')); return; }
+          animation.pause();
+          resolve(animation);
+        });
+        observer.observe(document.querySelector('.studio-workspace')!, { childList: true });
+        document.querySelector<HTMLButtonElement>('[aria-label="Grids"]')!.click();
       });
-      return seen;
+      const animation = await opening;
+      const duration = Number(animation.effect!.getTiming().duration);
+      const widths = [0, .2, .4, .6, .8, 1].map((progress) => {
+        animation.currentTime = duration * progress;
+        return stage.getBoundingClientRect().width;
+      });
+      animation.currentTime = 0;
+      animation.play();
+      await animation.finished;
+      return { widths, duration };
     });
+    expect(duration).toBeGreaterThan(1);
     const openWidth = widths.at(-1)!;
+    expect(widths[0]).toBeGreaterThan(openWidth + 200);
     expect(openWidth).toBeLessThan(closedWidth - 200);
     expect(new Set(widths.filter((width) => width < closedWidth - 1 && width > openWidth + 1)).size).toBeGreaterThanOrEqual(3);
     for (let index = 1; index < widths.length; index++) expect(widths[index]).toBeLessThanOrEqual(widths[index - 1]);
@@ -159,8 +175,6 @@ test.describe('Studio phone', () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 
   test('glass chrome retains import, text, selection, slide actions and export', async ({ page }) => {
-    const errors: string[] = [];
-    page.on('pageerror', (error) => errors.push(error.message));
     await page.goto('/');
     await expect(page.locator('.studio-mobile-home')).toBeVisible();
     await screenshot(page, 'mobile-home');
@@ -209,6 +223,5 @@ test.describe('Studio phone', () => {
     const download = page.waitForEvent('download');
     await page.getByRole('button', { name: /Export carousel/ }).tap();
     expect((await download).suggestedFilename()).toMatch(/\.zip$/);
-    expect(errors).toEqual([]);
   });
 });

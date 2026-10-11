@@ -1,4 +1,4 @@
-import { expect,test,type Download } from '@playwright/test';
+import { expect,test,type Download } from './fixtures/test';
 import { readFile } from 'node:fs/promises';
 import { BlobReader, ZipReader } from '@zip.js/zip.js';
 
@@ -6,8 +6,6 @@ const tinyPng=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQ
 const tinyGif=Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7','base64');
 async function archiveEntries(download:Download){const path=await download.path();expect(path).not.toBeNull();const bytes=await readFile(path!);const reader=new ZipReader(new BlobReader(new Blob([new Uint8Array(bytes)])));const entries=await reader.getEntries();await reader.close();return entries.map((entry)=>entry.filename);}
 test('creates a large project while keeping viewport canvases bounded', async ({ page }) => {
-  const errors: string[] = [];
-  page.on('pageerror', (error) => errors.push(error.message));
 
   await test.step('Create a 20-slide project with 10 layers per slide', async () => {
     await page.goto('/');
@@ -55,7 +53,6 @@ test('creates a large project while keeping viewport canvases bounded', async ({
       height: (node as HTMLCanvasElement).height,
     })));
     expect(sizes.every((size) => size.width > 0 && size.height > 0 && size.width <= viewport.width && size.height <= viewport.height)).toBeTruthy();
-    expect(errors).toEqual([]);
   });
 
   await test.step('Export the final slide', async () => {
@@ -65,7 +62,6 @@ test('creates a large project while keeping viewport canvases bounded', async ({
     ]);
     expect(download.suggestedFilename()).toMatch(/_20\.png$/);
     await expect(page.getByRole('button', { name: 'Export Carousel' })).toBeVisible();
-    expect(errors).toEqual([]);
   });
 });
 
@@ -123,7 +119,6 @@ test('wheel scrolling moves the rendered carousel with the scroll container',asy
 });
 
 test('command palette, shortcuts, and context menus drive editor actions',async({page})=>{
-  const errors:string[]=[];page.on('pageerror',(error)=>errors.push(error.message));
   await page.goto('/');await page.getByRole('button',{name:/create|start/i}).first().click();await expect(page.getByTitle('Projects')).toBeVisible();
   await page.keyboard.press('Control+k');const palette=page.getByRole('dialog',{name:'Command palette'});await expect(palette).toBeVisible();
   await page.getByLabel('Search commands').fill('2 × 2');await page.keyboard.press('Enter');await expect(palette).toHaveCount(0);
@@ -135,5 +130,4 @@ test('command palette, shortcuts, and context menus drive editor actions',async(
   const stage=await page.locator('.konvajs-content').boundingBox();await page.mouse.click(stage!.x+stage!.width/2,stage!.y+stage!.height/2,{button:'right'});
   const menu=page.getByRole('menu',{name:'Canvas actions'});await expect(menu).toBeVisible();await menu.getByRole('menuitem',{name:/Bring to front/}).click();await expect(page.getByText('5 of 5')).toBeVisible();
   await page.keyboard.press('?');await expect(page.getByRole('dialog',{name:'Keyboard shortcuts'})).toBeVisible();await page.keyboard.press('Escape');await expect(page.getByRole('dialog',{name:'Keyboard shortcuts'})).toHaveCount(0);
-  expect(errors).toEqual([]);
 });

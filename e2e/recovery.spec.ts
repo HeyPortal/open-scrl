@@ -1,16 +1,14 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures/test';
 
 const tinyPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
 
 test('a failed project-library load can be retried without reloading the page', async ({ page }) => {
-  const errors: string[] = [];
-  page.on('pageerror', (error) => errors.push(error.message));
   await page.addInitScript(() => {
     const original = IDBFactory.prototype.open;
     Object.assign(window, { failProjectOpen: true });
     IDBFactory.prototype.open = function (...args) {
       if (args[0] === 'open-scrl' && (window as unknown as { failProjectOpen: boolean }).failProjectOpen) throw new DOMException('Storage temporarily unavailable', 'SecurityError');
-      return original.apply(this, args);
+      return Reflect.apply(original, this, args);
     };
   });
   await page.goto('/');
@@ -18,17 +16,14 @@ test('a failed project-library load can be retried without reloading the page', 
   await page.evaluate(() => Object.assign(window, { failProjectOpen: false }));
   await page.getByRole('button', { name: 'Retry loading' }).click();
   await expect(page.getByText('Recent projects')).toBeVisible();
-  expect(errors).toEqual([]);
 });
 
 test('failed autosave keeps edits available and retry persists them', async ({ page }, testInfo) => {
-  const errors: string[] = [];
-  page.on('pageerror', (error) => errors.push(error.message));
   await page.addInitScript(() => {
     const original = IDBDatabase.prototype.transaction;
     IDBDatabase.prototype.transaction = function (...args) {
       if (this.name === 'open-scrl' && args[1] === 'readwrite' && (window as unknown as { failProjectSave?: boolean }).failProjectSave) throw new DOMException('Quota exceeded', 'QuotaExceededError');
-      return original.apply(this, args);
+      return Reflect.apply(original, this, args);
     };
   });
   await page.goto('/');
@@ -47,13 +42,10 @@ test('failed autosave keeps edits available and retry persists them', async ({ p
   await expect(page.getByRole('button', { name: /Recovered changes/ })).toBeVisible();
   await page.reload();
   await expect(page.getByRole('button', { name: /Recovered changes/ })).toBeVisible();
-  expect(errors).toEqual([]);
 });
 
 test('two tabs importing the same file keep one original and both project links', async ({ page, context }) => {
   const other = await context.newPage();
-  const errors: string[] = [];
-  for (const tab of [page, other]) tab.on('pageerror', (error) => errors.push(error.message));
   await Promise.all([page.goto('/'), other.goto('/')]);
   await Promise.all([page, other].map(async (tab, index) => {
     await tab.getByLabel('Project name').fill(`Tab ${index}`);
@@ -82,17 +74,14 @@ test('two tabs importing the same file keep one original and both project links'
     const { useDocumentStore } = await import(storePath);
     return { linked: await assetRepository.isLinkedToProject(useDocumentStore.getState().activeProjectId, assetId), size: (await assetRepository.readOriginal(assetId))?.size };
   }, metadata[0].id)).toEqual({ linked: true, size: tinyPng.length });
-  expect(errors).toEqual([]);
 });
 
 test('a failed media-library load can be retried inside the editor', async ({ page }) => {
-  const errors: string[] = [];
-  page.on('pageerror', (error) => errors.push(error.message));
   await page.addInitScript(() => {
     const original = IDBIndex.prototype.getAll;
     IDBIndex.prototype.getAll = function (...args) {
       if (this.objectStore.name === 'projectAssets' && (window as unknown as { failMediaLoad?: boolean }).failMediaLoad) throw new Error('Temporary media read failure');
-      return original.apply(this, args);
+      return Reflect.apply(original, this, args);
     };
   });
   await page.goto('/');
@@ -105,5 +94,4 @@ test('a failed media-library load can be retried inside the editor', async ({ pa
   await expect(page.locator('.media-dropzone').getByRole('button', { name: /^Import media/ })).toBeVisible();
   await expect(page.locator('.studio-left-panel img')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Retry media' })).toHaveCount(0);
-  expect(errors).toEqual([]);
 });

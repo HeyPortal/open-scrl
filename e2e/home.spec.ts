@@ -1,11 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
-
-/** Collects uncaught page errors; each test asserts the list is empty at the end. */
-function trackPageErrors(page: Page) {
-  const errors: string[] = [];
-  page.on('pageerror', (error) => errors.push(error.stack ?? error.message));
-  return errors;
-}
+import { expect, test, type Page } from './fixtures/test';
 
 interface Seed { name: string; format?: string; slides?: number }
 
@@ -29,13 +22,12 @@ async function seedProjects(page: Page, projects: Seed[]) {
 }
 
 const names = (strings: string[]) => strings.map((name) => ({ name }));
-const cardNames = (page: Page) => page.locator('.home-grid .home-card-name').allTextContents();
+const cardNames = (page: Page) => page.locator('.home-grid .home-card-name');
 
 test.describe('desktop home', () => {
   test.use({ viewport: { width: 1280, height: 800 } });
 
   test('creates a project with the chosen format and name', async ({ page }) => {
-    const errors = trackPageErrors(page);
     await page.goto('/');
     await expect(page.getByRole('heading', { level: 1, name: 'Recent projects' })).toBeVisible();
 
@@ -51,7 +43,6 @@ test.describe('desktop home', () => {
     await expect(page.getByTitle('Zoom out')).toBeVisible();
     await expect(page.getByLabel('Project name')).toHaveValue('New project test');
     await expect(page.getByLabel('Canvas format')).toHaveValue('IG Square');
-    expect(errors).toEqual([]);
   });
 
   test('format cards move with the arrow keys', async ({ page }) => {
@@ -66,33 +57,28 @@ test.describe('desktop home', () => {
   });
 
   test('empty profile shows a quiet empty state under the create row', async ({ page }) => {
-    const errors = trackPageErrors(page);
     await page.goto('/');
     await expect(page.getByRole('heading', { name: 'No carousels yet' })).toBeVisible();
     await expect(page.getByRole('region', { name: 'Continue editing' })).toHaveCount(0);
     await expect(page.getByLabel('Search projects')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Create carousel', exact: true })).toBeInViewport();
     await expect(page.getByRole('button', { name: 'New carousel', exact: true })).toHaveCount(0);
-    expect(errors).toEqual([]);
   });
 
   test('recent projects shows the latest project once and opens it', async ({ page }) => {
-    const errors = trackPageErrors(page);
     await page.goto('/');
     await seedProjects(page, [{ name: 'Older', format: 'IG Landscape', slides: 3 }, { name: 'Newest', format: 'IG Story / Reels', slides: 2 }]);
     const recent = page.getByRole('region', { name: /Recent projects/ });
     const newest = recent.getByRole('button', { name: 'Open Newest', exact: true });
     await expect(newest).toHaveCount(1);
     await expect(newest).toContainText('IG Story / Reels · 2 slides');
-    expect(await cardNames(page)).toEqual(['Newest', 'Older']);
+    await expect(cardNames(page)).toHaveText(['Newest', 'Older']);
     await newest.click();
     await expect(page.getByTitle('Zoom out')).toBeVisible();
     await expect(page.getByLabel('Project name')).toHaveValue('Newest');
-    expect(errors).toEqual([]);
   });
 
   test('project cards open projects, show relative times with the date in a title, and load real previews', async ({ page }) => {
-    const errors = trackPageErrors(page);
     await page.goto('/');
     await seedProjects(page, names(['Alpha', 'Bravo']));
 
@@ -109,7 +95,6 @@ test.describe('desktop home', () => {
 
     await card.click();
     await expect(page.getByLabel('Project name')).toHaveValue('Alpha');
-    expect(errors).toEqual([]);
   });
 
   test('search, no-match state and Clear search', async ({ page }) => {
@@ -119,7 +104,7 @@ test.describe('desktop home', () => {
 
     const search = page.getByLabel('Search projects');
     await search.fill('al');
-    expect(await cardNames(page)).toEqual(['Alpine trip']);
+    await expect(cardNames(page)).toHaveText(['Alpine trip']);
 
     await search.fill('zzz');
     await expect(page.locator('.home-grid')).toHaveCount(0);
@@ -134,11 +119,11 @@ test.describe('desktop home', () => {
     await seedProjects(page, names(['Bravo', 'Alpha', 'Charlie']));
     const sort = page.getByLabel('Sort projects');
     await expect(sort).toHaveValue('updated');
-    expect(await cardNames(page)).toEqual(['Charlie', 'Alpha', 'Bravo']);
+    await expect(cardNames(page)).toHaveText(['Charlie', 'Alpha', 'Bravo']);
     await sort.selectOption('name');
-    expect(await cardNames(page)).toEqual(['Alpha', 'Bravo', 'Charlie']);
+    await expect(cardNames(page)).toHaveText(['Alpha', 'Bravo', 'Charlie']);
     await sort.selectOption('created');
-    expect(await cardNames(page)).toEqual(['Charlie', 'Alpha', 'Bravo']);
+    await expect(cardNames(page)).toHaveText(['Charlie', 'Alpha', 'Bravo']);
   });
 
   test('grid and list views switch and are remembered', async ({ page }) => {
@@ -160,7 +145,6 @@ test.describe('desktop home', () => {
   });
 
   test('a grid starter creates a project with that grid on its first slide', async ({ page }) => {
-    const errors = trackPageErrors(page);
     await page.goto('/');
     await page.getByRole('radiogroup', { name: 'Canvas format' }).getByRole('radio', { name: /IG Square/ }).click();
     await page.getByLabel('Project name').fill('Grid start');
@@ -179,7 +163,6 @@ test.describe('desktop home', () => {
     });
     expect(grid).toMatchObject({ templateId: 'two-v', gap: 16, margin: 16 });
     expect(grid?.slotIds).toHaveLength(2);
-    expect(errors).toEqual([]);
   });
 
   test('the header "New carousel" button scrolls to and focuses the create panel', async ({ page }) => {
@@ -207,7 +190,6 @@ test.describe('phone home', () => {
   const pill = (page: Page) => page.getByRole('button', { name: 'New carousel', exact: true });
 
   test('creates from the card with a chosen format and name', async ({ page }) => {
-    const errors = trackPageErrors(page);
     await page.goto('/');
     await expect(page.getByRole('heading', { name: 'No carousels yet' })).toBeVisible();
     await page.getByRole('radio', { name: /IG Story/ }).tap();
@@ -216,11 +198,9 @@ test.describe('phone home', () => {
     await page.getByRole('button', { name: 'Create carousel', exact: true }).tap();
     await expect(page.getByRole('tablist', { name: 'Editor tools' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Project settings: Phone hero', exact: true })).toBeVisible();
-    expect(errors).toEqual([]);
   });
 
   test('recent project rows open projects with relative times and previews', async ({ page }) => {
-    const errors = trackPageErrors(page);
     await page.goto('/');
     await seedProjects(page, [{ name: 'Earlier', slides: 4 }, { name: 'Latest', format: 'IG Square', slides: 2 }]);
     const row = page.getByRole('button', { name: 'Open Latest', exact: true });
@@ -234,7 +214,6 @@ test.describe('phone home', () => {
     await expect(earlier.locator('.home-prow-time')).toHaveAttribute('title', /\d{4}/);
     await row.tap();
     await expect(page.getByRole('button', { name: 'Project settings: Latest', exact: true })).toBeVisible();
-    expect(errors).toEqual([]);
   });
 
   test('search, no-match state and Clear search', async ({ page }) => {
@@ -252,7 +231,6 @@ test.describe('phone home', () => {
   });
 
   test('the floating New carousel pill appears after scrolling and returns to the create card', async ({ page }) => {
-    const errors = trackPageErrors(page);
     await page.goto('/');
     await seedProjects(page, names(['A', 'B', 'C', 'D', 'E', 'F']));
     const scroller = page.locator('[data-home-scroll]');
@@ -264,15 +242,16 @@ test.describe('phone home', () => {
     await scroller.evaluate((el) => el.scrollTo(0, el.scrollHeight));
     await expect(pill(page)).toBeVisible();
     await expect(createButton).not.toBeInViewport();
-    // It floats clear of the bottom edge.
-    const box = (await pill(page).boundingBox())!;
-    expect(box.y + box.height).toBeLessThanOrEqual(844 - 8);
+    // Visibility can precede the end of the entrance transition. Keep the
+    // clearance requirement and wait for it against the actual viewport.
+    await expect.poll(() => pill(page).evaluate((button) =>
+      window.innerHeight - button.getBoundingClientRect().bottom,
+    )).toBeGreaterThanOrEqual(8);
 
     await pill(page).tap();
     await expect.poll(() => scroller.evaluate((el) => el.scrollTop)).toBe(0);
     await expect(createButton).toBeInViewport();
     await expect(pill(page)).toBeHidden();
-    expect(errors).toEqual([]);
   });
 
   test('the pill hides while a text field is focused (keyboard up)', async ({ page }) => {

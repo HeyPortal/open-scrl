@@ -6,20 +6,23 @@ Open-SCRL is a local-first photo grid / social carousel maker. The repo holds tw
 
 ## Web app commands
 
-Node 22.12+. Path alias `@/*` → `src/*`.
+Bun 1.4+ is the package manager and script runner (`bun.lock`; don't add a `package-lock.json`). Node 22.12+ is still required because Vite, Vitest, tsc and Playwright run on Node through their bin shebangs. Path alias `@/*` → `src/*`.
 
 ```bash
-npm run dev                # Vite dev server on :5173
-npm run verify             # typecheck + lint + vitest + build + bundle:check (what CI runs first)
-npm test                   # vitest run (jsdom; setup in src/test/setup.ts)
-npx vitest run src/core/scene/compileScene.test.ts   # single test file
-npx vitest run -t "name"   # single test by name
-npm run test:e2e           # Playwright (Chromium only); auto-starts or reuses dev server on :5173
-npm run test:pwa           # production Chromium offline/update lifecycle checks
-npx playwright test e2e/smoke.spec.ts
+bun install                # --frozen-lockfile in CI
+bun run dev                # Vite dev server on :5173
+bun run verify             # typecheck + lint + vitest + build + bundle:check (what CI runs first)
+bun run test               # vitest run (jsdom; setup in src/test/setup.ts)
+bunx vitest run src/core/scene/compileScene.test.ts   # single test file
+bunx vitest run -t "name"  # single test by name
+bun run test:e2e           # Playwright (Chromium only); auto-starts or reuses dev server on :5173
+bun run test:pwa           # production Chromium offline/update lifecycle checks
+bunx playwright test e2e/smoke.spec.ts
 ```
 
-- `verify` does **not** run the Playwright tests; CI runs `verify`, `test:e2e`, then `test:pwa`. Run `npx playwright install --with-deps chromium` once first.
+- Use `bun run test`, never bare `bun test`: the latter starts Bun's own test runner, which doesn't load the Vitest config, jsdom environment or setup file.
+- `verify` does **not** run the Playwright tests; CI runs `verify`, `test:e2e`, then `test:pwa`. Run `bunx playwright install --with-deps chromium` once first.
+- Browser specs import `test` and `expect` from `e2e/fixtures/test.ts`; its automatic fixture checks uncaught errors across all tabs. Browser specs and both Playwright configs are included in `typecheck`. Keep layout assertions retryable through transitions; animation tests should sample controlled progress instead of counting rendered frames. See `docs/testing.md` for focused runs and Bun trace commands.
 - `bundle:check` fails if the initial entry chunk exceeds 120 KiB gzip, so heavy deps must stay in lazy chunks/workers (see `src/app/` lazy boundaries).
 
 ## Mac app commands
@@ -65,7 +68,7 @@ The mobile and desktop layouts share the document store, history, media, and exp
 - `MobileTextEditor.tsx` keeps editable text at least 16px, follows `visualViewport` around the keyboard, and uses the bundled font mapping. Done/blur commits, Escape discards, and switching projects drops a stale draft; a same-project field unmount preserves typed text. Keep it keyed by project and layer.
 - The mobile `PwaUpdatePrompt` stays above the dock and safe area, wraps its message above 44px actions, and retains the same save/update controller as desktop.
 
-Mobile regression coverage lives in `e2e/mobile.spec.ts`, `e2e/mobile-activity.spec.ts`, `e2e/fonts.spec.ts`, and `e2e/pwa/updates-mobile.pwa.ts`. The gesture specs use Chromium touch emulation/CDP and the actual `window.Konva` singleton; importing a generated Vite dependency filename is brittle across tooling upgrades. Pick unused ports, for example `SCRL_E2E_PORT=5186 npm run test:e2e` and `PWA_PORT=5187 npm run test:pwa`, to avoid another worktree's server. Run builds and PWA checks sequentially because both write `dist/`. For touch changes, also check photo/text selection, move/rotate, cross-slide editing, and keyboard behavior on a physical phone when available; state separately what emulation and hardware verified.
+Mobile regression coverage lives in `e2e/mobile.spec.ts`, `e2e/mobile-activity.spec.ts`, `e2e/fonts.spec.ts`, and `e2e/pwa/updates-mobile.pwa.ts`. The gesture specs use Chromium touch emulation/CDP and the actual `window.Konva` singleton; importing a generated Vite dependency filename is brittle across tooling upgrades. Pick unused ports, for example `SCRL_E2E_PORT=5186 bun run test:e2e` and `PWA_PORT=5187 bun run test:pwa`, to avoid another worktree's server. Run builds and PWA checks sequentially because both write `dist/`. For touch changes, also check photo/text selection, move/rotate, cross-slide editing, and keyboard behavior on a physical phone when available; state separately what emulation and hardware verified.
 
 ## Mac architecture
 
@@ -109,9 +112,9 @@ Rebase on `main` before asking for review if it has moved, and say in the PR wha
 **Before opening a PR,** run what CI runs. If you skip a step, say so in the PR.
 
 ```bash
-npm run verify
-npm run test:e2e
-npm run test:pwa
+bun run verify
+bun run test:e2e
+bun run test:pwa
 ```
 
 If you touched `macos/`, also build it in Xcode 27 and run the scripts in `macos/Scripts/` that cover your change (`test-gpu-rendering.sh`, `test-canvas-rendering.sh`, `test-seam-blend.sh`, `check-features.sh`; see `docs/mac.md`). If you changed the project schema, update both `src/core/document` (plus a migration) and `ProjectFile.swift` in the same PR.
