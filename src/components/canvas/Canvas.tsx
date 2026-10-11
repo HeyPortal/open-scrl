@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { flushSync } from 'react-dom';
 import { Group, Layer as KLayer, Line, Rect, Stage, Transformer } from 'react-konva';
 import Konva from 'konva';
+import { Plus } from 'lucide-react';
 import { useEditor } from '@/store/editor';
 import { useAssets } from '@/store/assets';
 import { MAX_ZOOM, MIN_ZOOM, useEditorSession } from '@/editor/sessionStore';
@@ -20,6 +21,7 @@ import { compileScene } from '@/core/scene/compileScene';
 import { findCrossedSlideSeams } from '@/core/scene/slideSeams';
 import { getCanvasScrollIntent } from '@/core/scene/scrollIntent';
 import { snapBox, type SnapGuide } from '@/lib/snap';
+import { createSnapFeedback } from '@/lib/mobileHaptics';
 import { ImageNode } from './ImageNode';
 import { TextNode } from './TextNode';
 import { ShapeNode } from './ShapeNode';
@@ -128,6 +130,7 @@ export function Canvas({ width, height, variant = 'desktop' }: { width: number; 
   const drag = useRef<DragSession | null>(null);
   const groupTransform = useRef<GroupTransform | null>(null);
   const pendingNarrow = useRef<string | null>(null);
+  const snapFeedback = useRef(createSnapFeedback());
   type CanvasActivity = `drag:${string}` | 'transform' | 'touch' | 'marquee';
   const activity = useRef(new Map<CanvasActivity, () => void>());
   const cancelling = useRef(false);
@@ -136,15 +139,19 @@ export function Canvas({ width, height, variant = 'desktop' }: { width: number; 
   const abortTouchGestures = useRef<(() => void) | null>(null);
   const marqueeCleanup = useRef<(() => void) | null>(null);
   const beginActivity = useCallback((kind: CanvasActivity) => {
+    if (!activity.current.has(kind)) snapFeedback.current.reset();
     if (!activity.current.has(kind)) activity.current.set(kind, editorActivity.begin());
   }, []);
   const endActivity = useCallback((kind: CanvasActivity) => {
+    snapFeedback.current.reset();
     const release = activity.current.get(kind);
     activity.current.delete(kind);
     release?.();
   }, []);
   const [visibleRange, setVisibleRange] = useState({ start: 0, end: 0 });
   const [viewportOffset, setViewportOffset] = useState({ x: PADDING, y: PADDING });
+  const [nextSlidePull, setNextSlidePull] = useState({ distance: 0, ready: false });
+  const canvasOffset = { x: viewportOffset.x - nextSlidePull.distance, y: viewportOffset.y };
   const [guides, setGuides] = useState<SnapGuide[]>([]);
   const [guideOffsetX, setGuideOffsetX] = useState(0);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
@@ -153,14 +160,15 @@ export function Canvas({ width, height, variant = 'desktop' }: { width: number; 
   // What a media drag would land on right now; hovering never changes the selection.
   const [dropHover, setDropHover] = useState<{ slideId: string; layerId: string | null } | null>(null);
   // Live view transform for window listeners: clicking a slide can scroll the canvas mid-gesture.
-  const viewRef = useRef({ offset: viewportOffset, zoom });
-  useLayoutEffect(() => { viewRef.current = { offset: viewportOffset, zoom }; }, [viewportOffset, zoom]);
+  const viewRef = useRef({ offset: canvasOffset, zoom });
+  useLayoutEffect(() => { viewRef.current = { offset: { x: viewportOffset.x - nextSlidePull.distance, y: viewportOffset.y }, zoom }; }, [viewportOffset, nextSlidePull.distance, zoom]);
   const fmt = doc.format;
   const assetsById = useMemo(() => new Map(assets.map((asset) => [asset.id, asset])), [assets]);
 
   useLayoutEffect(() => {
     cancelling.current = false;
     const cancel = () => {
+      snapFeedback.current.reset();
       cancelling.current = true;
       drag.current = null; groupTransform.current = null; touch.current = null;
       marqueeCleanup.current?.(); marqueeCleanup.current = null;
@@ -230,12 +238,12 @@ export function Canvas({ width, height, variant = 'desktop' }: { width: number; 
     setFitZoom(targetZoom);
     if (isCustomZoom()) { const kept = Math.max(zoomRange.min, Math.min(zoomRange.max, useEditorSession.getState().zoom)); userZoom.current = kept; setZoom(kept); } else setZoom(targetZoom);
   }, [isCustomZoom, setFitZoom, setZoom, targetZoom, zoomRange]);
-  // Mobile: scroll that was computed for a new zoom lands only once the scroller has resized for it.
+  // Scroll for a new zoom or appended slide lands once the scroller has resized.
   useLayoutEffect(() => {
     const el = scrollRef.current; const pending = pendingScroll.current; if (!el || !pending) return;
     pendingScroll.current = null; el.scrollLeft = pending.left; el.scrollTop = pending.top;
     scrollPosition.current = { left: el.scrollLeft, top: el.scrollTop };
-  }, [zoom]);
+  }, [doc.slideOrder, zoom]);
   // Mobile: when the stage is resized under a zoomed view, keep the same point at the centre.
   useLayoutEffect(() => {
     const before = lastSize.current; lastSize.current = { width, height };
@@ -293,7 +301,7 @@ export function Canvas({ width, height, variant = 'desktop' }: { width: number; 
       mobileViewSlide.current = doc.slideOrder[slideIndexAtCentre(geometry, z, left, fmt.width, doc.slideOrder.length)];
     };
     gestureHost.current = !mobile ? null : {
-      view: () => ({ zoom: useEditorSession.getState().zoom, offset: viewRef.current.offset, geometry, fitZoom: targetZoom, limits: zoomRange, slideWidth: fmt.width, slideOrder: doc.slideOrder }),
+      view: () => ({ zoom: useEditorSession.getState().zoom, offset: viewRef.current.offset, geometry, fitZoom: targetZoom, limits: zoomRange, slideWidth: fmt.width, slideOrder: doc.slideOrder, canAppendSlide: !wideMode && !useEditor.getState().readOnlyError && !useEditor.getState().transaction }),
       applyView: (next, scroll) => {
         const el = scrollRef.current; if (!el) return;
         rememberViewSlide(next, scroll.left);
@@ -313,6 +321,24 @@ export function Canvas({ width, height, variant = 'desktop' }: { width: number; 
       layerNode: (id) => layerNodes.current.get(id),
       pageX,
       cancelDrag: () => { if (drag.current) drag.current.cancelled = true; },
+      previewNextSlide: (distance, ready) => setNextSlidePull((previous) => previous.distance === distance && previous.ready === ready ? previous : { distance, ready }),
+      appendSlide: (left) => {
+        const editor = useEditor.getState();
+        if (editor.readOnlyError || editor.doc.id !== doc.id || editor.transaction) return null;
+        // addSlide selects its new slide. Mark that selection as quiet within the
+        // same render so focus doesn't jump ahead of the settling animation.
+        let slideId: string | null = null;
+        flushSync(() => {
+          pendingScroll.current = { left, top: scrollRef.current?.scrollTop ?? 0 };
+          editor.addSlide();
+          const order = useEditor.getState().doc.slideOrder;
+          slideId = order.at(-1)!;
+          mobileViewSlide.current = slideId;
+          focusKey.current = `${slideId}:${useEditorSession.getState().slideFocusRequest}:${order.length - 1}`;
+          setNextSlidePull({ distance: 0, ready: false });
+        });
+        return slideId;
+      },
     };
   });
   const touchGestures = useTouchGestures(mobile, stageRef, scrollRef, gestureHost);
@@ -597,6 +623,7 @@ export function Canvas({ width, height, variant = 'desktop' }: { width: number; 
       const start = st.starts.get(st.anchorId)!;
       const moving = { ...st.union, x: st.union.x + e.target.x() - start.x, y: st.union.y + e.target.y() - start.y };
       const result = snapBox(moving, st.others, fmt, SNAP_THRESHOLD_PX / zoom);
+      if (mobile) snapFeedback.current.update(result.guides.map((guide) => `${guide.orientation}:${guide.position + (guide.orientation === 'v' ? st.offset : 0)}`));
       st.dx = result.x - st.union.x; st.dy = result.y - st.union.y;
       for (const id of st.ids) { const from = st.starts.get(id)!; layerNodes.current.get(id)?.position({ x: from.x + st.dx, y: from.y + st.dy }); }
       if (st.proxyStart) proxyRef.current?.position({ x: st.proxyStart.x + st.dx, y: st.proxyStart.y + st.dy });
@@ -615,7 +642,7 @@ export function Canvas({ width, height, variant = 'desktop' }: { width: number; 
         useEditor.getState().moveLayers(st.ids, st.dx, st.dy);
       } finally { endActivity(`drag:${layer.id}`); }
     };
-    const onTransform = (e: Konva.KonvaEventObject<Event>) => { if(layer.locked)return;const moving=localMoving(e.target,layer,true);const result=snap(slide,layer,moving);e.target.position({x:result.x+moving.width/2,y:result.y+moving.height/2});setGuideOffsetX(offset);setGuides(result.guides);if(layer.kind==='image'){const seams=findCrossedSlideSeams({x:offset+result.x,y:result.y,width:moving.width,height:moving.height},fmt.width,doc.slideOrder.length);setResizeSeams(seams.map((x)=>({x,y:result.y,height:moving.height})));}else setResizeSeams([]); };
+    const onTransform = (e: Konva.KonvaEventObject<Event>) => { if(layer.locked)return;const moving=localMoving(e.target,layer,true);const result=snap(slide,layer,moving);if(mobile)snapFeedback.current.update([...result.guides.map((guide)=>`${guide.orientation}:${guide.position+(guide.orientation==='v'?offset:0)}`),...(e.target.rotation()!==layer.rotation&&Math.abs(e.target.rotation()%45)<.001?[`rotation:${e.target.rotation()}`]:[])]);e.target.position({x:result.x+moving.width/2,y:result.y+moving.height/2});setGuideOffsetX(offset);setGuides(result.guides);if(layer.kind==='image'){const seams=findCrossedSlideSeams({x:offset+result.x,y:result.y,width:moving.width,height:moving.height},fmt.width,doc.slideOrder.length);setResizeSeams(seams.map((x)=>({x,y:result.y,height:moving.height})));}else setResizeSeams([]); };
     const onTransformEnd = (e: Konva.KonvaEventObject<Event>) => { try { setResizeSeams([]);if(layer.locked||cancelling.current)return;const node=e.target;const moving=localMoving(node,layer,true);const result=snap(slide,layer,moving);node.scale({x:1,y:1});updateLayer(layer.id,{x:result.x,y:result.y,width:moving.width,height:moving.height,rotation:node.rotation()});setGuides([]); } finally { endActivity('transform'); } };
     const ref = (node: Konva.Node|null) => { if(node)layerNodes.current.set(layer.id,node);else layerNodes.current.delete(layer.id); };
     const outline = selectedSet.has(layer.id);
@@ -632,15 +659,17 @@ export function Canvas({ width, height, variant = 'desktop' }: { width: number; 
   const dropIndex = dropHover ? doc.slideOrder.indexOf(dropHover.slideId) : -1;
 
   return <div ref={workspaceRef} className="workspace relative h-full w-full overflow-hidden select-none" style={mobile?TOUCH_SURFACE:undefined} onDragEnter={onMediaDragOver} onDragOver={onMediaDragOver} onDragLeave={onMediaDragLeave} onDrop={onMediaDrop}>
-    <div ref={scrollRef} data-testid="canvas-scroll" onScroll={scheduleScrollSync} className="absolute inset-0 overflow-auto scrollbar-thin"><div style={{width:spacerWidth,height:spacerHeight}} /></div>
+    {/* The scroll bounds must update immediately, including under the mobile
+        reduced-motion rule that assigns a tiny transition to every element. */}
+    <div ref={scrollRef} data-testid="canvas-scroll" onScroll={scheduleScrollSync} className="absolute inset-0 overflow-auto scrollbar-thin"><div style={{width:spacerWidth,height:spacerHeight,transitionProperty:'none'}} /></div>
     <div className="absolute inset-0 pointer-events-auto overflow-hidden" style={mobile?TOUCH_SURFACE:undefined}>
       <Stage ref={stageRef} width={Math.max(1,width)} height={Math.max(1,height)} {...(mobile?{dragDistance:TOUCH_DRAG_DISTANCE}:{})} onWheel={onWheel} onContextMenu={(e)=>{e.evt.preventDefault();openContextMenu(e.evt.clientX,e.evt.clientY,layerMenu(),'Canvas actions');}} onMouseDown={(e)=>{if(e.target!==e.target.getStage()||(mobile&&touchGestures.recentTouch()))return;if(e.evt.button===0)startMarquee(e.evt);else selectPageAtPointer();}} onTouchStart={mobile?undefined:onTouchStart} onTouchMove={mobile?undefined:onTouchMove} onTouchEnd={mobile?undefined:(e)=>{if(touch.current)selectPageAtPointer();touch.current=null;if(!e.evt.touches.length)endActivity('touch');}} onTouchCancel={mobile?undefined:()=>{touch.current=null;endActivity('touch');}}>
-        <KLayer listening={false}><Group x={viewportOffset.x} y={viewportOffset.y} scaleX={zoom} scaleY={zoom}>
+        <KLayer listening={false}><Group x={canvasOffset.x} y={canvasOffset.y} scaleX={zoom} scaleY={zoom}>
           {/* One shadow under the whole strip, so neighboring slides don't shade each other at the seams. */}
           <Rect x={stripStart} width={stripWidth} height={fmt.height} fill="#ffffff" shadowColor={canvasTheme.slideShadow} shadowOpacity={0.55} shadowBlur={32/zoom} shadowOffsetY={8/zoom}/>
           {visibleSlides.map(({slide,index})=>{const x=index*fmt.width;const bgAsset=slide.background.kind==='image'&&slide.background.assetId?assetsById.get(slide.background.assetId):undefined;const selected=slide.id===selectedSlideId;return <Group key={slide.id} x={x}><SlideBackground background={slide.background} asset={bgAsset} width={fmt.width} height={fmt.height} zoom={zoom}/>{!wideMode&&<Rect width={fmt.width} height={fmt.height} stroke={selected?canvasTheme.selection:canvasTheme.slideOutline} strokeWidth={(selected?3:1)/zoom}/>}</Group>;})}
         </Group></KLayer>
-        <KLayer><Group x={viewportOffset.x} y={viewportOffset.y} scaleX={zoom} scaleY={zoom}>
+        <KLayer><Group x={canvasOffset.x} y={canvasOffset.y} scaleX={zoom} scaleY={zoom}>
           {visibleItems.map((item)=>renderNode(item.slideId,item.layer))}
           {selectionBox&&<Rect ref={proxyRef} x={pageX(selectionBox.slideId)+selectionBox.bounds.x} y={selectionBox.bounds.y} width={selectionBox.bounds.width} height={selectionBox.bounds.height} listening={false}/>}
           <Transformer ref={transformerRef} rotateEnabled anchorSize={mobile?18:10} anchorCornerRadius={mobile?9:3} anchorStroke={canvasTheme.selection} anchorFill={canvasTheme.transformerAnchorFill} borderStroke={canvasTheme.selection} borderStrokeWidth={mobile?2.5:1.5} borderDash={multi?[4,3]:undefined} {...(mobile?{visible:!editingTextId,anchorStrokeWidth:2,rotateAnchorOffset:32,anchorStyleFunc:touchAnchor}:{})} keepRatio={multi||active?.kind==='image'} flipEnabled={!multi} ignoreStroke
@@ -648,7 +677,7 @@ export function Canvas({ width, height, variant = 'desktop' }: { width: number; 
             boundBoxFunc={(oldBox,newBox)=>multi&&(Math.abs(newBox.width)<MIN_LAYER_SIZE*zoom||Math.abs(newBox.height)<MIN_LAYER_SIZE*zoom)?oldBox:newBox}
             onTransformStart={()=>{beginActivity('transform');onGroupTransformStart();}} onTransform={()=>applyGroupTransform(false)} onTransformEnd={onGroupTransformEnd}/>
         </Group></KLayer>
-        <KLayer listening={false}><Group x={viewportOffset.x} y={viewportOffset.y} scaleX={zoom} scaleY={zoom}>
+        <KLayer listening={false}><Group x={canvasOffset.x} y={canvasOffset.y} scaleX={zoom} scaleY={zoom}>
           {wideMode&&visibleSlides.slice(1).map(({index})=><Line key={`seam-${index}`} points={[index*fmt.width,0,index*fmt.width,fmt.height]} stroke={canvasTheme.seam} opacity={0.45} strokeWidth={1/zoom} dash={[6/zoom,5/zoom]}/>)}
           {wideMode&&selectedIndex>=visibleRange.start&&selectedIndex<=visibleRange.end&&<Rect x={selectedIndex*fmt.width} y={fmt.height+8/zoom} width={fmt.width} height={3/zoom} cornerRadius={1.5/zoom} fill={canvasTheme.selection}/>}
           {resizeSeams.map((seam)=><Group key={`seam-${seam.x}`}><Rect x={seam.x-6/zoom} y={seam.y} width={12/zoom} height={seam.height} fill={canvasTheme.guide} opacity={0.2}/><Line points={[seam.x,seam.y,seam.x,seam.y+seam.height]} stroke={canvasTheme.guide} strokeWidth={3/zoom} dash={[10/zoom,6/zoom]}/></Group>)}
@@ -659,6 +688,12 @@ export function Canvas({ width, height, variant = 'desktop' }: { width: number; 
         </Group></KLayer>
       </Stage>
     </div>
+    {mobile && nextSlidePull.distance > 0 && <>
+      <div className="mobile-slide-append-preview" aria-hidden style={{ left: canvasOffset.x + deckWidth * zoom, top: canvasOffset.y, width: fmt.width * zoom, height: fmt.height * zoom }}>
+        <span style={{ left: Math.max(24, Math.min(fmt.width * zoom / 2, (width - canvasOffset.x - deckWidth * zoom) / 2)) }}><Plus size={24} /></span>
+      </div>
+      <div className="mobile-slide-append-hint" role="status" data-testid="slide-append-hint"><span>{nextSlidePull.ready ? 'Release to add slide' : 'Keep swiping to add slide'}</span></div>
+    </>}
     {marquee&&<div className="pointer-events-none absolute rounded-[2px] border border-accent" style={{left:marquee.x,top:marquee.y,width:marquee.width,height:marquee.height,background:canvasTheme.selectionFill}} data-testid="marquee"/>}
     {!mobile&&<SlideHeaders containerRef={workspaceRef} slides={visibleSlides} count={doc.slideOrder.length} selectedSlideId={selectedSlideId} offset={viewportOffset} slideWidth={fmt.width*zoom} slideHeight={fmt.height*zoom} numbersOnly={wideMode}/>}
     {editingTextId&&active?.kind==='text'&&stageRef.current&&(

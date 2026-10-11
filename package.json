@@ -45,6 +45,7 @@
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-konva": "19.3.0",
+    "web-haptics": "^0.0.6",
     "zustand": "^5.0.3"
   },
   "devDependencies": {

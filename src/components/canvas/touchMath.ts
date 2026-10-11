@@ -189,3 +189,10 @@ export function sampleVelocity(samples: readonly Sample[], now: number, window =
 }
 
 export const easeOutCubic = (t: number) => 1 - Math.pow(1 - clamp(t, 0, 1), 3);
+
+/** A deliberate pull beyond the last slide, with resistance in screen pixels. */
+export function slideAppendPull(travel: number, slidePixels: number) {
+  const threshold = clamp(slidePixels * 0.25, 56, 96);
+  const limit = Math.max(1, slidePixels * 0.65);
+  return { distance: limit * (1 - Math.exp(-Math.max(0, travel) / limit)), ready: travel >= threshold };
+}

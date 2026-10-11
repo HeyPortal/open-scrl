@@ -6,9 +6,11 @@ import { useEditorSession } from '@/editor/sessionStore';
 import type { ImageLayer, Layer, ShapeLayer, TextLayer } from '@/types';
 import { ContextMenuHost, useContextMenu } from '@/components/Menu';
 import { MobileSelectionBar } from './MobileSelectionBar';
+import { mobileHaptic } from '@/lib/mobileHaptics';
 
 // The export pipeline loads Konva's Node build; it is not exercised here.
 vi.mock('@/lib/export', () => ({ exportInstagramCarousel: vi.fn(), exportSlide: vi.fn() }));
+vi.mock('@/lib/mobileHaptics', () => ({ mobileHaptic: vi.fn() }));
 
 const base = { x: 0, y: 0, width: 100, height: 100, rotation: 0, opacity: 1, visible: true, locked: false } as const;
 const photo = (id: string, assetId: string | null = 'asset'): ImageLayer => ({ ...base, id, kind: 'image', name: id, assetId, cornerRadius: 0, cropOffsetX: 0, cropOffsetY: 0, cropScale: 1 });
@@ -200,16 +202,13 @@ describe('MobileSelectionBar', () => {
     expect(screen.queryByRole('menu')).toBeNull();
   });
 
-  it('gives a light haptic tap where supported', () => {
-    seed([photo('a'), text('b'), shape('c')], ['c']);
-    const vibrate = vi.fn();
-    Object.defineProperty(navigator, 'vibrate', { value: vibrate, configurable: true });
-    try {
-      bar();
-      fireEvent.click(button('Duplicate'));
-      expect(vibrate).toHaveBeenCalledWith(8);
-    } finally {
-      delete (navigator as unknown as { vibrate?: unknown }).vibrate;
-    }
+  it('ticks when opening More and leaves command feedback to the mobile shell', () => {
+    vi.mocked(mobileHaptic).mockClear();
+    bar();
+    fireEvent.click(more());
+    expect(mobileHaptic).toHaveBeenCalledExactlyOnceWith('selection');
+    vi.mocked(mobileHaptic).mockClear();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Duplicate' }));
+    expect(mobileHaptic).not.toHaveBeenCalled();
   });
 });

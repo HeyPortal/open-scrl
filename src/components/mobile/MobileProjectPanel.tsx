@@ -2,6 +2,7 @@ import { Check, ChevronLeft } from 'lucide-react';
 import { useEditor } from '@/store/editor';
 import { FORMATS } from '@/lib/format';
 import { goToProjects } from './editorActions';
+import { mobileHaptic, useHapticPreference } from '@/lib/mobileHaptics';
 
 /** Rename the project, pick its canvas format, or head back to the project list. */
 export function MobileProjectPanel() {
@@ -9,6 +10,8 @@ export function MobileProjectPanel() {
   const setDocName = useEditor((s) => s.setDocName);
   const format = useEditor((s) => s.doc.format);
   const setFormat = useEditor((s) => s.setFormat);
+  const haptics = useHapticPreference((s) => s.enabled);
+  const setHaptics = useHapticPreference((s) => s.setEnabled);
 
   return (
     <div className="space-y-5 px-4 pb-4 pt-2">
@@ -58,6 +61,24 @@ export function MobileProjectPanel() {
             );
           })}
         </div>
+      </div>
+
+      <div className="flex min-h-14 items-center justify-between gap-3 rounded-xl bg-bg-inset px-3.5 py-2.5">
+        <div>
+          <span id="haptics-label" className="block text-[14px] font-medium text-ink">Haptics</span>
+          <p id="haptics-hint" className="text-[12px] text-ink-dim">Touch feedback on this device</p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={haptics}
+          aria-labelledby="haptics-label"
+          aria-describedby="haptics-hint"
+          className={`flex h-11 w-14 shrink-0 items-center rounded-full p-1.5 transition-colors ${haptics ? 'bg-accent' : 'bg-bg-hover ring-1 ring-inset ring-line-strong'}`}
+          onClick={() => { setHaptics(!haptics); if (!haptics) mobileHaptic('selection'); }}
+        >
+          <span aria-hidden className={`h-7 w-7 rounded-full bg-ink transition-transform ${haptics ? 'translate-x-4' : ''}`} />
+        </button>
       </div>
 
       <button

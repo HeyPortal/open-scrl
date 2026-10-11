@@ -6,6 +6,7 @@ import { materializeSlides } from '@/core/document/selectors';
 import { slideScene, type SlideScene } from '@/render/preview';
 import type { Slide } from '@/types';
 import { SlidePreviewImage } from '../SlidePreviewCanvas';
+import { mobileHaptic } from '@/lib/mobileHaptics';
 
 const MIN_TILE_W = 44;
 const LANDSCAPE_PHONE = '(orientation: landscape) and (max-height: 500px)';
@@ -163,7 +164,7 @@ export function MobileSlideStrip({ visible = true }: { visible?: boolean }) {
   }, [menuOpen, selectedId]);
 
   const onSelect = (slideId: string) => {
-    if (slideId === selectedId) setMenuOpen((open) => !open);
+    if (slideId === selectedId) { mobileHaptic('selection'); setMenuOpen((open) => !open); }
     else focusSlide(slideId);
   };
 
