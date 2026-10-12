@@ -53,6 +53,13 @@ VITE_GOOGLE_FONTS_API_KEY=your_key_here
 Restart `bun run dev` after changing this file. Production deployments need the
 variable at build time and a new build. `.env.local` is ignored by Git.
 
+For **GitHub Pages**, the build runs on GitHub rather than your computer. Add
+`VITE_GOOGLE_FONTS_API_KEY` as a secret in the repository's **github-pages**
+environment, then redeploy `main`. The Pages workflow supplies it only to the
+deployment build. See [GitHub Pages key setup](hosting.md#google-fonts-catalog) for the
+settings path, referrer restrictions, and redeployment steps. Changing a local
+`.env.local` file does not update the published site.
+
 This is a browser application: deployment keys are visible in its built code,
 and visitor-provided keys are accessible to that visitor's browser. Enable the
 **Fonts Developer API** in Google Cloud Console, restrict the key to that API,
