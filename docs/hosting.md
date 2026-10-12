@@ -58,3 +58,10 @@ The test server serves only the configured path, so an accidental request to
 
 Existing project data belongs to the browser origin where it was created.
 Moving to another domain does not move stored projects or photos automatically.
+
+The optional Google Fonts catalog uses a browser-visible API key. Set
+`VITE_GOOGLE_FONTS_API_KEY` at build time to provide a deployment default, or let
+visitors enter their own key in **Typography → Manage fonts → Google Fonts**.
+See [custom fonts](custom-fonts.md) for local setup, key restrictions, and offline
+font storage. Fonts, projects and media remain local; catalog and chosen font
+downloads require an internet connection.

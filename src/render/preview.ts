@@ -5,6 +5,7 @@ import { getAssetThumbUrl } from '@/lib/assets';
 import { getMediaKind } from '@/lib/media';
 import { imageResourceManager } from './resources/ImageResourceManager';
 import { paintBackground, paintCheckerboard, paintLayer, type Context2D, type PaintMedia } from './paint/layers';
+import { ensureLayerFonts } from './fonts/families';
 
 /**
  * Main-thread slide previews (filmstrip thumbnails, the phone preview) drawn with the same
@@ -73,6 +74,8 @@ export async function paintSlidePreview(
   assets: Map<string, AssetMeta>,
   options: { checkerboard?: boolean; isCurrent?: () => boolean } = {},
 ) {
+  // Missing fonts remain recoverable in the editor; export requires every font.
+  await ensureLayerFonts(scene.items.map((item) => item.layer)).catch(() => undefined);
   const scale = pixelWidth / format.width;
   const edge = Math.max(format.width, format.height) * scale * 1.5;
   const ids = new Set<string>();

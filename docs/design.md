@@ -11,6 +11,21 @@ saved-project titles. The phone wordmark is 28px. Instrument stays at weight
 400 without synthesized bold. Document text keeps its bundled Inter face;
 changing interface fonts does not change saved text layers or exports.
 
+Text box side handles rewrap at the current font size while dragging; their
+height follows the text. The opposite top corner stays in place, including
+on rotated layers. Hold Alt/Option to resize around the center. Shrink-to-fit
+boxes retain all resize handles and recompute their fitting font size during
+the drag. Text handles snap only the moving edge; rotating text keeps its
+center fixed. Releasing a handle saves the preview as one undo step, and
+losing window focus discards an unfinished resize. Wheel zoom uses the canvas
+origin at the new zoom to preserve the point under the cursor within the
+available scroll bounds.
+
+Typography's **Manage fonts** dialog imports
+local font files and downloads Google Fonts families into a shared local
+library. The Google Fonts tab is disabled offline; saved fonts remain usable.
+See [Custom fonts](custom-fonts.md) for setup and storage behavior.
+
 The home screen is one calm column on desktop and phones: a format row with
 name and Create, expandable grid starters, then recent projects shown as
 strips of their opening slides. A soft brand glow replaces the dotted stage

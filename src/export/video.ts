@@ -9,6 +9,7 @@ import { getMediaKind, setVideoElementPlaying } from '@/lib/media';
 import { createTemporaryExportFile } from '@/storage/exportTemp';
 import { captureSlotForElapsed } from './timeline';
 import { loadInterFonts } from '@/render/fonts/inter';
+import { ensureLayerFonts } from '@/render/fonts/families';
 import {
   createAnimatedGifCanvas,
   seekAnimatedGifCanvas,
@@ -270,6 +271,7 @@ async function renderSlideVideo(
   }
   if (!project.slides[slideId]) throw new Error('A slide no longer exists.');
   await loadInterFonts();
+  await ensureLayerFonts(compileScene(project, getSlideViewport(project, slideId)!).map((item) => item.layer));
   await document.fonts?.ready;
   checkCancelled();
   const { config, fps } = await bestSupportedConfig(project);
