@@ -59,9 +59,29 @@ The test server serves only the configured path, so an accidental request to
 Existing project data belongs to the browser origin where it was created.
 Moving to another domain does not move stored projects or photos automatically.
 
+## Google Fonts catalog
+
 The optional Google Fonts catalog uses a browser-visible API key. Set
 `VITE_GOOGLE_FONTS_API_KEY` at build time to provide a deployment default, or let
 visitors enter their own key in **Typography → Manage fonts → Google Fonts**.
+
+For GitHub Pages, open **Settings → Environments → github-pages** in the
+repository and add an environment secret named `VITE_GOOGLE_FONTS_API_KEY`.
+The deployment build reads that secret; checks and pull-request builds do not.
+Local `.env.local` files are ignored by Git and are not available to Actions.
+After adding or changing the secret, redeploy using **Actions → CI → Run
+workflow → main**. The secret is optional: without it, visitors can still
+provide their own key.
+
+Enable **Fonts Developer API** in Google Cloud Console and restrict the key to
+that API. Under **Application restrictions → Websites**, allow
+`https://heyportal.github.io/*` for the canonical Pages site, or your own
+deployment hostname. Allow the origin rather than only `/open-scrl/*`, since
+cross-origin browser requests can omit the path from their referrer. Add your
+development origins only if the same key is also used locally. The Actions
+secret keeps the value out of Git and workflow logs; Vite embeds it into the
+public JavaScript, so website and API restrictions remain necessary.
+
 See [custom fonts](custom-fonts.md) for local setup, key restrictions, and offline
 font storage. Fonts, projects and media remain local; catalog and chosen font
 downloads require an internet connection.

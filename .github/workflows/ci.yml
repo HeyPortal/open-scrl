@@ -140,6 +140,7 @@ jobs:
         run: bun run build && bun run bundle:check
         env:
           SCRL_BASE_PATH: ${{ steps.pages.outputs.base_path }}/
+          VITE_GOOGLE_FONTS_API_KEY: ${{ secrets.VITE_GOOGLE_FONTS_API_KEY }}
       - uses: actions/upload-pages-artifact@v5
         with:
           path: dist
