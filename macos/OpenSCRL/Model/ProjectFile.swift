@@ -220,7 +220,7 @@ extension Background: Codable {
 extension Layer: Codable {
     private enum CodingKeys: String, CodingKey {
         case id, kind, name, x, y, width, height, rotation, opacity, visible, locked, groupId, groupKind, shadow
-        case assetId, cornerRadius, cropOffsetX, cropOffsetY, cropScale, mask, seamBlend
+        case assetId, cornerRadius, cropOffsetX, cropOffsetY, cropScale, mask, seamBlend, frameStyle
         case text, fontFamily, fontSize, fontWeight, italic, fill, align, letterSpacing, lineHeight
         case fillGradient, highlight, autoFit
         case shape, stroke, strokeWidth
@@ -256,7 +256,10 @@ extension Layer: Codable {
                 mask: ImageMask(rawValue: (try? c.decodeIfPresent(String.self, forKey: .mask)) ?? "rect") ?? .rect,
                 stroke: (try? c.decodeIfPresent(String.self, forKey: .stroke)) ?? "#ffffff",
                 strokeWidth: max(0, try num(.strokeWidth, 0)),
-                seamBlend: try c.decodeIfPresent(SeamBlend.self, forKey: .seamBlend)?.sanitized
+                seamBlend: try c.decodeIfPresent(SeamBlend.self, forKey: .seamBlend)?.sanitized,
+                frameStyle: try c.decodeIfPresent(String.self, forKey: .frameStyle).flatMap {
+                    ["polaroid", "paper", "film", "postcard"].contains($0) ? $0 : nil
+                }
             ))
         case "text":
             let numericWeight = try num(.fontWeight, 400)
@@ -313,6 +316,7 @@ extension Layer: Codable {
             try c.encode(p.cropScale, forKey: .cropScale)
             try c.encode(p.mask.rawValue, forKey: .mask)
             try c.encodeIfPresent(p.seamBlend, forKey: .seamBlend)
+            try c.encodeIfPresent(p.frameStyle, forKey: .frameStyle)
             try c.encode(p.stroke, forKey: .stroke)
             try c.encode(p.strokeWidth, forKey: .strokeWidth)
         case .text(let p):
