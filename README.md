@@ -35,6 +35,7 @@ Create a carousel or pick up a saved project from the [home screen](docs/images/
 - 25 grid layouts, with gap and margin you can change after the photos are in
 - Text with outlines, shadows, gradients, and highlight boxes
 - Photo masks, borders, and blurred-photo backgrounds
+- [Media sorting and shape filters](docs/media-library.md) for finding photos in larger libraries
 - [Export settings](docs/web-export.md) for PNG/JPEG, resolution, slide selection, and MP4 animations
 - A phone preview of the feed, story, and profile grid crop
 

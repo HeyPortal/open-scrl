@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { MEDIA_SHAPES, type MediaShape, type MediaSort } from '@/lib/mediaLibrary';
 
 export type LeftPanel = 'templates' | 'photos' | 'text' | 'shapes' | 'background' | 'export';
 export type SaveStatus = 'saved' | 'pending' | 'saving';
@@ -35,6 +36,12 @@ interface SessionState {
   setOverlay: (overlay: Overlay) => void;
   requestImport: () => void;
   setGridLinked: (linked: boolean) => void;
+  /** How the media library is ordered and filtered. Display-only; never saved, never an edit. */
+  mediaSort: MediaSort;
+  mediaShapes: MediaShape[];
+  setMediaSort: (sort: MediaSort) => void;
+  toggleMediaShape: (shape: MediaShape) => void;
+  clearMediaFilters: () => void;
 }
 
 export const MIN_ZOOM = 0.05;
@@ -55,6 +62,8 @@ export const useEditorSession = create<SessionState>((set) => ({
   overlay: null,
   importRequest: 0,
   gridLinked: false,
+  mediaSort: 'none',
+  mediaShapes: [],
   selectSlide: (selectedSlideId) => set({ selectedSlideId, selectedLayerId: null, selectedLayerIds: [] }),
   focusSlide: (selectedSlideId) => set((state) => ({
     selectedSlideId,
@@ -78,4 +87,10 @@ export const useEditorSession = create<SessionState>((set) => ({
   setOverlay: (overlay) => set({ overlay }),
   requestImport: () => set((state) => ({ leftPanel: 'photos', leftPanelOpen: true, importRequest: state.importRequest + 1 })),
   setGridLinked: (gridLinked) => set({ gridLinked }),
+  setMediaSort: (mediaSort) => set({ mediaSort }),
+  // Kept in the canonical Square, Vertical, Horizontal order so equal selections compare equal.
+  toggleMediaShape: (shape) => set((state) => ({
+    mediaShapes: MEDIA_SHAPES.map((s) => s.id).filter((id) => id === shape ? !state.mediaShapes.includes(id) : state.mediaShapes.includes(id)),
+  })),
+  clearMediaFilters: () => set({ mediaShapes: [] }),
 }));

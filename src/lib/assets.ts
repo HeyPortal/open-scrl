@@ -68,7 +68,10 @@ export async function importAsset(file: File, projectId: string): Promise<AssetM
   if (file.type.startsWith('video/') || VIDEO_EXTENSIONS.has(extension(file.name))) {
     return importPrepared(await prepareVideo(file), projectId);
   }
+  let source: Pick<PreparedAsset, 'sourceName' | 'sourceMime'> | undefined;
   if (/heic|heif/i.test(`${file.type} ${file.name}`)) {
+    // Remember what the user picked; the converted JPEG would otherwise sort and read as a plain .jpg.
+    source = { sourceName: file.name, sourceMime: file.type || (/heif$/i.test(file.name) ? 'image/heif' : 'image/heic') };
     // heic2any owns a decoder worker, but its adapter needs window and canvas.
     const { default: convert } = await import('heic2any');
     const converted = await convert({ blob: file, toType: 'image/jpeg', quality: 0.92 });
@@ -76,8 +79,8 @@ export async function importAsset(file: File, projectId: string): Promise<AssetM
     file = new File([normalized], file.name.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg', lastModified: file.lastModified });
   }
   if (importer === undefined) importer = typeof Worker !== 'undefined' ? new AssetImportController(assetRepository, 2) : null;
-  if (importer) return importer.import(file, projectId);
-  return importPrepared(await prepareOnMain(file), projectId);
+  if (importer) return importer.import(file, projectId, source);
+  return importPrepared({ ...(await prepareOnMain(file)), ...source }, projectId);
 }
 
 export async function getAsset(assetId: string): Promise<Asset | undefined> {

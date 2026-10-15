@@ -2,6 +2,7 @@ import { Blob as NodeBlob } from 'node:buffer';
 import { openDB } from 'idb';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { deferred } from '@/test/deferred';
+import * as nano from '@/lib/nano';
 import type { PreparedAsset } from '../AssetRepository';
 import { IndexedDbAssetRepository } from './IndexedDbAssetRepository';
 
@@ -20,6 +21,24 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe('atomic asset mutations', () => {
+  it('reloads in first-import order when timestamps tie and assets are reused', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1000);
+    vi.spyOn(nano, 'id').mockReturnValueOnce('z-order-first').mockReturnValueOnce('a-order-second');
+    const firstRepository = new IndexedDbAssetRepository();
+    const first = await firstRepository.commit(prepared('order-first'), 'import-order');
+    const second = await firstRepository.commit(prepared('order-second'), 'import-order');
+    const reopened = new IndexedDbAssetRepository();
+    await reopened.linkToProject('import-order', first.id);
+    await reopened.commit(prepared('order-first'), 'import-order');
+    expect((await reopened.listMetadata('import-order')).map((asset) => asset.id)).toEqual([first.id, second.id]);
+  });
+
+  it('retains source format metadata when reading imported editing renditions', async () => {
+    const repository = new IndexedDbAssetRepository();
+    const asset = await repository.commit({ ...prepared('source-metadata'), sourceName: 'IMG_2.HEIC', sourceMime: 'image/heic' }, 'source-metadata');
+    expect(await repository.readMetadata(asset.id)).toMatchObject({ sourceName: 'IMG_2.HEIC', sourceMime: 'image/heic', mime: 'image/png' });
+  });
+
   it('deduplicates simultaneous commits from separate repositories and cleans losing files', async () => {
     const a = new IndexedDbAssetRepository();
     const b = new IndexedDbAssetRepository();

@@ -32,7 +32,7 @@ struct BlendGroupSection: View {
             HStack {
                 Menu("Add Photo", systemImage: "photo.badge.plus") {
                     Section("From Media") {
-                        ForEach(controller.project.assets) { asset in
+                        ForEach(MediaLibraryOrder.displayed(controller.project.assets, sort: controller.mediaSort)) { asset in
                             Button(asset.name) { controller.addAssetToBlendGroup(asset.id) }
                         }
                     }

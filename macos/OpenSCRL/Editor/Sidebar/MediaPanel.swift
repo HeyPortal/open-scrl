@@ -41,13 +41,17 @@ struct MediaPanel: View {
 
     var body: some View {
         let assets = controller.project.assets
+        let shown = MediaLibraryOrder.displayed(assets, sort: controller.mediaSort, orientations: controller.mediaOrientations)
         let used = controller.project.usedAssetIDs
         let target = controller.selectedLayer?.image != nil ? controller.selectedLayer : nil
 
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 PanelHeader(title: "Media") {
-                    if !assets.isEmpty { Text("\(assets.count)").monospacedDigit().foregroundStyle(.secondary) }
+                    if !assets.isEmpty {
+                        Text(shown.count == assets.count ? "\(assets.count)" : "\(shown.count) of \(assets.count)")
+                            .monospacedDigit().foregroundStyle(.secondary)
+                    }
                 }
 
                 HStack(spacing: 8) {
@@ -94,10 +98,23 @@ struct MediaPanel: View {
                         }
                         .fixedSize(horizontal: false, vertical: true)
 
-                    LazyVGrid(columns: columns, spacing: 6) {
-                        ForEach(assets) { asset in
-                            MediaTile(controller: controller, asset: asset, used: used.contains(asset.id),
-                                      current: target?.image?.assetID == asset.id)
+                    sortAndFilterControls
+
+                    if shown.isEmpty {
+                        ContentUnavailableView {
+                            Label("No Matching Media", systemImage: "line.3.horizontal.decrease.circle")
+                        } description: {
+                            Text("No media matches the selected shapes.")
+                        } actions: {
+                            Button("Clear Filters") { controller.mediaOrientations = [] }
+                        }
+                        .padding(.top, 8)
+                    } else {
+                        LazyVGrid(columns: columns, spacing: 6) {
+                            ForEach(shown) { asset in
+                                MediaTile(controller: controller, asset: asset, used: used.contains(asset.id),
+                                          current: target?.image?.assetID == asset.id)
+                            }
                         }
                     }
                 } else {
@@ -137,6 +154,55 @@ struct MediaPanel: View {
                 for url in urls { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
             }
         }
+    }
+}
+
+extension MediaPanel {
+    /// Display-only ordering and shape filter; neither touches the project or undo history.
+    private var sortAndFilterControls: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Text("Sort").font(.caption).foregroundStyle(.secondary)
+                Picker("Sort Media", selection: $controller.mediaSort) {
+                    ForEach(MediaSortOrder.allCases) { order in Text(order.title).tag(order) }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .controlSize(.small)
+                .help("Sort the media library. Your import order is kept.")
+                .accessibilityLabel("Sort media")
+            }
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 84), spacing: 6)], alignment: .leading, spacing: 6) {
+                ForEach(MediaOrientation.allCases) { orientation in
+                    Toggle(isOn: orientationBinding(orientation)) {
+                        Label(orientation.title, systemImage: orientation.symbol)
+                            .labelStyle(.titleAndIcon)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .toggleStyle(.button)
+                    .controlSize(.small)
+                    .help("Show \(orientation.title.lowercased()) media. Combine shapes to show more; none shows all.")
+                    .accessibilityLabel("\(orientation.title) media")
+                }
+                if !controller.mediaOrientations.isEmpty {
+                    Button("Clear filters") { controller.mediaOrientations = [] }
+                        .buttonStyle(.plain)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .help("Clear filters")
+                        .accessibilityLabel("Clear media filters")
+                }
+            }
+        }
+    }
+
+    private func orientationBinding(_ orientation: MediaOrientation) -> Binding<Bool> {
+        Binding(
+            get: { controller.mediaOrientations.contains(orientation) },
+            set: { on in
+                if on { controller.mediaOrientations.insert(orientation) } else { controller.mediaOrientations.remove(orientation) }
+            }
+        )
     }
 }
 

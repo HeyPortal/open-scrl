@@ -28,6 +28,7 @@ while IFS= read -r source; do sources+=("$source"); done < <(
     fi
 )
 xcrun swiftc -Onone "${sources[@]}" OpenSCRLApp.swift \
-    "$macos_root/Tests/EditorFeatures/main.swift" "$macos_root/Tests/EditorFeatures/PhotoChecks.swift" -o editor-checks
+    "$macos_root/Tests/EditorFeatures/main.swift" "$macos_root/Tests/EditorFeatures/PhotoChecks.swift" \
+    "$macos_root/Tests/EditorFeatures/MediaLibraryChecks.swift" -o editor-checks
 ./editor-checks
 printf 'Offscreen renders: %s/out\n' "$check_dir"
