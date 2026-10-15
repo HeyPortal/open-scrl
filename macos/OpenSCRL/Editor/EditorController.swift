@@ -87,6 +87,10 @@ final class EditorController {
     var fitZoom: CGFloat = 0.5
     var zoomFollowsFit = true
     var sidebarPanel: SidebarPanel = .media
+    /// Media panel ordering and orientation filter. Per window and session only: never saved
+    /// in the project or part of undo, and `project.assets` keeps its import order.
+    var mediaSort: MediaSortOrder = .imported
+    var mediaOrientations: Set<MediaOrientation> = []
     var inspectorTab: InspectorTab = .design
     var showsInspector = true
     var showsCommandPalette = false

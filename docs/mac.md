@@ -53,6 +53,11 @@ keeping each slide's layout. Frames moved or resized by hand stay in place; choo
 **Re-attach Moved Slots** to return them to their grid cells. Grid settings are saved with
 the project, and spacing changes support undo.
 
+The **Media** sidebar can sort filenames naturally or group by file type. Combine
+**Square**, **Vertical**, and **Horizontal** to filter by shape; no shape selected
+shows everything. The sort and filters stay in the current window's session,
+without changing the project or undo history. See [media sorting and filtering](media-library.md).
+
 ## Seam blending
 
 Select two or more photo or video layers and choose **Arrange ▸ Blend Photos**, or choose a partner
