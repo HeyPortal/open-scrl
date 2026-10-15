@@ -10,6 +10,9 @@ export interface PreparedAsset {
   name: string;
   mediaKind?: 'image' | 'gif' | 'video';
   duration?: number;
+  /** Original name and type when import converted the file. */
+  sourceName?: string;
+  sourceMime?: string;
 }
 
 export interface ProjectAssetScope {

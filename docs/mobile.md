@@ -43,6 +43,12 @@ A sheet rises from the dock and the canvas shrinks to make room. The slide strip
 - **Shapes**: tap a shape to add it to the slide.
 - **Canvas**: sets the background of the current slide to a color, gradient, photo, or none. **Apply to all N slides** copies it to every slide.
 
+In **Photos**, **Sort media** orders filenames naturally or groups files by type.
+Combine **Square**, **Vertical**, and **Horizontal** to narrow the library; none
+selected shows everything. **Clear filters** keeps the chosen sort. These choices
+last for the current app session and do not change your slides or undo history.
+See [media sorting and filtering](media-library.md) for details.
+
 <img src="./images/mobile-grid.png" alt="A phone carousel with a filled two-by-two photo grid and slide thumbnails." width="320" />
 
 ## Selecting and editing

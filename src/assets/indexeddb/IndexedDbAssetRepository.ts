@@ -30,6 +30,20 @@ const PROJECT_SCOPE_MIGRATION = 'project-scopes-v1';
 const LEGACY_INDEX_MIGRATION = 'legacy-index-v1';
 const linkId = (projectId: string, assetId: string) => `${projectId}:${assetId}`;
 
+interface ProjectLinkStore {
+  index(name: 'projectId'): { getAll(projectId: string): Promise<ProjectAssetLink[]> };
+  put(link: ProjectAssetLink, key: string): Promise<string>;
+}
+
+/** Keep first-import order even when the clock repeats or a reused asset is linked again. */
+async function addProjectLink(store: ProjectLinkStore, projectId: string, assetId: string) {
+  const links = await store.index('projectId').getAll(projectId);
+  if (links.some((link) => link.assetId === assetId)) return;
+  const addedAt = links.reduce((next, link) => Math.max(next, link.addedAt + 1), Date.now());
+  const link = { id: linkId(projectId, assetId), projectId, assetId, addedAt };
+  await store.put(link, link.id);
+}
+
 let dbPromise: Promise<IDBPDatabase<AssetDb>> | null = null;
 function getAssetDatabase() {
   return dbPromise ??= openDB<AssetDb>('open-scrl-assets', 3, {
@@ -96,6 +110,7 @@ export class IndexedDbAssetRepository implements AssetRepository {
     const db = await getAssetDatabase();
     if (!projectId) return db.getAll('metadata');
     const links = await db.getAllFromIndex('projectAssets', 'projectId', projectId);
+    links.sort((a, b) => a.addedAt - b.addedAt);
     const metadata = await Promise.all(links.map((link) => db.get('metadata', link.assetId)));
     return metadata.filter((meta): meta is AssetMeta => Boolean(meta));
   }
@@ -112,8 +127,7 @@ export class IndexedDbAssetRepository implements AssetRepository {
     const tx = db.transaction(['metadata', 'projectAssets'], 'readwrite');
     await completeTransaction(tx, async () => {
       if (!(await tx.objectStore('metadata').get(assetId))) return;
-      const link: ProjectAssetLink = { id: linkId(projectId, assetId), projectId, assetId, addedAt: Date.now() };
-      await tx.objectStore('projectAssets').put(link, link.id);
+      await addProjectLink(tx.objectStore('projectAssets'), projectId, assetId);
     });
   }
 
@@ -208,8 +222,7 @@ export class IndexedDbAssetRepository implements AssetRepository {
     await completeTransaction(existingTx, async () => {
       existing = await existingTx.objectStore('metadata').index('hash').get(prepared.hash);
       if (existing) {
-        const link = { id: linkId(projectId, existing.id), projectId, assetId: existing.id, addedAt: Date.now() };
-        await existingTx.objectStore('projectAssets').put(link, link.id);
+        await addProjectLink(existingTx.objectStore('projectAssets'), projectId, existing.id);
       }
     });
     if (existing) return existing;
@@ -223,7 +236,7 @@ export class IndexedDbAssetRepository implements AssetRepository {
     try {
       const originalInOpfs = await writeOpfsBlob(blobKey, prepared.file);
       const thumbInOpfs = await writeOpfsBlob(thumbnailKey, prepared.thumbnail);
-      const meta: AssetMeta = { id: assetId, blobKey, thumbnailKey, hash: prepared.hash, name: prepared.name, mime: prepared.mime, width: prepared.width, height: prepared.height, size: prepared.file.size, mediaKind: prepared.mediaKind, duration: prepared.duration };
+      const meta: AssetMeta = { id: assetId, blobKey, thumbnailKey, hash: prepared.hash, name: prepared.name, mime: prepared.mime, width: prepared.width, height: prepared.height, size: prepared.file.size, mediaKind: prepared.mediaKind, duration: prepared.duration, ...(prepared.sourceName && { sourceName: prepared.sourceName }), ...(prepared.sourceMime && { sourceMime: prepared.sourceMime }) };
       const tx = db.transaction(['metadata', 'blobs', 'thumbnails', 'projectAssets'], 'readwrite');
       let result = meta;
       await completeTransaction(tx, async () => {
@@ -234,8 +247,7 @@ export class IndexedDbAssetRepository implements AssetRepository {
           if (!originalInOpfs) await tx.objectStore('blobs').put(prepared.file, blobKey);
           if (!thumbInOpfs) await tx.objectStore('thumbnails').put(prepared.thumbnail, thumbnailKey);
         }
-        const link = { id: linkId(projectId, result.id), projectId, assetId: result.id, addedAt: Date.now() };
-        await tx.objectStore('projectAssets').put(link, link.id);
+        await addProjectLink(tx.objectStore('projectAssets'), projectId, result.id);
       });
       retained = result.id === assetId;
       return result;

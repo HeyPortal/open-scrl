@@ -219,4 +219,7 @@ export interface AssetMeta {
   /** Missing on assets imported before animated media support. */
   mediaKind?: 'image' | 'gif' | 'video';
   duration?: number;
+  /** Name and type of the file as picked, when import converted it (HEIC → JPEG). Absent on older imports. */
+  sourceName?: string;
+  sourceMime?: string;
 }

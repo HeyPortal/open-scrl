@@ -21,3 +21,18 @@ describe('multi-selection session', () => {
     expect(session().slideFocusRequest).toBe(before + (action === 'focusSlide' ? 1 : 0));
   });
 });
+
+describe('media library view', () => {
+  beforeEach(() => { session().setMediaSort('none'); session().clearMediaFilters(); });
+  it('defaults to import order with no shape filter', () => { expect(session()).toMatchObject({ mediaSort: 'none', mediaShapes: [] }); });
+  it('toggles shapes independently and keeps them in a stable order', () => {
+    session().toggleMediaShape('horizontal'); session().toggleMediaShape('square');
+    expect(session().mediaShapes).toEqual(['square', 'horizontal']);
+    session().toggleMediaShape('square');
+    expect(session().mediaShapes).toEqual(['horizontal']);
+  });
+  it('clears filters without touching the sort', () => {
+    session().setMediaSort('type'); session().toggleMediaShape('vertical'); session().clearMediaFilters();
+    expect(session()).toMatchObject({ mediaSort: 'type', mediaShapes: [] });
+  });
+});

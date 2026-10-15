@@ -7,6 +7,7 @@ import { useToasts } from '@/store/toasts';
 import { useEditorSession } from '@/editor/sessionStore';
 import { slideSpanFor } from '@/core/document/geometry';
 import { getMediaKind } from '@/lib/media';
+import { MEDIA_SHAPES, MEDIA_SORTS, selectMedia, type MediaShape, type MediaSort } from '@/lib/mediaLibrary';
 import { ASSET_DRAG_TYPE } from '../canvas/mediaDrop';
 import { useContextMenu } from '../Menu';
 import { PanelHeader } from '../ui';
@@ -62,6 +63,56 @@ function MediaThumbnail({
   );
 }
 
+/** Display-only sort and shape filter for the library; nothing here touches the document or its history. */
+function MediaViewControls({ sheet, sort, shapes, shown, total, onSort, onToggleShape, onClear }: {
+  sheet: boolean;
+  sort: MediaSort;
+  shapes: readonly MediaShape[];
+  shown: number;
+  total: number;
+  onSort: (sort: MediaSort) => void;
+  onToggleShape: (shape: MediaShape) => void;
+  onClear: () => void;
+}) {
+  const height = sheet ? 'min-h-11' : 'min-h-8';
+  return (
+    <div className="flex flex-col gap-1.5" role="group" aria-label="Sort and filter media">
+      <select
+        className={`input w-full ${height} ${sheet ? 'text-[14px]' : ''}`}
+        value={sort}
+        onChange={(e) => onSort(e.target.value as MediaSort)}
+        aria-label="Sort media"
+      >
+        {MEDIA_SORTS.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
+      </select>
+      <div className="grid grid-cols-3 gap-1.5">
+        {MEDIA_SHAPES.map((shape) => {
+          const active = shapes.includes(shape.id);
+          return (
+            <button
+              key={shape.id}
+              type="button"
+              aria-pressed={active}
+              onClick={() => onToggleShape(shape.id)}
+              className={`flex ${height} min-w-0 items-center justify-center truncate rounded-lg px-1.5 font-medium transition-colors ${sheet ? 'text-[13px]' : 'text-[12px]'} ${active ? 'bg-accent-soft text-accent ring-1 ring-inset ring-accent/50' : 'bg-bg-inset text-ink-dim hover:bg-bg-hover hover:text-ink'}`}
+            >
+              {shape.label}
+            </button>
+          );
+        })}
+      </div>
+      {shapes.length > 0 && (
+        <p className="flex items-center justify-between gap-2 text-[11px] leading-snug text-ink-dim" role="status">
+          <span>Showing {shown} of {total}</span>
+          {/* With zero matches the grid's empty state owns the Clear filters action. */}
+          {shown > 0 && <button type="button" className={`rounded-md px-1.5 font-semibold underline underline-offset-2 hover:text-ink ${sheet ? 'min-h-11' : 'min-h-6'}`} onClick={onClear}>Clear filters</button>}
+        </p>
+      )}
+    </div>
+  );
+}
+
+const NO_ASSETS: AssetMeta[] = [];
 const MEDIA_TYPES = 'JPG · PNG · HEIC · GIF · MP4 · MOV';
 
 /**
@@ -110,7 +161,14 @@ export function PhotosPanel({ layout = 'sidebar' }: { layout?: 'sidebar' | 'shee
   const activeProjectId = useEditor((s) => s.activeProjectId);
   const assetProjectId = useAssets((s) => s.projectId);
   const scopedAssets = useAssets((s) => s.assets);
-  const assets = assetProjectId === activeProjectId ? scopedAssets : [];
+  const assets = assetProjectId === activeProjectId ? scopedAssets : NO_ASSETS;
+  const mediaSort = useEditorSession((s) => s.mediaSort);
+  const mediaShapes = useEditorSession((s) => s.mediaShapes);
+  const setMediaSort = useEditorSession((s) => s.setMediaSort);
+  const toggleMediaShape = useEditorSession((s) => s.toggleMediaShape);
+  const clearMediaFilters = useEditorSession((s) => s.clearMediaFilters);
+  // The one place sort and filter apply; `assets` itself stays in import order for everything else.
+  const visibleAssets = useMemo(() => selectMedia(assets, { sort: mediaSort, shapes: mediaShapes }), [assets, mediaSort, mediaShapes]);
   const importFiles = useAssets((s) => s.importFiles);
   const remove = useAssets((s) => s.remove);
   const importMessage = useAssets((s) => s.importMessage);
@@ -169,6 +227,12 @@ export function PhotosPanel({ layout = 'sidebar' }: { layout?: 'sidebar' | 'shee
     try {
       const imported = await importFiles(files);
       if (useEditor.getState().activeProjectId !== importingProjectId) return;
+      // Imports always go in as picked; the filter only changes what the grid shows afterwards.
+      const { mediaSort: sort, mediaShapes: shapes } = useEditorSession.getState();
+      const hidden = imported.length - selectMedia(imported, { sort, shapes }).length;
+      if (hidden > 0) {
+        addToast(`${hidden} imported item${hidden === 1 ? ' is' : 's are'} hidden by the media filter.`, 'info', { label: 'Show all', run: clearMediaFilters });
+      }
       if (asSlides && imported.length) {
         addMediaAsSlides(imported);
         const count = imported.reduce((n, a) => n + spanOf(a), 0);
@@ -283,9 +347,27 @@ export function PhotosPanel({ layout = 'sidebar' }: { layout?: 'sidebar' | 'shee
               : 'Click a photo to add it to the slide, or drag it onto a frame or the canvas.'}
           </p>
         ))}
+        {assets.length > 0 && (
+          <MediaViewControls
+            sheet={sheet}
+            sort={mediaSort}
+            shapes={mediaShapes}
+            shown={visibleAssets.length}
+            total={assets.length}
+            onSort={setMediaSort}
+            onToggleShape={toggleMediaShape}
+            onClear={clearMediaFilters}
+          />
+        )}
       </div>
       <div className={sheet ? 'grid grid-cols-[repeat(auto-fill,minmax(92px,1fr))] content-start gap-2 border-t border-line px-4 py-3' : 'grid min-h-0 flex-1 grid-cols-3 content-start gap-1.5 overflow-auto border-t border-line px-3 py-3 scrollbar-thin'}>
-        {assets.map((a) => {
+        {assets.length > 0 && visibleAssets.length === 0 && (
+          <div role="status" className="col-span-full flex flex-col items-center gap-2 px-3 py-6 text-center">
+            <p className={`leading-snug text-ink-dim ${sheet ? 'text-[14px]' : 'text-[12px]'}`}>No media matches these filters.</p>
+            <button type="button" className={`btn btn-secondary ${sheet ? 'min-h-11' : 'btn-sm'}`} onClick={clearMediaFilters}>Clear filters</button>
+          </div>
+        )}
+        {visibleAssets.map((a) => {
           const current = targetSlot?.assetId === a.id;
           const span = spanOf(a);
           return (

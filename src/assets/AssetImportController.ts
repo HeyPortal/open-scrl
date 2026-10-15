@@ -70,10 +70,10 @@ export class AssetImportController {
     });
   }
 
-  async import(file: File, projectId: string): Promise<AssetMeta> {
+  async import(file: File, projectId: string, source?: Pick<PreparedAsset, 'sourceName' | 'sourceMime'>): Promise<AssetMeta> {
     await this.acquire();
     try {
-      const prepared = await this.prepare(file);
+      const prepared = { ...(await this.prepare(file)), ...source };
       const duplicate = await this.repository.findByHash(prepared.hash);
       if (duplicate) {
         if (await this.repository.isLinkedToProject(projectId, duplicate.id)) throw new DuplicateAssetError(duplicate);

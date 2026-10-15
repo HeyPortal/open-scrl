@@ -28,6 +28,15 @@ describe('HEIC adapter loading', () => {
     expect(project).toBe('project');
   });
 
+  it('hands the original name and type to the import so sorting can still see them', async () => {
+    mocks.convert.mockResolvedValue(new Blob(['jpeg'], { type: 'image/jpeg' }));
+    await importAsset(new File(['heic'], 'IMG_0042.HEIC', { type: 'image/heic' }), 'project');
+    expect(mocks.import.mock.calls[0][2]).toEqual({ sourceName: 'IMG_0042.HEIC', sourceMime: 'image/heic' });
+    mocks.import.mockClear();
+    await importAsset(new File(['heif'], 'IMG_0043.heif'), 'project');
+    expect(mocks.import.mock.calls[0][2]).toEqual({ sourceName: 'IMG_0043.heif', sourceMime: 'image/heif' });
+  });
+
   it('preserves the first-image behavior for multi-image HEIF conversion', async () => {
     const first = new Blob(['first'], { type: 'image/jpeg' });
     mocks.convert.mockResolvedValue([first, new Blob(['second'])]);
@@ -39,7 +48,7 @@ describe('HEIC adapter loading', () => {
     const file = new File(['png'], 'photo.png', { type: 'image/png' });
     await importAsset(file, 'project');
     expect(mocks.convert).not.toHaveBeenCalled();
-    expect(mocks.import).toHaveBeenCalledWith(file, 'project');
+    expect(mocks.import).toHaveBeenCalledWith(file, 'project', undefined);
   });
 
   it('reports decoder failures without posting an unusable file to the worker', async () => {
