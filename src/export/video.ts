@@ -1,13 +1,12 @@
-import Konva from 'konva';
-import { paintBackground, paintLayer } from '@/render/paint/layers';
+import { paintBackground, paintLayer, type PaintMedia } from '@/render/paint/layers';
 import { ArrayBufferTarget, FileSystemWritableFileStreamTarget, Muxer } from 'mp4-muxer';
 import { compileScene } from '@/core/scene/compileScene';
 import { getSlideViewport } from '@/core/document/coordinates';
 import type { Asset, Layer, ProjectDocumentV2 } from '@/types';
 import { getAsset, getAssetMetadata } from '@/lib/assets';
-import { getMediaKind, setVideoElementPlaying } from '@/lib/media';
+import { getMediaKind } from '@/lib/media';
 import { createTemporaryExportFile } from '@/storage/exportTemp';
-import { captureSlotForElapsed } from './timeline';
+import { frameTime, frameTimestamp, loopedSourceTime } from './timeline';
 import { loadInterFonts } from '@/render/fonts/inter';
 import { ensureLayerFonts } from '@/render/fonts/families';
 import {
@@ -20,154 +19,180 @@ const PREFERRED_FPS = 60;
 const FALLBACK_FPS = 30;
 const DEFAULT_SLIDE_DURATION = 3;
 const MAX_SLIDE_DURATION = 60;
-type Drawable = HTMLImageElement | HTMLVideoElement | HTMLCanvasElement;
+const MAX_ENCODE_QUEUE = 4;
+const SEEK_TIMEOUT_MS = 5000;
 
-async function image(blob: Blob) {
-  const url = URL.createObjectURL(blob);
+/**
+ * Media drawn into an MP4 frame. Animated sources are positioned at an exact
+ * slide time before each frame is painted, so the export never depends on how
+ * fast the device can play, decode or encode in real time.
+ */
+interface FrameMedia {
+  media: () => PaintMedia | null;
+  seek?: (timeSeconds: number) => Promise<void> | void;
+  release: () => void;
+}
+
+function staticImage(bitmap: ImageBitmap): FrameMedia {
+  const media = { source: bitmap, width: bitmap.width, height: bitmap.height };
+  return { media: () => media, release: () => bitmap.close() };
+}
+
+function animatedGif(canvas: HTMLCanvasElement): FrameMedia {
+  const media = { source: canvas, width: canvas.width, height: canvas.height };
+  return {
+    media: () => media,
+    seek: (timeSeconds) => seekAnimatedGifCanvas(canvas, timeSeconds),
+    release: () => stopAnimatedGifCanvas(canvas),
+  };
+}
+
+/**
+ * Decodes video frames with WebCodecs for the export's fixed frame times;
+ * returns undefined when this browser can't demux or decode the track.
+ */
+async function decodedVideo(blob: Blob, frameTimes: readonly number[]): Promise<FrameMedia | undefined> {
+  let input: import('mediabunny').Input | undefined;
   try {
-    return await new Promise<HTMLImageElement>((resolve, reject) => {
-      const value = new Image();
-      value.onload = () => resolve(value);
-      value.onerror = reject;
-      value.src = url;
-    });
-  } finally {
-    window.setTimeout(() => URL.revokeObjectURL(url), 5000);
+    // Loaded only when a video slide is exported; the importer accepts MP4, MOV, M4V and WebM.
+    const { BlobSource, CanvasSink, Input, MATROSKA, MP4, QTFF, WEBM } = await import('mediabunny');
+    input = new Input({ source: new BlobSource(blob), formats: [MP4, QTFF, WEBM, MATROSKA] });
+    const track = await input.getPrimaryVideoTrack();
+    if (!track || !(await track.canDecode())) throw new Error('Unsupported video track.');
+    const first = await track.getFirstTimestamp();
+    const period = (await track.computeDuration()) - first;
+    const width = await track.getDisplayWidth();
+    const height = await track.getDisplayHeight();
+    const sink = new CanvasSink(track, { width, height, poolSize: 2 });
+    // The sink reads these ahead of rendering and decodes each packet once per
+    // loop, yielding one frame per export frame in the same order.
+    const frames = sink.canvasesAtTimestamps(frameTimes.map((time) => first + loopedSourceTime(time, period)));
+    const owner = input;
+    let media: PaintMedia | null = null;
+    return {
+      media: () => media,
+      seek: async () => {
+        const next = await frames.next();
+        if (!next.done && next.value) media = { source: next.value.canvas as CanvasImageSource, width, height };
+      },
+      release: () => {
+        void frames.return(undefined);
+        owner.dispose();
+      },
+    };
+  } catch {
+    input?.dispose();
+    return undefined;
   }
 }
 
-async function video(blob: Blob) {
+/** Fallback for containers or codecs WebCodecs can't read: seek a media element to each frame time. */
+async function seekedVideo(blob: Blob): Promise<FrameMedia> {
   const url = URL.createObjectURL(blob);
   const value = document.createElement('video');
   value.muted = true;
-  value.loop = true;
   value.playsInline = true;
   value.preload = 'auto';
   value.src = url;
+  const release = () => {
+    value.removeAttribute('src');
+    value.load();
+    URL.revokeObjectURL(url);
+  };
   try {
     await new Promise<void>((resolve, reject) => {
       value.onloadeddata = () => resolve();
       value.onerror = () => reject(new Error('This browser could not decode an imported video.'));
     });
-    value.width = value.videoWidth;
-    value.height = value.videoHeight;
-    return value;
   } catch (error) {
-    URL.revokeObjectURL(url);
+    release();
     throw error;
   }
-}
-
-async function drawable(asset: Asset): Promise<Drawable> {
-  const kind = getMediaKind(asset);
-  if (kind === 'video') return video(asset.blob);
-  if (kind === 'gif') return createAnimatedGifCanvas(asset.blob, asset.width, asset.height, false);
-  return image(asset.blob);
-}
-
-async function start(value: Drawable) {
-  if (value instanceof HTMLVideoElement) {
-    if (value.readyState >= HTMLMediaElement.HAVE_METADATA) value.currentTime = 0;
-    await setVideoElementPlaying(value, true);
-  }
-}
-
-function seek(value: Drawable, timeSeconds: number) {
-  if (value instanceof HTMLCanvasElement) seekAnimatedGifCanvas(value, timeSeconds);
-}
-
-function release(value: Drawable) {
-  if (value instanceof HTMLCanvasElement) {
-    stopAnimatedGifCanvas(value);
-    return;
-  }
-  if (value instanceof HTMLVideoElement) {
-    value.pause();
-    URL.revokeObjectURL(value.src);
-    value.removeAttribute('src');
-    value.load();
-  }
-}
-
-/** A Konva shape that paints one layer through the shared painter, re-reading video and GIF frames on every draw. */
-function addLayer(target: Konva.Layer, item: Layer, offsetX: number, source?: Drawable) {
-  if (item.kind === 'image' && (!item.assetId || !source)) return;
-  const media = source && item.kind === 'image' ? source : undefined;
-  target.add(new Konva.Shape({
-    listening: false,
-    sceneFunc: (context) => {
-      const ctx = context._context;
-      ctx.save();
-      // MP4 frames are opaque; the shape's own transform is identity, so paint in slide space.
-      paintLayer(ctx, item, offsetX, media ? { source: media, width: media.width, height: media.height } : null);
-      ctx.restore();
+  const media = { source: value, width: value.videoWidth, height: value.videoHeight };
+  return {
+    media: () => media,
+    seek: async (timeSeconds) => {
+      const time = loopedSourceTime(timeSeconds, value.duration);
+      if (Math.abs(value.currentTime - time) < 1e-4 && !value.seeking) return;
+      await new Promise<void>((resolve) => {
+        const done = () => { window.clearTimeout(timer); value.removeEventListener('seeked', done); resolve(); };
+        const timer = window.setTimeout(done, SEEK_TIMEOUT_MS);
+        value.addEventListener('seeked', done);
+        value.currentTime = time;
+      });
     },
-  }));
+    release,
+  };
 }
 
-async function prepareStage(project: ProjectDocumentV2, slideId: string) {
+async function frameMedia(asset: Asset, frameTimes: readonly number[]): Promise<FrameMedia> {
+  const kind = getMediaKind(asset);
+  if (kind === 'video') return (await decodedVideo(asset.blob, frameTimes)) ?? seekedVideo(asset.blob);
+  if (kind === 'gif') return animatedGif(await createAnimatedGifCanvas(asset.blob, asset.width, asset.height, false));
+  return staticImage(await createImageBitmap(asset.blob));
+}
+
+/** Builds a 1x slide painter; MP4 frames are opaque, so transparent slides are flattened onto white. */
+async function prepareSlide(project: ProjectDocumentV2, slideId: string, frameTimes: readonly number[]) {
   const targetIndex = project.slideOrder.indexOf(slideId);
   const slide = project.slides[slideId];
   const viewport = getSlideViewport(project, slideId);
   if (targetIndex < 0 || !slide || !viewport) throw new Error('The selected slide no longer exists.');
+  const { width, height } = project.format;
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d', { alpha: false });
+  if (!ctx) throw new Error('2D canvas is unavailable.');
 
-  const container = document.createElement('div');
-  container.style.cssText = 'position:absolute;left:-99999px;top:-99999px';
-  document.body.appendChild(container);
-  const stage = new Konva.Stage({
-    container,
-    width: project.format.width,
-    height: project.format.height,
-  });
-  const layer = new Konva.Layer();
-  const media: Drawable[] = [];
-  stage.add(layer);
+  const sources: FrameMedia[] = [];
+  const items: { layer: Layer; offsetX: number; media?: FrameMedia }[] = [];
+  try {
+    const background = slide.background;
+    const backgroundAsset = background.kind === 'image' && background.assetId ? await getAsset(background.assetId) : undefined;
+    const backgroundImage = backgroundAsset ? await createImageBitmap(backgroundAsset.blob).catch(() => undefined) : undefined;
+    if (backgroundImage) sources.push(staticImage(backgroundImage));
+    const backgroundMedia = backgroundImage && background.kind === 'image'
+      ? { source: backgroundImage, width: backgroundImage.width, height: backgroundImage.height, key: background.assetId ?? '' }
+      : null;
 
-  // H.264 has no alpha, so transparent slides are flattened onto white.
-  const background = slide.background;
-  const backgroundAsset = background.kind === 'image' && background.assetId ? await getAsset(background.assetId) : undefined;
-  const backgroundImage = backgroundAsset ? await image(backgroundAsset.blob).catch(() => undefined) : undefined;
-  layer.add(new Konva.Shape({
-    listening: false,
-    sceneFunc: (context) => {
-      const ctx = context._context;
-      const { width, height } = project.format;
-      ctx.save();
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, width, height);
-      paintBackground(ctx, background, width, height, backgroundImage && background.kind === 'image'
-        ? { source: backgroundImage, width: backgroundImage.naturalWidth, height: backgroundImage.naturalHeight, key: background.assetId ?? '' }
-        : null);
-      ctx.restore();
-    },
-  }));
-
-  for (const sceneItem of compileScene(project, viewport)) {
-    const sourceIndex = project.slideOrder.indexOf(sceneItem.slideId);
-    const offsetX = (sourceIndex - targetIndex) * project.format.width;
-    let source: Drawable | undefined;
-    if (sceneItem.layer.kind === 'image' && sceneItem.layer.assetId) {
-      const asset = await getAsset(sceneItem.layer.assetId);
-      if (asset) {
-        source = await drawable(asset);
-        media.push(source);
+    for (const sceneItem of compileScene(project, viewport)) {
+      const offsetX = (project.slideOrder.indexOf(sceneItem.slideId) - targetIndex) * width;
+      const { layer } = sceneItem;
+      if (layer.kind !== 'image') {
+        items.push({ layer, offsetX });
+        continue;
       }
+      if (!layer.assetId) continue;
+      const asset = await getAsset(layer.assetId);
+      if (!asset) continue;
+      const media = await frameMedia(asset, frameTimes);
+      sources.push(media);
+      items.push({ layer, offsetX, media });
     }
-    addLayer(layer, sceneItem.layer, offsetX, source);
-  }
 
-  layer.draw();
-  return {
-    stage,
-    layer,
-    play: () => Promise.all(media.map(start)),
-    seek: (timeSeconds: number) => media.forEach((value) => seek(value, timeSeconds)),
-    destroy: () => {
-      media.forEach(release);
-      stage.destroy();
-      container.remove();
-    },
-  };
+    return {
+      canvas,
+      /** Advances every animated source to the next frame time, in order, then paints the slide. */
+      render: async (timeSeconds: number) => {
+        await Promise.all(sources.map((source) => source.seek?.(timeSeconds)));
+        ctx.save();
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, width, height);
+        paintBackground(ctx, background, width, height, backgroundMedia);
+        ctx.restore();
+        for (const item of items) {
+          const media = item.media?.media();
+          if (item.media && !media) continue;
+          paintLayer(ctx, item.layer, item.offsetX, media);
+        }
+      },
+      destroy: () => sources.forEach((source) => source.release()),
+    };
+  } catch (error) {
+    sources.forEach((source) => source.release());
+    throw error;
+  }
 }
 
 export async function inspectSlideVideo(project: ProjectDocumentV2, slideId: string) {
@@ -185,11 +210,15 @@ export async function inspectSlideVideo(project: ProjectDocumentV2, slideId: str
   return { animated, duration: Math.min(MAX_SLIDE_DURATION, duration) };
 }
 
-function waitUntil(deadline: number) {
-  const remaining = deadline - performance.now();
-  return remaining > 1
-    ? new Promise<void>((resolve) => window.setTimeout(resolve, remaining))
-    : Promise.resolve();
+/** Applies backpressure without flushing, which would stall the encoder pipeline. */
+async function waitForEncoder(encoder: VideoEncoder) {
+  while (encoder.state === 'configured' && encoder.encodeQueueSize > MAX_ENCODE_QUEUE) {
+    await new Promise<void>((resolve) => {
+      const done = () => { window.clearTimeout(timer); encoder.removeEventListener('dequeue', done); resolve(); };
+      const timer = window.setTimeout(done, 50);
+      encoder.addEventListener('dequeue', done);
+    });
+  }
 }
 
 export interface RenderedSlideVideo {
@@ -300,58 +329,34 @@ async function renderSlideVideo(
   });
   const cancelEncoder = () => { if (encoder.state !== 'closed') encoder.close(); };
   options.signal?.addEventListener('abort', cancelEncoder, { once: true });
-  let prepared: Awaited<ReturnType<typeof prepareStage>> | undefined;
+  let prepared: Awaited<ReturnType<typeof prepareSlide>> | undefined;
   let completed = false;
   try {
     checkCancelled();
     encoder.configure(config);
-    prepared = await prepareStage(project, slideId);
-    await prepared.play();
+    const frameTimes = Array.from({ length: total }, (_, index) => frameTime(index, fps));
+    prepared = await prepareSlide(project, slideId, frameTimes);
     checkCancelled();
-    const started = performance.now();
     const durationMicros = Math.round(duration * 1_000_000);
-    let scheduledSlot = 0;
-    let lastKeyFrameTimestamp = Number.NEGATIVE_INFINITY;
-    let pending: { canvas: HTMLCanvasElement; timestamp: number } | undefined;
-
-    const encodeCanvas = (item: typeof pending, frameDuration: number) => {
-      if (!item) return;
-      const frame = new VideoFrame(item.canvas, {
-        timestamp: item.timestamp,
-        duration: Math.max(1, frameDuration),
-      });
-      const keyFrame = item.timestamp === 0 || item.timestamp - lastKeyFrameTimestamp >= 2_000_000;
-      encoder.encode(frame, { keyFrame });
-      if (keyFrame) lastKeyFrameTimestamp = item.timestamp;
-      frame.close();
-    };
-
-    while (scheduledSlot < total) {
-      await waitUntil(started + scheduledSlot * 1000 / fps);
+    const keyFrameInterval = fps * 2;
+    // Every frame is rendered at its exact slide time, however long the device
+    // takes, so slow phones export more slowly instead of dropping frames.
+    for (let index = 0; index < total; index++) {
       checkCancelled();
-      const elapsedMs = performance.now() - started;
-      if (pending && elapsedMs >= duration * 1000) {
-        onProgress?.(total, total);
-        break;
-      }
-      const slot = captureSlotForElapsed(
-        elapsedMs,
-        fps,
-        total,
-        scheduledSlot,
-      );
-      const timestamp = Math.round(slot * 1_000_000 / fps);
-      prepared.seek(slot / fps);
-      prepared.layer.draw();
-      const canvas = prepared.stage.toCanvas({ pixelRatio: 1, imageSmoothingEnabled: true });
-      if (pending) encodeCanvas(pending, timestamp - pending.timestamp);
-      pending = { canvas, timestamp };
-      onProgress?.(slot + 1, total);
-      scheduledSlot = slot + 1;
-      if (encoder.encodeQueueSize > 8) await encoder.flush();
+      const timestamp = frameTimestamp(index, fps);
+      await prepared.render(frameTimes[index]);
+      checkCancelled();
       if (encoderError) throw encoderError;
+      await waitForEncoder(encoder);
+      const next = index + 1 < total ? frameTimestamp(index + 1, fps) : durationMicros;
+      const frame = new VideoFrame(prepared.canvas, { timestamp, duration: Math.max(1, next - timestamp) });
+      try {
+        encoder.encode(frame, { keyFrame: index % keyFrameInterval === 0 });
+      } finally {
+        frame.close();
+      }
+      onProgress?.(index + 1, total);
     }
-    if (pending) encodeCanvas(pending, durationMicros - pending.timestamp);
     await encoder.flush();
     checkCancelled();
     if (encoderError) throw encoderError;
