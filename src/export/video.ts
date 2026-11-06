@@ -253,7 +253,7 @@ async function createVideoOutput(preferTemporary: boolean) {
   };
 }
 
-function encoderConfig(project: ProjectDocumentV2, codec: string, fps: number): VideoEncoderConfig {
+function encoderConfig(project: ProjectDocumentV2, codec: string, fps: number, hardwareAcceleration: HardwareAcceleration): VideoEncoderConfig {
   const pixelsPerSecond = project.format.width * project.format.height * fps;
   const bitrate = Math.min(50_000_000, Math.max(fps === PREFERRED_FPS ? 20_000_000 : 12_000_000, Math.round(pixelsPerSecond * .28)));
   return {
@@ -263,7 +263,7 @@ function encoderConfig(project: ProjectDocumentV2, codec: string, fps: number): 
     bitrate,
     bitrateMode: 'variable',
     framerate: fps,
-    hardwareAcceleration: 'prefer-hardware',
+    hardwareAcceleration,
     latencyMode: 'quality',
     avc: { format: 'avc' },
   };
@@ -271,15 +271,19 @@ function encoderConfig(project: ProjectDocumentV2, codec: string, fps: number): 
 
 async function bestSupportedConfig(project: ProjectDocumentV2) {
   // Prefer High Profile H.264 at 60 fps. Main/Baseline and 30 fps remain
-  // compatibility fallbacks for devices with more limited encoders.
-  for (const fps of [PREFERRED_FPS, FALLBACK_FPS]) {
-    for (const codec of ['avc1.64002a', 'avc1.4d002a', 'avc1.42002a']) {
-      const candidate = encoderConfig(project, codec, fps);
-      try {
-        const support = await VideoEncoder.isConfigSupported(candidate);
-        if (support.supported) return { config: support.config ?? candidate, fps };
-      } catch {
-        // Try the next standards-compatible profile.
+  // compatibility fallbacks for devices with more limited encoders. Chromium
+  // treats 'prefer-hardware' as a requirement, so devices without a suitable
+  // hardware encoder (or one capped below the canvas size) use software.
+  for (const acceleration of ['prefer-hardware', 'no-preference'] as const) {
+    for (const fps of [PREFERRED_FPS, FALLBACK_FPS]) {
+      for (const codec of ['avc1.64002a', 'avc1.4d002a', 'avc1.42002a']) {
+        const candidate = encoderConfig(project, codec, fps, acceleration);
+        try {
+          const support = await VideoEncoder.isConfigSupported(candidate);
+          if (support.supported) return { config: support.config ?? candidate, fps };
+        } catch {
+          // Try the next standards-compatible profile.
+        }
       }
     }
   }

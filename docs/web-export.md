@@ -19,8 +19,9 @@ share the same settings. All rendering and packaging happen on your device.
   Choose **MP4** to keep them moving, or **Still** to export still frames in the chosen image format.
   MP4 stays at the original canvas dimensions. Every frame is rendered at
   its exact time, so slower phones take longer to export but don't drop or
-  repeat frames. Browser WebCodecs/H.264 support is required for MP4; if
-  unavailable, choose still frames.
+  repeat frames. Browser WebCodecs/H.264 support is required for MP4; a
+  hardware encoder is used when available, otherwise the browser's software
+  encoder. If neither is available, choose still frames.
 - **File name** renames the download. ZIPs use
   `<name>_instagram.zip`; individual files use `<name>_01.png`, `.jpg`, or
   `.mp4`. Spaces and punctuation become underscores.
