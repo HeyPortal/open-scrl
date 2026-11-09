@@ -1,3 +1,4 @@
+import { FrameGallery } from './FrameGallery';
 import { RotateCcw } from 'lucide-react';
 import { useEditor } from '@/store/editor';
 import type { Gradient, ImageLayer, Layer, Shadow, TextHighlight, TextLayer } from '@/types';
@@ -120,11 +121,12 @@ export function ImageFrameSection({ layer }: { layer: ImageLayer }) {
           <RotateCcw size={12} aria-hidden /> Reset photo
         </button>
       }>
-        <MaskPicker value={mask} onChange={(next) => updateLayer(layer.id, { mask: next })} />
+        <MaskPicker value={mask} onChange={(next) => updateLayer(layer.id, { mask: next, frameStyle: undefined })} />
         {maskUsesCornerRadius(mask) && (
           <Slider label="Corner radius" display={`${Math.round(layer.cornerRadius)} px`} min={0} max={radiusMax} value={Math.min(layer.cornerRadius, radiusMax)} onChange={(cornerRadius) => updateLayer(layer.id, { cornerRadius })} gesture={radiusGesture} valueText={`${Math.round(layer.cornerRadius)} pixels`} />
         )}
       </Section>
+      <FrameGallery layer={layer}/>
       <EffectSection title="Border" enabled={border > 0}
         onToggle={(on) => updateLayer(layer.id, on ? { strokeWidth: Math.max(4, Math.round(Math.min(layer.width, layer.height) * 0.02)), stroke: layer.stroke ?? '#ffffff' } : { strokeWidth: 0 })}
         hint="A frame inside the photo’s outline.">

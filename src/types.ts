@@ -57,6 +57,8 @@ export interface ImageLayer extends BaseLayer {
   cropOffsetX: number;
   cropOffsetY: number;
   cropScale: number;
+  /** Decorative frame; omitted on older projects. */
+  frameStyle?: 'polaroid' | 'paper' | 'film' | 'postcard';
   /** Missing means `rect`. */
   mask?: ImageMask;
   /** Border color, drawn inside the mask outline. */

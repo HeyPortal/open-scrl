@@ -1,4 +1,5 @@
 import type { Background, Bounds, ImageLayer, Layer, ShapeLayer } from '@/types';
+import { photoWindow, paintFrame } from './frames';
 import { backgroundGradient, canvasGradient } from './gradient';
 import { isTransparentColor, withOpacity } from './color';
 import { maskPath } from './masks';
@@ -20,9 +21,10 @@ export interface PaintMedia {
 }
 
 /** The part of the media an image layer shows: cover-fit, zoomed by `cropScale`, offset in the slack. */
-export function imageCrop(layer: Pick<ImageLayer, 'width' | 'height' | 'cropScale' | 'cropOffsetX' | 'cropOffsetY'>, width: number, height: number) {
+export function imageCrop(layer: Pick<ImageLayer, 'width' | 'height' | 'cropScale' | 'cropOffsetX' | 'cropOffsetY' | 'frameStyle' | 'strokeWidth'>, width: number, height: number) {
   const scale = Math.max(1, layer.cropScale ?? 1);
-  const box = layer.width / layer.height;
+  const window = photoWindow(layer);
+  const box = window.width / window.height;
   let sw = width, sh = height;
   if (width / height > box) sw = height * box; else sh = width / box;
   sw /= scale; sh /= scale;
@@ -31,14 +33,18 @@ export function imageCrop(layer: Pick<ImageLayer, 'width' | 'height' | 'cropScal
 }
 
 export function paintImageContent(ctx: Context2D, layer: ImageLayer, media: PaintMedia | null | undefined) {
-  const path = maskPath(layer.mask, layer.width, layer.height, layer.cornerRadius);
+  const window = photoWindow(layer);
+  const decorated = Boolean(layer.frameStyle && (layer.strokeWidth ?? 0) > 0);
+  const path = maskPath(decorated ? 'rect' : layer.mask, window.width, window.height, decorated ? 0 : layer.cornerRadius);
   if (media && media.width > 0 && media.height > 0) {
     const crop = imageCrop(layer, media.width, media.height);
     ctx.save();
+    ctx.translate(window.x, window.y);
     ctx.clip(path);
-    ctx.drawImage(media.source, crop.x, crop.y, crop.width, crop.height, 0, 0, layer.width, layer.height);
+    ctx.drawImage(media.source, crop.x, crop.y, crop.width, crop.height, 0, 0, window.width, window.height);
     ctx.restore();
   }
+  if (decorated) { paintFrame(ctx, layer); return; }
   const border = layer.strokeWidth ?? 0;
   if (border > 0 && !isTransparentColor(layer.stroke)) {
     // Centered strokes are clipped to the mask, so the border sits inside the photo's outline.
