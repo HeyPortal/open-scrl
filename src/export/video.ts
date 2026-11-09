@@ -63,7 +63,8 @@ async function decodedVideo(blob: Blob, frameTimes: readonly number[]): Promise<
     const period = (await track.computeDuration()) - first;
     const width = await track.getDisplayWidth();
     const height = await track.getDisplayHeight();
-    const sink = new CanvasSink(track, { width, height, poolSize: 2 });
+    // Canvases default to the track's display size, with rotation applied.
+    const sink = new CanvasSink(track, { poolSize: 2, alpha: await track.canBeTransparent() });
     // The sink reads these ahead of rendering and decodes each packet once per
     // loop, yielding one frame per export frame in the same order.
     const frames = sink.canvasesAtTimestamps(frameTimes.map((time) => first + loopedSourceTime(time, period)));
@@ -80,7 +81,9 @@ async function decodedVideo(blob: Blob, frameTimes: readonly number[]): Promise<
         owner.dispose();
       },
     };
-  } catch {
+  } catch (error) {
+    // Seeking is far slower, so make an unexpected fallback visible.
+    console.warn('Could not decode this video with WebCodecs; seeking its frames instead.', error);
     input?.dispose();
     return undefined;
   }
