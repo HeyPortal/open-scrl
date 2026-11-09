@@ -20,6 +20,7 @@ const FALLBACK_FPS = 30;
 const DEFAULT_SLIDE_DURATION = 3;
 const MAX_SLIDE_DURATION = 60;
 const MAX_ENCODE_QUEUE = 4;
+const PROGRESS_INTERVAL_MS = 100;
 const SEEK_TIMEOUT_MS = 5000;
 
 /**
@@ -159,6 +160,9 @@ async function prepareSlide(project: ProjectDocumentV2, slideId: string, frameTi
       ? { source: backgroundImage, width: backgroundImage.width, height: backgroundImage.height, key: background.assetId ?? '' }
       : null;
 
+    // Repeated placements share one timeline and decoder. Advance and release
+    // each asset once, while painting every placement with its own geometry.
+    const mediaByAsset = new Map<string, FrameMedia>();
     for (const sceneItem of compileScene(project, viewport)) {
       const offsetX = (project.slideOrder.indexOf(sceneItem.slideId) - targetIndex) * width;
       const { layer } = sceneItem;
@@ -167,10 +171,14 @@ async function prepareSlide(project: ProjectDocumentV2, slideId: string, frameTi
         continue;
       }
       if (!layer.assetId) continue;
-      const asset = await getAsset(layer.assetId);
-      if (!asset) continue;
-      const media = await frameMedia(asset, frameTimes);
-      sources.push(media);
+      let media = mediaByAsset.get(layer.assetId);
+      if (!media) {
+        const asset = await getAsset(layer.assetId);
+        if (!asset) continue;
+        media = await frameMedia(asset, frameTimes);
+        mediaByAsset.set(layer.assetId, media);
+        sources.push(media);
+      }
       items.push({ layer, offsetX, media });
     }
 
@@ -346,6 +354,7 @@ async function renderSlideVideo(
     checkCancelled();
     const durationMicros = Math.round(duration * 1_000_000);
     const keyFrameInterval = fps * 2;
+    let lastProgressTime = -Infinity;
     // Every frame is rendered at its exact slide time, however long the device
     // takes, so slow phones export more slowly instead of dropping frames.
     for (let index = 0; index < total; index++) {
@@ -362,7 +371,15 @@ async function renderSlideVideo(
       } finally {
         frame.close();
       }
-      onProgress?.(index + 1, total);
+      // Updating the export UI for every frame competes with decoding and
+      // painting. Keep progress responsive without changing the frame timeline.
+      if (onProgress) {
+        const now = performance.now();
+        if (index + 1 === total || now - lastProgressTime >= PROGRESS_INTERVAL_MS) {
+          lastProgressTime = now;
+          onProgress(index + 1, total);
+        }
+      }
     }
     await encoder.flush();
     checkCancelled();

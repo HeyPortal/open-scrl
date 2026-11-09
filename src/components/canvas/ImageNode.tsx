@@ -8,6 +8,7 @@ import { imageResourceManager, type ImageLease } from '@/render/resources/ImageR
 import { maskPath } from '@/render/paint/masks';
 import { paintImageContent, paintLayerShadow, type PaintMedia } from '@/render/paint/layers';
 import { getMediaKind, setVideoElementPlaying } from '@/lib/media';
+import { useExport } from '@/editor/exportStore';
 import { SelectionOutline } from './SelectionOutline';
 import {
   createAnimatedGifCanvas,
@@ -65,6 +66,8 @@ export function ImageNode({ layer, asset, activeSlide, selected, onSelect, onCli
   const [detailEdge, setDetailEdge] = useState(NAVIGATION_IMAGE_EDGE);
   const [animated, setAnimated] = useState(false);
   const [missing, setMissing] = useState(false);
+  const exporting = useExport((state) => state.exporting);
+  const playing = selected && !exporting;
   const imageRef = useRef<Konva.Shape | null>(null);
   const idealEdge = chooseEditorImageTier(layer, renderScale);
   const requestedEdge = !activeSlide
@@ -119,14 +122,14 @@ export function ImageNode({ layer, asset, activeSlide, selected, onSelect, onCli
   useEffect(() => {
     if (!animated || !baseImg) return;
     if (baseImg instanceof HTMLVideoElement) {
-      void setVideoElementPlaying(baseImg, selected);
+      void setVideoElementPlaying(baseImg, playing);
     } else if (baseImg instanceof HTMLCanvasElement) {
-      setAnimatedGifCanvasPlaying(baseImg, selected, true);
+      setAnimatedGifCanvasPlaying(baseImg, playing, true);
     }
-    if (!selected || !imageRef.current) return;
+    if (!playing || !imageRef.current) return;
     const animation = new Konva.Animation(() => undefined, imageRef.current.getLayer()); animation.start();
     return () => { animation.stop(); };
-  }, [animated, baseImg, selected]);
+  }, [animated, baseImg, playing]);
 
   useEffect(() => {
     if (requestedEdge <= detailEdge) { setDetailEdge(requestedEdge); return; }
