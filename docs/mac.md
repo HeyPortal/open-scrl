@@ -38,9 +38,10 @@ open build/Build/Products/Release/Open-SCRL.app
   render to H.264 MP4 faster than real time. **Share Carousel** sends every slide with
   AirDrop, Messages, or Mail.
 - Dragging a filmstrip slide into Finder, Messages, or Mail creates a full-resolution PNG;
-  animated slides use their first frame. Snapping gives a trackpad haptic tap. Exports show
-  progress on the Dock icon, and long video exports can notify you when they finish in the
-  background. Notification permission is requested the first time you confirm a video
+  animated slides use their first frame. Moving and resizing snap to alignment guides and to
+  equal gaps between layers, with labelled markers on the equal gaps. Snapping gives a trackpad
+  haptic tap. Exports show progress on the Dock icon, and long video exports can notify you
+  when they finish in the background. Notification permission is requested the first time you confirm a video
   export or share.
 - Shortcuts are in the menu bar and in **Help ▸ Keyboard Shortcuts** (`⌘ /`). `⌥ ⌘ P` opens
   the phone preview and `⇧ ⌥ ⌘ P` opens it full screen.
