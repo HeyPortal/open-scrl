@@ -101,7 +101,7 @@ Turn **Haptics** on or off in the **Project** sheet; the preference stays on thi
 device across projects and reloads, and turning it off stops any active feedback.
 
 - A soft tick marks layer or slide selection, opening a tool or slide menu, and changing a sheet's size.
-- A crisp tick marks a new alignment guide while moving or resizing, a 45° rotation stop during a twist, or snapping the canvas back to fit. Holding the same snap point stays quiet.
+- A crisp tick marks a new alignment guide or equal gap while moving or resizing, a 45° rotation stop during a twist, or snapping the canvas back to fit. Holding the same snap point stays quiet.
 - Swiping past the last slide gives one readiness pulse when the add threshold is reached, then a firmer confirmation when the slide is added. Short or canceled pulls do not confirm an addition.
 - Adding, duplicating, rearranging, grouping, applying grids, and replacing photos get a confirmation pulse after the change. Deleting gets a stronger pulse; Undo and Redo have their own softer pulse.
 - Export gives a start pulse, two taps when the download is ready, or three taps if it fails. Canceling an export stays quiet.

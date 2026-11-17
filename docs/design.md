@@ -21,6 +21,14 @@ losing window focus discards an unfinished resize. Wheel zoom uses the canvas
 origin at the new zoom to preserve the point under the cursor within the
 available scroll bounds.
 
+Moving or resizing a layer also snaps to equal spacing: when a gap between the
+layer and its neighbour comes within the snap threshold of another
+layer-to-layer gap on the same slide, or the layer would sit centred between
+two neighbours, it snaps there. Pink measure markers label every equal gap
+while the snap holds and fade out on release. Only the part of a layer on the
+slide counts, so a layer over a seam is measured by its on-slide portion. The
+threshold is the same as for alignment, and the nearer of the two snaps wins.
+
 Typography's **Manage fonts** dialog imports
 local font files and downloads Google Fonts families into a shared local
 library. The Google Fonts tab is disabled offline; saved fonts remain usable.
