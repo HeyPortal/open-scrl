@@ -133,7 +133,7 @@ There's no Xcode test target. These scripts cover the native code instead:
 | `zsh macos/Scripts/benchmark-gpu-rendering.sh` | Optimized composition benchmark |
 | `zsh macos/Scripts/test-canvas-rendering.sh` | Canvas rendering checks against a Debug build (`macos/Tests/CanvasRenderingChecks.swift`) |
 | `zsh macos/Scripts/benchmark-canvas-interaction.sh` | Run after a Debug build. Measures native drag and resize work in the full SwiftUI editor and checks that geometry changes and GPU frames keep completing during each gesture. Loop timings include a fixed 8 ms event-processing wait, so they aren't display FPS. |
-| `bash macos/Scripts/check-features.sh` | Native selection, PNG drag delivery, Dock lifecycle, and offscreen preview renders |
+| `bash macos/Scripts/check-features.sh` | Native selection, equal-spacing snapping, PNG drag delivery, Dock lifecycle, and offscreen preview renders |
 | `macos/Scripts/make-dmg.sh` | Packages a Release build as `macos/build/dmg/Open-SCRL-<version>.dmg` with a branded install window |
 
 ## Under the hood
