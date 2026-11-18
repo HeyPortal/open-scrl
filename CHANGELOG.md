@@ -4,6 +4,17 @@ Every release of Open-SCRL for Mac, newest first. Each version is published on t
 [Releases page](https://github.com/HeyPortal/open-scrl/releases) with its disk image,
 checksums, and a copy of this changelog.
 
+## 0.5.7 — 2026-11-18 (build 9)
+
+Space layers evenly as you drag, and find photos faster in large libraries.
+
+- Moving or resizing a layer snaps it so its gap to a neighbour matches another gap on the slide, or centres it between two neighbours. Pink measurements mark every equal gap while the snap holds and fade when you let go.
+- Equal spacing uses the same snap distance as alignment guides, and the nearer snap wins. Hold ⌘ or turn off snapping in Settings to place layers freely.
+- Sort the Media sidebar by filename (A→Z or Z→A, with IMG_2 before IMG_10) or group it by file type. The default keeps import order.
+- Filter Media by shape (Square, Vertical, Horizontal). Filters combine, and Clear Filters keeps your sort. The Blend Group media menu follows the chosen sort.
+
+[Changes since 0.5.6](https://github.com/HeyPortal/open-scrl/compare/macos-v0.5.6...macos-v0.5.7)
+
 ## 0.5.6 — 2026-10-08 (build 8)
 
 Fine-tune photo grid spacing before and after adding your photos.
