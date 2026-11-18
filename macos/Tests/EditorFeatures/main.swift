@@ -11,6 +11,8 @@ import Darwin
     var checks = 0
     checks += runPhotoChecks()
     checks += runMediaLibraryChecks()
+    checks += runSnappingChecks()
+    checks += runGapMarkerCanvasChecks()
     func check(_ c: @autoclosure () -> Bool, _ name: String) { guard c() else { fatalError("FAIL: \(name)") }; checks += 1 }
     func shape(_ id: String, _ x: Double, _ y: Double, _ w: Double, _ h: Double, group: String? = nil, fill: String, ellipse: Bool = false) -> Layer {
         Layer(id: id, name: id.capitalized, x: x, y: y, width: w, height: h, groupID: group, content: .shape(ShapeProperties(shape: ellipse ? .ellipse : .rect, fill: fill, cornerRadius: ellipse ? 0 : 36)))

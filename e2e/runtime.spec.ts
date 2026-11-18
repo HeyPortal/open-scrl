@@ -96,9 +96,10 @@ test('native canvas gestures commit once and keep refs attached through undo and
   await setup(page);
   const initial = await state(page);
 
-  await drag(page, '#runtime-rect', 27, 17);
+  // Lands clear of every snap; a 27px move would match the 50px gap between the group shapes.
+  await drag(page, '#runtime-rect', 37, 17);
   const moved = await state(page);
-  expect(moved.doc.layers['runtime-rect'].x).toBeCloseTo(87, 1);
+  expect(moved.doc.layers['runtime-rect'].x).toBeCloseTo(97, 1);
   expect(moved.doc.layers['runtime-rect'].y).toBeCloseTo(72, 1);
   expect(moved.history).toBe(initial.history + 1);
   await undo(page, initial.doc.layers);

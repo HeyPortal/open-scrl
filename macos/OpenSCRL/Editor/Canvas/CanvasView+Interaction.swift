@@ -28,9 +28,10 @@ extension CanvasView {
         return selectionHandlePositions(box.rect).first { hypot($0.1.x - p.x, $0.1.y - p.y) <= 7 }?.0
     }
 
-    /// Plays the trackpad's alignment tap when a drag snaps to a guide it wasn't on, like Keynote.
+    /// Plays the trackpad's alignment tap when a drag snaps to a guide or an equal gap it wasn't on, like Keynote.
     func noteSnap(_ guides: [SnapGuide]) {
         let signature = Set(guides.map { "\($0.orientation == .vertical ? "v" : "h")\(Int(($0.position * 2).rounded()))" })
+            .union(gapMarkers.map { "gap\($0.axis == .horizontal ? "x" : "y")\(Int(($0.size * 2).rounded()))" })
         if !signature.isEmpty && !signature.isSubset(of: lastSnapSignature) {
             NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
         }
@@ -227,16 +228,19 @@ extension CanvasView {
             if event.modifierFlags.contains(.shift) {
                 if abs(dx) > abs(dy) { dy = 0 } else { dx = 0 }
             }
-            guides = []
+            var snapGuides: [SnapGuide] = [], snapGaps: [GapMarker] = []
             if snapping {
                 let moved = union.offsetBy(dx: dx, dy: dy)
                 let result = Snapping.snap(moving: moved, slide: controller.project.format.size, others: others, threshold: 6 / zoom)
                 dx += result.origin.x - moved.minX
                 dy += result.origin.y - moved.minY
-                guides = result.guides
+                snapGuides = result.guides
+                snapGaps = result.gaps
             }
-            noteSnap(guides)
             guideSlideOffset = Double(slide) * controller.project.format.width
+            guides = snapGuides
+            gapMarkers = snapGaps
+            noteSnap(guides)
             updateSeams(for: union.offsetBy(dx: dx, dy: dy), rotation: 0, slide: slide)
             let byID = Dictionary(uniqueKeysWithValues: bases.map { ($0.id, $0) })
             controller.perform(ids.count == 1 ? "Move Layer" : "Move Layers") { p in
@@ -344,6 +348,7 @@ extension CanvasView {
         }
         drag = .none
         guides = []
+        gapMarkers = []
         seams = []
         lastSnapSignature = []
         needsDisplay = true
@@ -377,27 +382,30 @@ extension CanvasView {
         }
         if keepRatio { applyRatio(widthLeads: false) }
 
-        var newGuides: [SnapGuide] = []
+        var newGuides: [SnapGuide] = [], newGaps: [GapMarker] = []
         if snapping && !fromCenter {
             let threshold = 6 / zoom
             if hx != 0 {
-                let (snapped, guide) = Snapping.snapEdge(hx == 1 ? right : left, orientation: .vertical, span: top...max(top, bottom), slide: project.format.size, others: others, threshold: threshold)
-                if let guide {
+                let snap = Snapping.snapEdge(hx == 1 ? right : left, fixed: hx == 1 ? left : right, orientation: .vertical, span: top...max(top, bottom), slide: project.format.size, others: others, threshold: threshold)
+                if let snapped = snap.value {
                     if hx == 1 { right = snapped } else { left = snapped }
-                    newGuides.append(guide)
                     if keepRatio { applyRatio(widthLeads: true) }
                 }
+                if let guide = snap.guide { newGuides.append(guide) }
+                newGaps += snap.gaps
             }
             if hy != 0 && !keepRatio {
-                let (snapped, guide) = Snapping.snapEdge(hy == 1 ? bottom : top, orientation: .horizontal, span: left...max(left, right), slide: project.format.size, others: others, threshold: threshold)
-                if let guide {
+                let snap = Snapping.snapEdge(hy == 1 ? bottom : top, fixed: hy == 1 ? top : bottom, orientation: .horizontal, span: left...max(left, right), slide: project.format.size, others: others, threshold: threshold)
+                if let snapped = snap.value {
                     if hy == 1 { bottom = snapped } else { top = snapped }
-                    newGuides.append(guide)
                 }
+                if let guide = snap.guide { newGuides.append(guide) }
+                newGaps += snap.gaps
             }
         }
-        guides = newGuides
         guideSlideOffset = slideOffset
+        guides = newGuides
+        gapMarkers = newGaps
         let minSide = 8.0
         if right - left < minSide { if hx == -1 { left = right - minSide } else { right = left + minSide } }
         if bottom - top < minSide { if hy == -1 { top = bottom - minSide } else { bottom = top + minSide } }
@@ -445,30 +453,33 @@ extension CanvasView {
         }
         if keepRatio { applyRatio(widthLeads: false) }
 
-        var newGuides: [SnapGuide] = []
+        var newGuides: [SnapGuide] = [], newGaps: [GapMarker] = []
         if snapping && base.rotation.truncatingRemainder(dividingBy: 360) == 0 && !fromCenter {
             let threshold = 6 / zoom
             let size = project.format.size
             if hx != 0 {
-                let edge = base.x + (hx == 1 ? right : left)
-                let (snapped, guide) = Snapping.snapEdge(edge, orientation: .vertical, span: (base.y + top)...(base.y + bottom), slide: size, others: others, threshold: threshold)
-                if let guide {
+                let edge = base.x + (hx == 1 ? right : left), fixed = base.x + (hx == 1 ? left : right)
+                let snap = Snapping.snapEdge(edge, fixed: fixed, orientation: .vertical, span: (base.y + min(top, bottom))...(base.y + max(top, bottom)), slide: size, others: others, threshold: threshold)
+                if let snapped = snap.value {
                     if hx == 1 { right = snapped - base.x } else { left = snapped - base.x }
-                    newGuides.append(guide)
                     if keepRatio { applyRatio(widthLeads: true) }
                 }
+                if let guide = snap.guide { newGuides.append(guide) }
+                newGaps += snap.gaps
             }
             if hy != 0 && !keepRatio && !isText {
-                let edge = base.y + (hy == 1 ? bottom : top)
-                let (snapped, guide) = Snapping.snapEdge(edge, orientation: .horizontal, span: (base.x + left)...(base.x + right), slide: size, others: others, threshold: threshold)
-                if let guide {
+                let edge = base.y + (hy == 1 ? bottom : top), fixed = base.y + (hy == 1 ? top : bottom)
+                let snap = Snapping.snapEdge(edge, fixed: fixed, orientation: .horizontal, span: (base.x + min(left, right))...(base.x + max(left, right)), slide: size, others: others, threshold: threshold)
+                if let snapped = snap.value {
                     if hy == 1 { bottom = snapped - base.y } else { top = snapped - base.y }
-                    newGuides.append(guide)
                 }
+                if let guide = snap.guide { newGuides.append(guide) }
+                newGaps += snap.gaps
             }
         }
-        guides = newGuides
         guideSlideOffset = slideOffset
+        guides = newGuides
+        gapMarkers = newGaps
 
         // Minimum size, keeping the anchored side in place.
         let minSide = 8.0

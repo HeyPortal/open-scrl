@@ -48,6 +48,14 @@ final class CanvasView: NSView {
     var drag: Drag = .none
     var guides: [SnapGuide] = []
     var guideSlideOffset: Double = 0
+    /// Equal gaps for the current snap. Clearing them fades the last set out briefly.
+    var gapMarkers: [GapMarker] = [] {
+        didSet {
+            if !gapMarkers.isEmpty { stopGapFade() } else if !oldValue.isEmpty { beginGapFade(oldValue) }
+        }
+    }
+    var fadingGaps: (markers: [GapMarker], offset: Double, start: CFTimeInterval)?
+    var gapFadeLink: CADisplayLink?
     var seams: [CGRect] = []
     var hoverLayerID: String?
     var hoverSlideIndex: Int?
@@ -405,6 +413,7 @@ final class CanvasView: NSView {
         }
         drawSelection(cg, project: project, controller: controller, accent: accent)
         drawGuides(cg)
+        drawGapMarkers(cg)
         drawMarquee(cg, accent: accent)
     }
 
@@ -791,6 +800,80 @@ final class CanvasView: NSView {
         cg.restoreGState()
     }
 
+    // MARK: Equal-spacing markers
+
+    private static let gapFadeDuration: CFTimeInterval = 0.16
+
+    private func drawGapMarkers(_ cg: CGContext) {
+        if !gapMarkers.isEmpty {
+            drawGapMarkers(cg, gapMarkers, offset: guideSlideOffset, alpha: 1)
+        } else if let fade = fadingGaps {
+            let progress = min(1, (CACurrentMediaTime() - fade.start) / Self.gapFadeDuration)
+            drawGapMarkers(cg, fade.markers, offset: fade.offset, alpha: 1 - progress * progress)
+        }
+    }
+
+    /// A measure across each equal gap, with end ticks and a pill showing its size in points.
+    private func drawGapMarkers(_ cg: CGContext, _ markers: [GapMarker], offset: Double, alpha: CGFloat) {
+        guard alpha > 0 else { return }
+        let color = Self.guideColor.withAlphaComponent(alpha)
+        let font = NSFont.systemFont(ofSize: 10, weight: .semibold)
+        let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.white.withAlphaComponent(alpha)]
+        cg.saveGState()
+        cg.setStrokeColor(color.cgColor)
+        cg.setLineWidth(1)
+        let tick = 4.0
+        for marker in markers {
+            let horizontal = marker.axis == .horizontal
+            let a = viewPoint(horizontal ? CGPoint(x: offset + marker.start, y: marker.position) : CGPoint(x: offset + marker.position, y: marker.start))
+            let b = viewPoint(horizontal ? CGPoint(x: offset + marker.end, y: marker.position) : CGPoint(x: offset + marker.position, y: marker.end))
+            if horizontal {
+                let y = a.y.rounded() + 0.5
+                cg.move(to: CGPoint(x: a.x, y: y)); cg.addLine(to: CGPoint(x: b.x, y: y))
+                for x in [a.x, b.x] { cg.move(to: CGPoint(x: x, y: y - tick)); cg.addLine(to: CGPoint(x: x, y: y + tick)) }
+            } else {
+                let x = a.x.rounded() + 0.5
+                cg.move(to: CGPoint(x: x, y: a.y)); cg.addLine(to: CGPoint(x: x, y: b.y))
+                for y in [a.y, b.y] { cg.move(to: CGPoint(x: x - tick, y: y)); cg.addLine(to: CGPoint(x: x + tick, y: y)) }
+            }
+        }
+        cg.strokePath()
+        for marker in markers {
+            let horizontal = marker.axis == .horizontal
+            let mid = (marker.start + marker.end) / 2
+            let center = viewPoint(horizontal ? CGPoint(x: offset + mid, y: marker.position) : CGPoint(x: offset + marker.position, y: mid))
+            let label = "\(Int(marker.size.rounded()))" as NSString
+            let size = label.size(withAttributes: attributes)
+            let pill = CGRect(x: center.x - size.width / 2 - 5, y: center.y - 8, width: size.width + 10, height: 16)
+            cg.setFillColor(color.cgColor)
+            cg.addPath(CGPath(roundedRect: pill, cornerWidth: 8, cornerHeight: 8, transform: nil))
+            cg.fillPath()
+            label.draw(at: CGPoint(x: pill.minX + 5, y: pill.midY - size.height / 2), withAttributes: attributes)
+        }
+        cg.restoreGState()
+    }
+
+    private func beginGapFade(_ markers: [GapMarker]) {
+        stopGapFade()
+        needsDisplay = true
+        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
+        fadingGaps = (markers, guideSlideOffset, CACurrentMediaTime())
+        let link = displayLink(target: self, selector: #selector(stepGapFade))
+        link.add(to: .main, forMode: .common)
+        gapFadeLink = link
+    }
+
+    private func stopGapFade() {
+        gapFadeLink?.invalidate()
+        gapFadeLink = nil
+        if fadingGaps != nil { fadingGaps = nil; needsDisplay = true }
+    }
+
+    @objc private func stepGapFade() {
+        guard let fade = fadingGaps else { stopGapFade(); return }
+        if CACurrentMediaTime() - fade.start >= Self.gapFadeDuration { stopGapFade() } else { needsDisplay = true }
+    }
+
     // MARK: Playback of animated media
 
     func syncPlayback() {
@@ -850,6 +933,7 @@ final class CanvasView: NSView {
         }
         displayLink?.invalidate()
         displayLink = nil
+        stopGapFade()
         playbacks = [:]
         metalSurface?.clear()
         chromeOverlay.isHidden = true

@@ -20,7 +20,7 @@ import { intersects } from '@/core/document/coordinates';
 import { compileScene } from '@/core/scene/compileScene';
 import { findCrossedSlideSeams } from '@/core/scene/slideSeams';
 import { getCanvasScrollIntent } from '@/core/scene/scrollIntent';
-import { snapBox, type SnapGuide } from '@/lib/snap';
+import { snapBox, type GapMarker, type SnapGuide } from '@/lib/snap';
 import { createSnapFeedback } from '@/lib/mobileHaptics';
 import { ImageNode } from './ImageNode';
 import { TextNode, previewTextNode } from './TextNode';
@@ -31,6 +31,7 @@ import { TextEditor } from './TextEditor';
 import { MobileTextEditor } from './MobileTextEditor';
 import { SlideHeaders } from './SlideHeaders';
 import { SlideBackground } from './SlideBackground';
+import { GapMarkers } from './GapMarkers';
 import { canvasTheme } from './canvasTheme';
 import { contentPointAt, scrollForAnchor, slideIndexAtCentre, zoomLimits, type ViewGeometry } from './touchMath';
 import { useTouchGestures, type GestureHost } from './useTouchGestures';
@@ -66,6 +67,11 @@ type PointerEvt = MouseEvent | TouchEvent;
 const isAdditive = (evt: PointerEvt) => evt.shiftKey || (isMac ? evt.metaKey : evt.ctrlKey);
 const normalizeAngle = (degrees: number) => ((((degrees + 180) % 360) + 360) % 360) - 180;
 const centerOf = (l: DocLayer) => ({ x: l.x + l.width / 2, y: l.y + l.height / 2 });
+/** Mobile haptic keys: one per alignment line and one per matched gap size, so entering either ticks once. */
+const snapKeys = (r: { guides: SnapGuide[]; gaps: GapMarker[] }, offset: number) => [
+  ...r.guides.map((g) => `${g.orientation}:${g.position + (g.orientation === 'v' ? offset : 0)}`),
+  ...new Set(r.gaps.map((g) => `gap:${g.axis}:${Math.round((g.end - g.start) * 2)}`)),
+];
 
 interface DragSession {
   anchorId: string;
@@ -157,6 +163,9 @@ export function Canvas({ width, height, variant = 'desktop' }: { width: number; 
   const [nextSlidePull, setNextSlidePull] = useState({ distance: 0, ready: false });
   const canvasOffset = { x: viewportOffset.x - nextSlidePull.distance, y: viewportOffset.y };
   const [guides, setGuides] = useState<SnapGuide[]>([]);
+  const [gaps, setGaps] = useState<GapMarker[]>([]);
+  // Most moves have no equal gap; skip the render when it stays empty.
+  const showGaps = useCallback((next: GapMarker[]) => setGaps((prev) => prev.length || next.length ? next : prev), []);
   const [guideOffsetX, setGuideOffsetX] = useState(0);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [resizeSeams, setResizeSeams] = useState<{ x: number; y: number; height: number }[]>([]);
@@ -194,7 +203,7 @@ export function Canvas({ width, height, variant = 'desktop' }: { width: number; 
       for (const release of activity.current.values()) release();
       activity.current.clear();
     };
-    const blur = () => { cancel(); cancelling.current = false; setGuides([]); setResizeSeams([]); setMarquee(null); };
+    const blur = () => { cancel(); cancelling.current = false; setGuides([]); setGaps([]); setResizeSeams([]); setMarquee(null); };
     cancelGestures.current = blur;
     window.addEventListener('blur', blur);
     return () => { window.removeEventListener('blur', blur); cancelGestures.current = null; cancel(); };
@@ -642,15 +651,15 @@ export function Canvas({ width, height, variant = 'desktop' }: { width: number; 
       const start = st.starts.get(st.anchorId)!;
       const moving = { ...st.union, x: st.union.x + e.target.x() - start.x, y: st.union.y + e.target.y() - start.y };
       const result = snapBox(moving, st.others, fmt, SNAP_THRESHOLD_PX / zoom);
-      if (mobile) snapFeedback.current.update(result.guides.map((guide) => `${guide.orientation}:${guide.position + (guide.orientation === 'v' ? st.offset : 0)}`));
+      if (mobile) snapFeedback.current.update(snapKeys(result, st.offset));
       st.dx = result.x - st.union.x; st.dy = result.y - st.union.y;
       for (const id of st.ids) { const from = st.starts.get(id)!; layerNodes.current.get(id)?.position({ x: from.x + st.dx, y: from.y + st.dy }); }
       if (st.proxyStart) proxyRef.current?.position({ x: st.proxyStart.x + st.dx, y: st.proxyStart.y + st.dy });
-      setGuideOffsetX(st.offset); setGuides(result.guides);
+      setGuideOffsetX(st.offset); setGuides(result.guides); showGaps(result.gaps);
     };
     const onDragEnd = () => {
       const st = drag.current;
-      if (st?.anchorId === layer.id) { drag.current = null; setGuides([]); }
+      if (st?.anchorId === layer.id) { drag.current = null; setGuides([]); setGaps([]); }
       try {
         if (st?.anchorId === layer.id && st.cancelled) {
           for (const id of st.ids) { const from = st.starts.get(id)!; const node = layerNodes.current.get(id); node?.position(from); node?.getLayer()?.batchDraw(); }
@@ -668,7 +677,7 @@ export function Canvas({ width, height, variant = 'desktop' }: { width: number; 
         if (st.anchor === 'rotater') {
           st.preview = { ...st.base, rotation: normalizeAngle(e.target.rotation()) };
           previewTextNode(e.currentTarget as Konva.Group, st.preview);
-          setGuides([]);
+          setGuides([]); setGaps([]);
           return;
         }
         const pointer = stageRef.current?.getPointerPosition(); if (!pointer) return;
@@ -678,15 +687,15 @@ export function Canvas({ width, height, variant = 'desktop' }: { width: number; 
         st.preview = result.layer;
         previewTextNode(e.currentTarget as Konva.Group, result.layer);
         transformerRef.current?.forceUpdate();
-        if (mobile) snapFeedback.current.update(result.guides.map((guide) => `${guide.orientation}:${guide.position + (guide.orientation === 'v' ? offset : 0)}`));
-        setGuideOffsetX(offset); setGuides(result.guides); setResizeSeams([]);
+        if (mobile) snapFeedback.current.update(snapKeys(result, offset));
+        setGuideOffsetX(offset); setGuides(result.guides); showGaps(result.gaps); setResizeSeams([]);
         return;
       }
-      const moving=localMoving(e.target,layer,true);const result=snap(slide,layer,moving);if(mobile)snapFeedback.current.update([...result.guides.map((guide)=>`${guide.orientation}:${guide.position+(guide.orientation==='v'?offset:0)}`),...(e.target.rotation()!==layer.rotation&&Math.abs(e.target.rotation()%45)<.001?[`rotation:${e.target.rotation()}`]:[])]);e.target.position({x:result.x+moving.width/2,y:result.y+moving.height/2});setGuideOffsetX(offset);setGuides(result.guides);if(layer.kind==='image'){const seams=findCrossedSlideSeams({x:offset+result.x,y:result.y,width:moving.width,height:moving.height},fmt.width,doc.slideOrder.length);setResizeSeams(seams.map((x)=>({x,y:result.y,height:moving.height})));}else setResizeSeams([]);
+      const moving=localMoving(e.target,layer,true);const result=snap(slide,layer,moving);if(mobile)snapFeedback.current.update([...snapKeys(result,offset),...(e.target.rotation()!==layer.rotation&&Math.abs(e.target.rotation()%45)<.001?[`rotation:${e.target.rotation()}`]:[])]);e.target.position({x:result.x+moving.width/2,y:result.y+moving.height/2});setGuideOffsetX(offset);setGuides(result.guides);showGaps(result.gaps);if(layer.kind==='image'){const seams=findCrossedSlideSeams({x:offset+result.x,y:result.y,width:moving.width,height:moving.height},fmt.width,doc.slideOrder.length);setResizeSeams(seams.map((x)=>({x,y:result.y,height:moving.height})));}else setResizeSeams([]);
     };
     const onTransformEnd = (e: Konva.KonvaEventObject<Event>) => {
       try {
-        setResizeSeams([]); setGuides([]);
+        setResizeSeams([]); setGuides([]); setGaps([]);
         if (layer.locked || cancelling.current) return;
         const st = textTransform.current;
         if (layer.kind === 'text' && st?.base.id === layer.id) {
@@ -739,6 +748,7 @@ export function Canvas({ width, height, variant = 'desktop' }: { width: number; 
           {dropHover&&dropIndex>=0&&(dropLayer
             ?<Rect x={dropIndex*fmt.width+dropLayer.x+dropLayer.width/2} y={dropLayer.y+dropLayer.height/2} offsetX={dropLayer.width/2} offsetY={dropLayer.height/2} width={dropLayer.width} height={dropLayer.height} rotation={dropLayer.rotation} stroke={canvasTheme.selection} strokeWidth={4/zoom} fill={canvasTheme.dropFill}/>
             :<Rect x={dropIndex*fmt.width} width={fmt.width} height={fmt.height} stroke={canvasTheme.selection} strokeWidth={3/zoom} dash={[12/zoom,8/zoom]} fill={canvasTheme.slideDropFill}/>)}
+          <GapMarkers markers={gaps} offsetX={guideOffsetX} zoom={zoom}/>
           {guides.map((g,i)=>g.orientation==='v'?<Line key={i} points={[guideOffsetX+g.position,g.start,guideOffsetX+g.position,g.end]} stroke={canvasTheme.guide} strokeWidth={1/zoom}/>:<Line key={i} points={[guideOffsetX+g.start,g.position,guideOffsetX+g.end,g.position]} stroke={canvasTheme.guide} strokeWidth={1/zoom}/>)}
         </Group></KLayer>
       </Stage>
